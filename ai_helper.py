@@ -1,11 +1,13 @@
 import os
 import logging
+from typing import Optional
 from google import genai
 from google.genai import types
 
 logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL_NAME = "gemini-2.5-flash"
 
 client = None
 if GEMINI_API_KEY:
@@ -15,31 +17,26 @@ if GEMINI_API_KEY:
         logger.error(f"Gemini Client yaratishda xatolik: {e}")
 
 SYSTEM_INSTRUCTION = """
-Siz "Mars" kompaniyasining Smart POS kassa apparatlari xizmati bo'yicha yordamchi aqlli botsiz.
-Foydalanuvchilar guruhda yoki shaxsiy chatda:
-- apparati ishlamay qolganini ("ishlamayapti", "blok bo'lib qoldi", "chek chiqmayapti", "ochilmayapti");
-- qarzi bor-yo'qligini ("qarzim bormi", "balansim qancha", "tekshirib bering");
-- to'lov haqida yoki umumiy shikoyat qilishadi.
-
-Sizning vazifangiz:
-1. Ularga juda xushmuomala, iliq va tushunarli o'zbek tilida qisqa javob qaytarish.
-2. Apparatning ishlamay qolishining eng ko'p uchraydigan sababi oylik abonent to'lovidan qarzdorlik ekanligini eslatish.
-3. Qarzdorlikni darhol tekshirib berish uchun ulardan korxona STIR (INN) raqamini (9 xonali) yoki YaTT bo'lsa JSHSHIR raqamini (14 xonali) yuborishlarini so'rash.
-4. Javobingiz juda cho'zilib ketmasin (2-4 gap kifoya), professional va samimiy bo'lsin.
+Siz "Mars" kompaniyasining Smart POS kassa apparatlari bo'yicha yordamchi aqlli botsiz.
+Foydalanuvchi turli savollar bersa:
+1. Agar apparat nosozligi, ishlamay qolishi yoki qarz so'ralsa: xushmuomala tushuntirib, qarzdorlikni tekshirish uchun korxona INN (9 xonali) yoki JSHSHIR (14 xonali) raqamini so'rang.
+2. Agar umumiy boshqa savollar bo'lsa (masalan "salom", "qayerdasizlar", "ish vaqtingiz qachon"): o'zbek tilida muloyim va aniq javob bering, keraksiz joyda INN SO'RAMANG.
 """
 
-def generate_ai_reply(user_message: str) -> str:
-    """Foydalanuvchi murojaatiga Gemini orqali professional va tabiiy javob tayyorlash"""
+def generate_ai_reply(user_message: str, image_bytes: Optional[bytes] = None, mime_type: str = "image/jpeg") -> str:
+    """Foydalanuvchi savoliga mazmuniga qarab tabiiy javob qaytarish"""
     if not client:
-        return (
-            "Assalomu alaykum! Apparatingiz holatini va oylik abonent to'lovi bo'yicha qarzdorlikni tekshirish uchun "
-            "iltimos, korxonangizning 9 xonali <b>INN (STIR)</b> yoki 14 xonali <b>JSHSHIR</b> raqamini yozib yuboring."
-        )
+        return "Assalomu alaykum! Sizga qanday yordam bera olaman?"
 
     try:
+        contents = []
+        if image_bytes:
+            contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+        contents.append(user_message.strip() if user_message else "Yordam bering")
+
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=user_message,
+            model=MODEL_NAME,
+            contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
                 temperature=0.3,
@@ -48,7 +45,4 @@ def generate_ai_reply(user_message: str) -> str:
         return response.text.strip()
     except Exception as e:
         logger.error(f"Gemini API xatolik: {e}")
-        return (
-            "Assalomu alaykum! Apparatingiz holatini va qarzdorlikni tekshirish uchun, "
-            "iltimos, <b>INN (STIR)</b> raqamingizni yuboring."
-        )
+        return "Assalomu alaykum! Savolingiz bo'yicha yordam berishga tayyorman."

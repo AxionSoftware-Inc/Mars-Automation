@@ -1,5 +1,6 @@
 import os
 import re
+import io
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 
 from excel_manager import excel_manager, DATA_DIR
 from ai_helper import generate_ai_reply
+from catalog import find_video_post, normalize
 
 load_dotenv()
 
@@ -15,10 +17,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+DESTINATION_CHANNEL_ID = -1003784534841  # marsfayllar
+SOURCE_CHANNEL_ID = -1001641871516       # @POS_Terminal_UzSmart_Bank
+
 dp = Dispatcher()
 
 def format_debt_response(results: list) -> str:
-    """Tekshirish natijasini chiroyli va tushunarli qilib formatlash"""
+    """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
     if not results:
         return (
             "❌ <b>Bazada ushbu raqam bo'yicha ma'lumot topilmadi.</b>\n\n"
@@ -30,41 +35,27 @@ def format_debt_response(results: list) -> str:
     inn = first.get("stir", "-")
     jshshir = first.get("jshshir", "-")
     tuman = first.get("tuman", "-")
+    device_count = len(results)
     
     text = f"🏢 <b>Korxona:</b> {org_name}\n"
     if inn != "-":
         text += f"🆔 <b>СТИР (INN):</b> <code>{inn}</code>\n"
     if jshshir != "-":
-        text += f"🆔 <b>ЖШШИР:</b> <code>{jshshir}</code>\n"
+        text += f"🆔 <b>ЖШSHIR:</b> <code>{jshshir}</code>\n"
     if tuman != "-":
         text += f"📍 <b>Hudud / Tuman:</b> {tuman}\n"
+    
+    text += f"📟 <b>Biriktirilgan apparatlar soni:</b> {device_count} ta\n"
     text += "────────────────────\n"
 
-    total_debt = 0.0
+    total_debt = sum(item.get("debt", 0.0) for item in results)
 
-    for idx, item in enumerate(results, start=1):
-        device = item.get("terminal", "-")
-        debt = item.get("debt", 0.0)
-        total_debt += debt
-
-        if len(results) > 1:
-            text += f"📟 <b>#{idx} Apparat (Онлайн-НКМ):</b> <code>{device}</code>\n"
-            if debt > 0:
-                text += f"💰 <b>Qarzdorlik:</b> ❗️ <b>{debt:,.0f} so'm</b>\n\n"
-            elif debt < 0:
-                text += f"💰 <b>Haqdorlik (Ortiqcha to'lov):</b> <b>{abs(debt):,.0f} so'm</b>\n\n"
-            else:
-                text += f"💰 <b>Qarz:</b> 0 so'm (To'langan)\n\n"
-        else:
-            if device and device != "-":
-                text += f"📟 <b>Apparat (Онлайн-НКМ):</b> <code>{device}</code>\n"
-
-    text += "────────────────────\n"
     if total_debt > 0:
         text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
-        text += "⚠️ <i>Eslatma: Apparat ishlamay qolganining sababi abonent to'lovidagi qarzdorlik bo'lishi mumkin. Iltimos, hisobingizni to'ldiring!</i>"
+        text += "⚠️ <i>Apparat ishlamay qolganining sababi oylik abonent to'lovidagi qarzdorlik!</i>\n"
+        text += "👇 <i>Quyida to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
     elif total_debt < 0:
-        text += f"🟢 <b>Oldindan to'lov mavjud: {abs(total_debt):,.0f} so'm</b>\n\n"
+        text += f"🟢 <b>Oldindan ortiqcha to'lov mavjud: {abs(total_debt):,.0f} so'm</b>\n\n"
         text += "✅ <i>Abonent to'lovidan qarzdorlik yo'q. Agar apparat baribir ishlamayotgan bo'lsa, internet aloqasi yoki apparat sozlamalarini tekshiring.</i>"
     else:
         text += "✅ <b>Qarzdorlik mavjud emas (0 so'm).</b>\n\n"
@@ -76,13 +67,13 @@ def format_debt_response(results: list) -> str:
 async def cmd_start(message: types.Message):
     await message.answer(
         "👋 <b>Assalomu alaykum!</b>\n\n"
-        "Smart POS kassa apparatlari bo'yicha abonent qarzdorligini tekshirish uchun:\n\n"
-        "👉 <b>INN</b> (9 xonali) yoki <b>JSHSHIR</b> (14 xonali) raqamingizni yuboring.\n"
-        "Masalan: <code>123456789</code>",
+        "Smart POS kassa apparatlari yordamchi botiga xush kelibsiz!\n\n"
+        "🔹 <b>Qarzdorlikni tekshirish uchun:</b> INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingizni yuboring.\n"
+        "🔹 <b>To'lov qilish yoki apparat sozlamalari bo'yicha:</b> savolingizni yozsangiz tegishli video-qo'llanma yuboriladi.",
         parse_mode="HTML"
     )
 
-# 1. KANAL VA GURUHLARDAN YANGI EXCEL FAYLNI QABUL QILIB BAZANI YANGILASH
+# 1. KANAL VA GURUHLARDAN YANGI EXCEL FAYLNI QABUL QILISH
 @dp.channel_post(F.document)
 @dp.message(F.document)
 async def handle_document(message: types.Message, bot: Bot):
@@ -109,62 +100,168 @@ async def handle_document(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Faylni yuklashda xatolik: {e}")
 
-# 2. BUYRUQ ORQALI TEKSHIRISH (/tekshir 123456789)
+# 2. @POS_Terminal_UzSmart_Bank KANALIDAN YANGI POSTLARNI BIZNING KANALGA AVTOMATIK UZATISH
+@dp.channel_post()
+async def handle_source_channel_post(message: types.Message, bot: Bot):
+    if message.chat.id == SOURCE_CHANNEL_ID:
+        try:
+            logger.info(f"@POS_Terminal_UzSmart_Bank dan yangi post keldi (ID: {message.message_id}), uzatilmoqda...")
+            await bot.forward_message(
+                chat_id=DESTINATION_CHANNEL_ID,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=message.message_id
+            )
+        except Exception as e:
+            logger.error(f"Postni kanalga uzatishda xatolik: {e}")
+
+# 3. RASM BILAN KELGAN XABARLAR
+@dp.message(F.photo)
+async def handle_photo(message: types.Message, bot: Bot):
+    caption = message.caption or ""
+    
+    found_nums = re.findall(r"\b(\d{14}|\d{9})\b", caption)
+    if found_nums:
+        results = excel_manager.search(found_nums[0])
+        resp = format_debt_response(results)
+        await message.reply(resp, parse_mode="HTML")
+        total_debt = sum(item.get("debt", 0.0) for item in results)
+        if total_debt > 0:
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=148
+                )
+            except Exception as e:
+                logger.error(f"Qo'llanma yuborishda xatolik: {e}")
+        return
+
+    # Video qo'llanma so'ralgan bo'lsa
+    video_id = find_video_post(caption)
+    if video_id:
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=video_id
+            )
+            return
+        except Exception as e:
+            logger.error(f"Video yuborishda xatolik: {e}")
+
+    try:
+        photo = message.photo[-1]
+        file_io = io.BytesIO()
+        await bot.download(photo, destination=file_io)
+        image_bytes = file_io.getvalue()
+        
+        reply_text = generate_ai_reply(user_message=caption, image_bytes=image_bytes)
+        await message.reply(reply_text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Rasmni tahlil qilishda xatolik: {e}")
+        await message.reply("Assalomu alaykum! Savolingizni aniqroq yozsangiz yordam beramiz.")
+
+# 4. BUYRUQ ORQALI TEKSHIRISH (/tekshir 123456789)
 @dp.message(Command("tekshir"))
-async def cmd_tekshir(message: types.Message):
+async def cmd_tekshir(message: types.Message, bot: Bot):
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.reply("⚠️ Iltimos, INN yoki JSHSHIR raqamini ham yozing.\nMasalan: <code>/tekshir 123456789</code>", parse_mode="HTML")
         return
     query = args[1].strip()
     results = excel_manager.search(query)
-    await message.reply(format_debt_response(results), parse_mode="HTML")
+    resp = format_debt_response(results)
+    await message.reply(resp, parse_mode="HTML")
+    
+    total_debt = sum(item.get("debt", 0.0) for item in results)
+    if total_debt > 0:
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=148
+            )
+        except Exception as e:
+            logger.error(f"Qo'llanma postini jo'natishda xatolik: {e}")
 
-# 3. GURUH VA SHAXSIY CHATDAGI GAPLAR VA RAQAMLAR
+# 5. MATNLI XABARLARNI GIBRID BOSHQARISH
 @dp.message(F.text)
-async def handle_text(message: types.Message):
+async def handle_text(message: types.Message, bot: Bot):
     text = message.text.strip()
+    t_norm = normalize(text)
     
-    # Matn ichidan 14 xonali (JSHSHIR) yoki 9 xonali (INN) raqam qidirish
+    # 1. AGAR MATNDA 9 XONALI INN YOKI 14 XONALI JSHSHIR BO'LSA
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", text)
-    
     if found_nums:
         query_num = found_nums[0]
         results = excel_manager.search(query_num)
         
         is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
-        if is_group:
-            keywords = ["inn", "stir", "инн", "стир", "qarz", "tekshir", "ishlamay", "ishlamayapti", "apparat", "terminal"]
-            has_kw = any(k in text.lower() for k in keywords)
-            is_pure_num = (text == query_num)
-            
-            if results or is_pure_num or has_kw:
-                resp = format_debt_response(results)
-                await message.reply(resp, parse_mode="HTML")
-        else:
+        keywords = ["inn", "stir", "инн", "стир", "qarz", "tekshir", "ishlamay", "ishlamayapti", "apparat", "terminal"]
+        has_kw = any(k in text.lower() for k in keywords)
+        is_pure_num = (text == query_num)
+        
+        if not is_group or results or is_pure_num or has_kw:
             resp = format_debt_response(results)
             await message.reply(resp, parse_mode="HTML")
+            
+            total_debt = sum(item.get("debt", 0.0) for item in results)
+            if total_debt > 0:
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=148
+                    )
+                except Exception as e:
+                    logger.error(f"To'lov videosini yuborishda xatolik: {e}")
         return
 
-    # AGAR RAQAM BO'LMASA: Oddiy gaplar (masalan: "apparatim ishlamayapti", "qarzim bormi", "chek chiqmayapti")
-    trigger_words = [
+    # 2. KANALNING BARCHA VIDEOLARI BILAN SOLISHTIRISH
+    # (narx o'zgartirish, vaqt to'g'irlash, markirovka, dastur yangilash, analitika, ma'lumot yuklash, to'lov qilish)
+    video_id = find_video_post(text)
+    if video_id:
+        logger.info(f"Video qo'llanma topildi (ID: {video_id}) so'rov: '{text}'")
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=video_id
+            )
+            return
+        except Exception as e:
+            logger.error(f"Video postni uzatishda xatolik: {e}")
+
+    # 3. APPARAT ISHLAMAY QOLGAN YOKI QARZDORLIKNI BILMOQCHI BO'LSA
+    # FAQAT shu holatda INN so'raydi
+    debt_keywords = [
         "ishlamay", "ishlamadi", "ishlamayapti", "ochilmay", "ochilmayapti",
-        "qarz", "qarzim", "balans", "qarzdorlik", "pulim", "to'lov", "tulov",
-        "blok", "bloklandi", "chek", "nkm", "terminal", "apparat", "pos"
+        "qarzim", "qarz bormi", "qarzdorlik", "kassa ochilmay", "blok bo'ldi",
+        "bloklandi", "chek chiqmay", "terminal ishlamay", "aparat ishlamay"
     ]
-    
-    text_lower = text.lower()
-    has_trigger = any(tw in text_lower for tw in trigger_words)
-    is_private = (message.chat.type == ChatType.PRIVATE)
-    
-    # Shaxsiy chatda har doim, guruhda esa tegishli mavzu bo'lganda javob beradi
-    if has_trigger or is_private:
+    if any(k in t_norm for k in debt_keywords):
+        await message.reply(
+            "Assalomu alaykum! Apparatingiz holatini va abonent qarzdorligini tekshirish uchun, "
+            "iltimos, korxonangizning 9 xonali <b>INN (STIR)</b> yoki 14 xonali <b>JSHSHIR</b> raqamini yozib yuboring.",
+            parse_mode="HTML"
+        )
+        return
+
+    # 4. BOSHQACHA SAVOLLAR VA GAPLAR (Faqat zarur bo'lganda javob beradi)
+    is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
+    if not is_group:
+        # Shaxsiy chatda tabiiy AI javob
         ai_reply = generate_ai_reply(text)
         await message.reply(ai_reply, parse_mode="HTML")
+    else:
+        # Guruhda agar savol apparat yoki xizmatga tegishli bo'lsa
+        if any(w in t_norm for w in ["kassa", "apparat", "pos", "terminal", "salom"]):
+            ai_reply = generate_ai_reply(text)
+            await message.reply(ai_reply, parse_mode="HTML")
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
-    logger.info("Bot qayta ishga tushirildi va xabarlarni kutmoqda...")
+    logger.info("Bot kengaytirilgan gibrid tizim bilan ishga tushirildi...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
