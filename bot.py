@@ -2,14 +2,18 @@ import os
 import re
 import io
 import logging
+from datetime import datetime
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
 from aiogram.enums import ChatType
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
 from excel_manager import excel_manager, DATA_DIR
-from ai_helper import generate_ai_reply
+from ai_helper import generate_ai_reply, analyze_pos_image
 from catalog import find_video_post, normalize
+from state_manager import get_last_file_message_id, set_last_file_message_id
 
 load_dotenv()
 
@@ -21,6 +25,7 @@ DESTINATION_CHANNEL_ID = -1003784534841  # marsfayllar
 SOURCE_CHANNEL_ID = -1001641871516       # @POS_Terminal_UzSmart_Bank
 
 dp = Dispatcher()
+scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
 
 def format_debt_response(results: list) -> str:
     """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
@@ -69,17 +74,29 @@ async def cmd_start(message: types.Message):
         "👋 <b>Assalomu alaykum!</b>\n\n"
         "Smart POS kassa apparatlari yordamchi botiga xush kelibsiz!\n\n"
         "🔹 <b>Qarzdorlikni tekshirish uchun:</b> INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingizni yuboring.\n"
-        "🔹 <b>To'lov qilish yoki apparat sozlamalari bo'yicha:</b> savolingizni yozsangiz tegishli video-qo'llanma yuboriladi.",
+        "🔹 <b>To'lov qilish yoki apparat sozlamalari bo'yicha:</b> savolingizni yozsangiz tegishli video-qo'llanma yuboriladi.\n"
+        "🔹 <b>Apparat xatolik berayotgan bo'lsa:</b> ekran rasmini yuborsangiz, nosozlik sababi aniqlanadi.",
         parse_mode="HTML"
     )
 
-# 1. KANAL VA GURUHLARDAN YANGI EXCEL FAYLNI QABUL QILISH
+# 1. KANAL VA GURUHLARDAN YANGI EXCEL FAYLNI QABUL QILISH VA ESKISINI O'CHIRISH
 @dp.channel_post(F.document)
 @dp.message(F.document)
 async def handle_document(message: types.Message, bot: Bot):
     doc = message.document
     if doc.file_name and (doc.file_name.endswith(".xlsx") or doc.file_name.endswith(".xls")):
         try:
+            # Agar asosiy kanalga kelgan bo'lsa, avvalgi eski fayl xabarini kanaldan o'chirish (tozalash)
+            if message.chat.id == DESTINATION_CHANNEL_ID:
+                last_msg_id = get_last_file_message_id()
+                if last_msg_id and last_msg_id != message.message_id:
+                    try:
+                        await bot.delete_message(chat_id=DESTINATION_CHANNEL_ID, message_id=last_msg_id)
+                        logger.info(f"Kanaldan avvalgi eski fayl posti o'chirildi (ID: {last_msg_id})")
+                    except Exception as err:
+                        logger.warning(f"Avvalgi fayl postini o'chirishda xatolik: {err}")
+                set_last_file_message_id(message.message_id)
+
             os.makedirs(DATA_DIR, exist_ok=True)
             temp_file = os.path.join(DATA_DIR, f"temp_{doc.file_name}")
             await bot.download(doc, destination=temp_file)
@@ -100,6 +117,10 @@ async def handle_document(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Faylni yuklashda xatolik: {e}")
 
+# HAR KUNI ERTALAB SOAT 9:00 DA AVTOMATIK YANGILANISH REJASI
+async def daily_channel_file_maintenance(bot: Bot):
+    logger.info("Har kungi soat 09:00 rejasi: yangi kunlik baza holati nazorat qilindi.")
+
 # 2. @POS_Terminal_UzSmart_Bank KANALIDAN YANGI POSTLARNI BIZNING KANALGA AVTOMATIK UZATISH
 @dp.channel_post()
 async def handle_source_channel_post(message: types.Message, bot: Bot):
@@ -114,11 +135,12 @@ async def handle_source_channel_post(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Postni kanalga uzatishda xatolik: {e}")
 
-# 3. RASM BILAN KELGAN XABARLAR
+# 3. RASM BILAN KELGAN XABARLAR (AGENT VIZUAL TAHLIL VA XATOLIK KODI BO'YICHA)
 @dp.message(F.photo)
 async def handle_photo(message: types.Message, bot: Bot):
     caption = message.caption or ""
     
+    # Rasm tagidagi matnda INN bormi?
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", caption)
     if found_nums:
         results = excel_manager.search(found_nums[0])
@@ -149,17 +171,18 @@ async def handle_photo(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Video yuborishda xatolik: {e}")
 
+    # Kengaytirilgan Agent tahlili: Ekrandagi xatolik kodlari va nosozlikni aniqlash
     try:
         photo = message.photo[-1]
         file_io = io.BytesIO()
         await bot.download(photo, destination=file_io)
         image_bytes = file_io.getvalue()
         
-        reply_text = generate_ai_reply(user_message=caption, image_bytes=image_bytes)
+        reply_text = analyze_pos_image(image_bytes=image_bytes, user_caption=caption)
         await message.reply(reply_text, parse_mode="HTML")
     except Exception as e:
         logger.error(f"Rasmni tahlil qilishda xatolik: {e}")
-        await message.reply("Assalomu alaykum! Savolingizni aniqroq yozsangiz yordam beramiz.")
+        await message.reply("Assalomu alaykum! Apparat ekranidagi xatolikni aniqroq rasmga olib yuborsangiz, yordam beramiz.")
 
 # 4. BUYRUQ ORQALI TEKSHIRISH (/tekshir 123456789)
 @dp.message(Command("tekshir"))
@@ -218,7 +241,6 @@ async def handle_text(message: types.Message, bot: Bot):
         return
 
     # 2. KANALNING BARCHA VIDEOLARI BILAN SOLISHTIRISH
-    # (narx o'zgartirish, vaqt to'g'irlash, markirovka, dastur yangilash, analitika, ma'lumot yuklash, to'lov qilish)
     video_id = find_video_post(text)
     if video_id:
         logger.info(f"Video qo'llanma topildi (ID: {video_id}) so'rov: '{text}'")
@@ -233,7 +255,6 @@ async def handle_text(message: types.Message, bot: Bot):
             logger.error(f"Video postni uzatishda xatolik: {e}")
 
     # 3. APPARAT ISHLAMAY QOLGAN YOKI QARZDORLIKNI BILMOQCHI BO'LSA
-    # FAQAT shu holatda INN so'raydi
     debt_keywords = [
         "ishlamay", "ishlamadi", "ishlamayapti", "ochilmay", "ochilmayapti",
         "qarzim", "qarz bormi", "qarzdorlik", "kassa ochilmay", "blok bo'ldi",
@@ -247,21 +268,25 @@ async def handle_text(message: types.Message, bot: Bot):
         )
         return
 
-    # 4. BOSHQACHA SAVOLLAR VA GAPLAR (Faqat zarur bo'lganda javob beradi)
+    # 4. BOSHQACHA SAVOLLAR VA GAPLAR
     is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
     if not is_group:
-        # Shaxsiy chatda tabiiy AI javob
         ai_reply = generate_ai_reply(text)
         await message.reply(ai_reply, parse_mode="HTML")
     else:
-        # Guruhda agar savol apparat yoki xizmatga tegishli bo'lsa
         if any(w in t_norm for w in ["kassa", "apparat", "pos", "terminal", "salom"]):
             ai_reply = generate_ai_reply(text)
             await message.reply(ai_reply, parse_mode="HTML")
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
-    logger.info("Bot kengaytirilgan gibrid tizim bilan ishga tushirildi...")
+    scheduler.add_job(
+        daily_channel_file_maintenance,
+        CronTrigger(hour=9, minute=0, timezone="Asia/Tashkent"),
+        args=[bot]
+    )
+    scheduler.start()
+    logger.info("Bot va ertalabki 09:00 vazifalar jadvali muvaffaqiyatli ishga tushdi...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

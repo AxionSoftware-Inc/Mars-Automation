@@ -1,6 +1,7 @@
 import os
+import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 from google import genai
 from google.genai import types
 
@@ -16,33 +17,66 @@ if GEMINI_API_KEY:
     except Exception as e:
         logger.error(f"Gemini Client yaratishda xatolik: {e}")
 
-SYSTEM_INSTRUCTION = """
-Siz "Mars" kompaniyasining Smart POS kassa apparatlari bo'yicha yordamchi aqlli botsiz.
-Foydalanuvchi turli savollar bersa:
-1. Agar apparat nosozligi, ishlamay qolishi yoki qarz so'ralsa: xushmuomala tushuntirib, qarzdorlikni tekshirish uchun korxona INN (9 xonali) yoki JSHSHIR (14 xonali) raqamini so'rang.
-2. Agar umumiy boshqa savollar bo'lsa (masalan "salom", "qayerdasizlar", "ish vaqtingiz qachon"): o'zbek tilida muloyim va aniq javob bering, keraksiz joyda INN SO'RAMANG.
+IMAGE_ERROR_ANALYSIS_PROMPT = """
+Siz Smart POS kassa apparatlari (UzSmart, Pax, Verifone, Sunmi va boshqalar) bo'yicha yuqori malakali texnik muhandis va yordamchisiz.
+Foydalanuvchi sizga apparat ekrani, chek yoki kassa terminalining rasmini yubordi.
+
+Vazifangiz rasmni diqqat bilan tahlil qilish:
+1. Ekrandagi xatolik kodini (Error code / Код ошибки) yoki xabarni aniqlang (masalan: "Aloqa yo'q", "Fiskal xotira to'ldi", "Bloklangan", "Tarmoq xatosi", "PIN kiritilmadi", "Tamper error", "Sim karta xatosi").
+2. Xatolik sababini o'zbek tilida juda aniq va sodda tushuntiring.
+3. Muammoni bartaraf qilish bo'yicha amaliy qadamlarni bering (masalan: apparatni o'chirib-yoqish, internet/Wi-Fi ni tekshirish, abonent to'lovini tekshirish, texnik xizmatga olib borish).
+4. Agar apparat bloklanganligi yoki to'lov bilan bog'liq bo'lsa, qarzni tekshirish uchun korxona INN yoki JSHSHIR raqamini yuborishni eslatib o'ting.
+5. Agar rasmda kassa apparatiga aloqador narsa ko'rinmasa, xushmuomala qilib apparat ekranidagi xatolikni aniqroq rasmga olib yuborishni so'rang.
 """
 
-def generate_ai_reply(user_message: str, image_bytes: Optional[bytes] = None, mime_type: str = "image/jpeg") -> str:
-    """Foydalanuvchi savoliga mazmuniga qarab tabiiy javob qaytarish"""
+def analyze_pos_image(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> str:
+    """Kelajakdagi kengaytirilgan texnik nosozlik va xatolik kodlari bo'yicha rasm tahlili"""
     if not client:
-        return "Assalomu alaykum! Sizga qanday yordam bera olaman?"
+        return (
+            "Rasm qabul qilindi. Apparatdagi nosozlikni aniqlash va qarz holatini tekshirish uchun, "
+            "iltimos, korxonangizning 9 xonali <b>INN (STIR)</b> yoki 14 xonali <b>JSHSHIR</b> raqamini yuboring."
+        )
 
     try:
-        contents = []
-        if image_bytes:
-            contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
-        contents.append(user_message.strip() if user_message else "Yordam bering")
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            user_caption.strip() if user_caption else "Ushbu apparat ekranidagi xatolik va holatni aniqlab bering."
+        ]
 
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=contents,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=0.3,
+                system_instruction=IMAGE_ERROR_ANALYSIS_PROMPT,
+                temperature=0.2,
             )
         )
         return response.text.strip()
     except Exception as e:
-        logger.error(f"Gemini API xatolik: {e}")
+        logger.error(f"Image analysis error: {e}")
+        return (
+            "Assalomu alaykum! Apparatingiz holatini tekshirish uchun, iltimos, "
+            "korxonangizning <b>INN (STIR)</b> raqamini yuboring."
+        )
+
+def generate_ai_reply(user_message: str) -> str:
+    """Umumiy savollarga tabiiy o'zbekcha javob (noo'rin INN so'ramasdan)"""
+    if not client:
+        return "Assalomu alaykum! Sizga qanday yordam bera olaman?"
+
+    prompt = (
+        "Siz Mars kompaniyasining Smart POS kassa xizmati bo'yicha yordamchi botsiz. "
+        "Foydalanuvchining quyidagi savoliga muloyim, qisqa va aniq javob bering. "
+        "Hech qanday asossiz joyda INN so'ramang. Savol: " + user_message
+    )
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.3)
+        )
+        return response.text.strip()
+    except Exception as e:
+        logger.error(f"AI reply error: {e}")
         return "Assalomu alaykum! Savolingiz bo'yicha yordam berishga tayyorman."
