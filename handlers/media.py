@@ -5,7 +5,7 @@ import logging
 from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
 from excel_manager import excel_manager, DATA_DIR
-from image_analyzer import analyze_pos_screen
+from image_analyzer import analyze_pos_screen, INCOMPLETE_SCREEN_REPLY
 from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
 from handlers.debt import format_debt_response
