@@ -23,17 +23,15 @@ if GEMINI_API_KEY:
         logger.error(f"ImageAnalyzer: Gemini client xatoligi: {e}")
 
 INCOMPLETE_SCREEN_REPLY = (
-    "⚠️ <b>Kassa apparati to'liq ko'rinmayapti.</b>\n"
-    "Apparatning tepasi, pasti yoki yon tomonlari kesilib qolgan. "
-    "Aniq tashxis qo'yishimiz uchun ekrandagi <b>soat va internet/Wi-Fi belgilari</b>, "
-    "hamda butun apparat korpusi to'liq ko'rinishi shart.\n\n"
-    "Iltimos, <b>kassa apparatini va uning butun ekranini to'liq (tepa, past va yonlari kesilmagan holda)</b> rasmga olib qayta yuboring."
+    "⚠️ <b>Kassa ekrani to'liq ko'rinmayapti.</b>\n"
+    "Ekranning tepasi (soat/internet) yoki chetlari kesilgan. "
+    "Iltimos, apparat ekranini va chetini to'liq ko'rinadigan qilib qayta rasm yuboring."
 )
 
 def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int]]:
     """
     Android POS apparati ekranini professional tashxis qilish:
-    1. Ekran to'liqligi (tepa, past, yon tomonlar) tekshiruvi.
+    1. Ekran to'liqligi (ekranning 4 burchagi, tepa status bar va chetki qismlari) tekshiruvi.
     2. Ekrandagi soat va sanani real Toshkent vaqti bilan solishtirish.
     3. Internet / Wi-Fi / Tarmoq holatini tekshirish.
     4. Ekrandagi xatolik kodlari va xabarlarini aniqlash.
@@ -57,19 +55,21 @@ Foydalanuvchi sizga apparatning fotosuratini yubordi.
 
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
-1-BOSQICH (ENG MUHIM): APPARAT VA EKRANNING TO'LIQLIGINI TEKSHIRISH
-DIQQAT! Kassa apparatini to'liq ko'rmasdan turib tashxis qo'yish QAT'IYAN TAQIQLANADI!
+1-BOSQICH (ENG MUHIM): EKRANNING TO'LIQLIGINI TEKSHIRISH
+MUHIM QOIDA: Butun apparat korpusi to'liq tushishi SHART EMAS! 
+Lekin EKRANNING O'ZI 100% TO'LIQ (barcha 4 burchagi) VA EKRANDAN TASHQARI KORPUSNING BIROZ QISMI (romka/cheti) rasmda aniq ko'rinishi shart!
+
 Agar quyidagi holatlardan BIRONTASI bo'lsa:
-- Rasm TEPASI kesilgan bo'lsa (ekranning eng yuqori qismidagi soat, sana yoki Wi-Fi/internet/SIM belgisi ko'rinmay qolgan bo'lsa);
-- Rasm PASTI kesilgan bo'lsa (pastki menyu yoki navigatsiya qismlari tushmagan bo'lsa);
-- Rasm YON TOMONLARI kesilgan yoki faqat ekranning o'rtasi/burchagi yaqinlashtirib (zoom) olingan bo'lsa;
-- Apparat to'liq ko'rinmay, chala bo'lsa yoki xira/qorong'u bo'lsa:
+- Ekran TEPASI kesilgan bo'lsa (Android status bar: soat yoki Wi-Fi/internet/SIM belgisi ko'rinmay qolgan bo'lsa);
+- Ekran PASTI kesilgan bo'lsa (pastki menyu yoki navigatsiya qismlari tushmagan bo'lsa);
+- Ekran YON TOMONLARI kesilgan bo'lsa yoki faqat ekranning o'rtasi/burchagi yaqinlashtirib (zoom) olingan bo'lsa;
+- Rasm xira, qorong'u yoki ekran chetlari ko'rinmay qolgan bo'lsa:
 
-Boshqa HECH QANDAY tashxis, sabab yoki taxmin yozish MUMKIN EMAS!
-DARHOL faqat va faqat quyidagi matnni qaytaring, HECH QANDAY video tegi qo'ymang:
-"⚠️ <b>Kassa apparati to'liq ko'rinmayapti.</b>\nApparatning tepasi, pasti yoki yon tomonlari kesilib qolgan. Aniq tashxis qo'yishimiz uchun ekrandagi <b>soat va internet/Wi-Fi belgilari</b>, hamda pastki qismi to'liq ko'rinishi shart.\n\nIltimos, <b>kassa apparatini va uning butun ekranini to'liq (tepa, past va yonlari kesilmagan holda)</b> rasmga olib qayta yuboring."
+Boshqa HECH QANDAY tashxis, sabab, maslahat yoki taxmin yozish MUMKIN EMAS!
+Javobni uzun qilib yozmang, qisqa qilib DARHOL faqat quyidagi matnni qaytaring, HECH QANDAY video tegi qo'ymang:
+"⚠️ <b>Kassa ekrani to'liq ko'rinmayapti.</b>\nEkranning tepasi (soat/internet) yoki chetlari kesilgan. Iltimos, apparat ekranini va chetini to'liq ko'rinadigan qilib qayta rasm yuboring."
 
-2-BOSQICH: FAQAT APPARAT VA BUTUN EKRAN TO'LIQ KO'RINGAN HOLATDAGINA:
+2-BOSQICH: FAQAT BUTUN EKRAN VA UNING ROMKASI TO'LIQ KO'RINGAN HOLATDAGINA TASHXIS QO'YING:
 1. SOAT VA VAQT TEKSHIRUVI:
    - Ekran tepasidagi (Android status bar) soatni o'qing. Hozirgi real Toshkent vaqti: {current_hour_min}.
    - Agar bir necha daqiqa (1-10 min) farq bo'lsa — bu to'g'ri (xato emas).
@@ -79,7 +79,7 @@ DARHOL faqat va faqat quyidagi matnni qaytaring, HECH QANDAY video tegi qo'ymang
    - Agar internet yo'q bo'lsa — "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
 3. EKRANDAGI XATOLIK KODI YOKI BLOKLANISH:
    - Ekrandagi xatolik xabarini o'qing.
-   - Sababi va yechimini 1-2 ta qisqa gapda tushuntiring.
+   - Sababi va yechimini qisqa va aniq (1-2 gapda) tushuntiring.
    - Agar blok yoki qarz bo'lsa, korxona INN yoki JSHSHIR raqamini so'rang.
 
 Foydalanuvchi izohi: "{user_caption}"
