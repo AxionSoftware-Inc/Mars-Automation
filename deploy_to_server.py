@@ -24,9 +24,21 @@ def deploy():
         'user_memory.py',
         'excel_manager.py',
         'data/video_catalog.json',
-        'data/screen_errors.json'
+        'data/screen_errors.json',
+        'handlers/__init__.py',
+        'handlers/channel.py',
+        'handlers/chat.py',
+        'handlers/commands.py',
+        'handlers/debt.py',
+        'handlers/media.py'
     ]
     
+    # Ensure handlers directory exists on remote server
+    try:
+        sftp.mkdir(f"{remote_dir}/handlers")
+    except Exception:
+        pass
+
     for filename in files_to_upload:
         local_path = os.path.join(os.path.dirname(__file__), filename)
         remote_path = f"{remote_dir}/{filename}"

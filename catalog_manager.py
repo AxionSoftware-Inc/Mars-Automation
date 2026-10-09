@@ -108,6 +108,11 @@ class CatalogManager:
         1-bosqich: Tezkor kalit so'zlar orqali;
         2-bosqich: Agar topilmasa, Gemini AI orqali butun indeks ichidan eng mosini topish.
         """
+        # 1-bosqich: Tezkor kalit so'zlar bo'yicha
+        kw_match = self.find_post_by_keywords(user_text)
+        if kw_match:
+            return kw_match
+
         t = self.normalize(user_text)
         # Agar apparat ishlamay qolganini bildirayotgan bo'lsa -> INN so'rash uchun video bermaymiz
         if any(w in t for w in ["ishlamay", "ishlamadi", "ishlamas", "ochib qol", "ochiq qol", "ochilmay", "blok", "qarzim", "qarz"]):
