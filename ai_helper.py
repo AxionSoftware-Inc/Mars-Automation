@@ -67,9 +67,10 @@ Talablar:
 4. Juda lo'nda va qisqa yozing.
 """
 
-def generate_ai_reply(user_message: str) -> Tuple[str, Optional[int]]:
+def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str, Optional[int]]:
     """
     Kontekst asosida, lo'nda va qisqa javob qaytarish.
+    Foydalanuvchining avvalgi suhbat tarixi hisobga olinadi.
     Natija: (javob_matni, video_message_id yoki None)
     """
     if not client:
@@ -79,9 +80,16 @@ def generate_ai_reply(user_message: str) -> Tuple[str, Optional[int]]:
         )
 
     try:
+        content_prompt = user_message.strip()
+        if context_history:
+            content_prompt = (
+                f"Ushbu mijoz bilan avvalgi suhbat konteksti:\n{context_history}\n\n"
+                f"Mijozning joriy savoli: {user_message.strip()}"
+            )
+
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=[user_message.strip()],
+            contents=[content_prompt],
             config=types.GenerateContentConfig(
                 system_instruction=COMPANY_SYSTEM_INSTRUCTION,
                 temperature=0.2

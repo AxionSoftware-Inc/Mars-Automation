@@ -20,6 +20,7 @@ def deploy():
         'catalog.py',
         'catalog_manager.py',
         'image_analyzer.py',
+        'user_memory.py',
         'data/video_catalog.json'
     ]
     

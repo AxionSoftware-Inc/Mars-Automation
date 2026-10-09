@@ -18,6 +18,7 @@ from excel_manager import excel_manager, DATA_DIR
 from ai_helper import generate_ai_reply
 from image_analyzer import analyze_pos_screen
 from catalog_manager import catalog_manager
+from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -187,6 +188,9 @@ async def handle_photo(message: types.Message, bot: Bot):
 
     # Kengaytirilgan Android POS ekran tahlili: Soat, internet, xatolik kodi
     try:
+        user_id = message.from_user.id if message.from_user else 0
+        chat_id = message.chat.id
+
         photo = message.photo[-1]
         file_io = io.BytesIO()
         await bot.download(photo, destination=file_io)
@@ -198,6 +202,10 @@ async def handle_photo(message: types.Message, bot: Bot):
             await message.reply(reply_text, parse_mode="HTML")
         except Exception:
             await message.reply(reply_text)
+
+        # Xotiraga saqlash
+        user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
+        user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
         # Agar xatolik bo'yicha yechim videosi aniqlansa (masalan soat/vaqt uchun 141)
         if video_id:
@@ -242,6 +250,8 @@ async def cmd_tekshir(message: types.Message, bot: Bot):
 @dp.message(F.text)
 async def handle_text(message: types.Message, bot: Bot):
     text = message.text.strip()
+    user_id = message.from_user.id if message.from_user else 0
+    chat_id = message.chat.id
     
     # 1-QADAM: Agar matnda 9 xonali INN yoki 14 xonali JSHSHIR bo'lsa -> Excel bazadan tekshirish
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", text)
@@ -254,6 +264,10 @@ async def handle_text(message: types.Message, bot: Bot):
         if not is_group or results or (text == query_num) or len(text) <= 25:
             resp = format_debt_response(results)
             await message.reply(resp, parse_mode="HTML")
+            
+            # Xotiraga saqlash
+            user_memory.add_user_message(chat_id, user_id, f"Mening INN/JSHSHIR raqamim: {query_num}")
+            user_memory.add_assistant_message(chat_id, user_id, resp)
             
             total_debt = sum(item.get("debt", 0.0) for item in results)
             if total_debt > 0:
@@ -280,17 +294,24 @@ async def handle_text(message: types.Message, bot: Bot):
                 message_id=video_id,
                 reply_to_message_id=message.message_id
             )
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
             return
         except Exception as e:
             logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
-    # 3-QADAM: AGAR VIDEO BO'LMASA — AI NING QISQA VA LO'NDA JAVOBINI MATN SIFATIDA YUBORISH
-    reply_text, _ = generate_ai_reply(text)
+    # 3-QADAM: AGAR VIDEO BO'LMASA — HAR BIR FOYDALANUVCHINING 12 SOATLIK SUHBAT XOTIRASI BILAN AI JAVOBI
+    context_summary = user_memory.get_context_summary(chat_id, user_id)
+    reply_text, _ = generate_ai_reply(text, context_history=context_summary)
 
     try:
         await message.reply(reply_text, parse_mode="HTML")
     except Exception:
         await message.reply(reply_text)
+
+    # Foydalanuvchi va AI suhbatini xotiraga yozish
+    user_memory.add_user_message(chat_id, user_id, text)
+    user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
