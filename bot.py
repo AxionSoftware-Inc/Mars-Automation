@@ -174,7 +174,8 @@ async def handle_photo(message: types.Message, bot: Bot):
                 await bot.copy_message(
                     chat_id=message.chat.id,
                     from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=148
+                    message_id=148,
+                    reply_to_message_id=message.message_id
                 )
             except Exception as e:
                 logger.error(f"Qo'llanma yuborishda xatolik: {e}")
@@ -211,7 +212,8 @@ async def cmd_tekshir(message: types.Message, bot: Bot):
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=148
+                message_id=148,
+                reply_to_message_id=message.message_id
             )
         except Exception as e:
             logger.error(f"Qo'llanma postini jo'natishda xatolik: {e}")
@@ -239,7 +241,8 @@ async def handle_text(message: types.Message, bot: Bot):
                     await bot.copy_message(
                         chat_id=message.chat.id,
                         from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=148
+                        message_id=148,
+                        reply_to_message_id=message.message_id
                     )
                 except Exception as e:
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
@@ -254,7 +257,8 @@ async def handle_text(message: types.Message, bot: Bot):
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=video_id
+                message_id=video_id,
+                reply_to_message_id=message.message_id
             )
             return
         except Exception as e:
