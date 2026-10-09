@@ -104,7 +104,16 @@ async def handle_pos_photo(message: types.Message, bot: Bot):
         
         reply_text, video_id, detected_inn = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
         
-        # 1. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> bazadan ham darhol tekshirish
+        # 1. Agar rasm haqiqiy kassa apparatiga tegishli bo'lmasa -> E'TIBORSIZ QOLDIRILADI (jim turadi)
+        if not reply_text:
+            return
+
+        # 2. Agar apparat tepasida soat va tarmoq qatori ko'rinmasa -> To'liq ekran talab qilish
+        if reply_text == INCOMPLETE_SCREEN_REPLY:
+            await message.reply(INCOMPLETE_SCREEN_REPLY, parse_mode="HTML")
+            return
+
+        # 3. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> bazadan ham tekshirish va birga qo'shib berish
         if detected_inn:
             results = excel_manager.search(detected_inn)
             org_name = results[0].get("name", "") if results else ""
@@ -135,11 +144,7 @@ async def handle_pos_photo(message: types.Message, bot: Bot):
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
             return
 
-        # Agar rasm haqiqiy kassa apparatiga tegishli bo'lmasa -> E'tiborsiz qoldiriladi
-        if not reply_text:
-            return
-
-        # 2. Oddiy holatda AI tahlil matnini yuborish
+        # 4. Oddiy holatda AI tahlil matnini yuborish
         try:
             await message.reply(reply_text, parse_mode="HTML")
         except Exception:

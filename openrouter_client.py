@@ -3,10 +3,13 @@ import json
 import logging
 import urllib.request
 from typing import Optional, Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("GEMINI_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "google/gemini-3.5-flash-lite"
 
@@ -16,7 +19,7 @@ class OpenRouterClient:
     Matn va rasm (multimodal) so'rovlarini to'liq qo'llab-quvvatlaydi.
     """
     def __init__(self, api_key: Optional[str] = None, model: str = DEFAULT_MODEL):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.model = model
 
     def chat_completion(

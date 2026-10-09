@@ -45,8 +45,8 @@ HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
 JAVOB FORMATI FAQAT JSON BO'LISHI SHART:
 {{
-  "is_real_pos_device": true/false, // Rasmda Smart POS kassa apparati, uning ekrani yoki kassa ilovasi ko'ringanmi? (Faqat apparatga aloqasiz hayvon, tabiat, taom, selfi bo'lsa false)
-  "is_status_bar_visible": true/false, // Ekran tepasidagi soat yoki tarmoq/internet status bar qatori tushganmi?
+  "is_real_pos_device": true/false, // QAT'IY QOIDA: Rasmda Smart POS kassa terminali (masalan Pax, UzSmart, Sunmi apparati yoki kassa dasturi ekrani) bormi? AGAR rasmda kassa apparatiga aloqasi bo'lmagan har qanday narsa (odam, tabiat, mashina, hayvon, taom, xona, chek qog'ozi, stol, devor, kiyim, oddiy fotosurat) bo'lsa -> ALBATTA false deb belgilang!
+  "is_status_bar_visible": true/false, // Ekran tepasidagi soat yoki tarmoq/internet status bar qatori to'liq tushganmi?
   "time_mismatch": true/false, // Ekrandagi soat hozirgi real Toshkent vaqtidan ({current_hour_min}) 10 daqiqadan ko'pga farq qiladimi?
   "has_internet": true/false, // Status bardagi Wi-Fi yoki mobil tarmoq ulanganmi?
   "error_type": "debt" | "fiscal_module" | "update" | "paper" | "none", // Ekrandagi asosiy muammo turi
@@ -85,11 +85,17 @@ Foydalanuvchi izohi: "{user_caption}"
 
         detected_inn = facts.get("detected_inn")
 
-        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati/ekrani emasmi?
-        if not facts.get("is_real_pos_device", False) and not detected_inn:
+        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati/ekrani bo'lmasa -> E'TIBORSIZ QOLDIRISH
+        if not facts.get("is_real_pos_device", False):
+            logger.info("Guardrail: Rasm kassa apparatiga tegishli emas. E'tiborsiz qoldirildi.")
             return "", None, None
 
-        # 1-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
+        # 1-BOSQICH (STATUS BAR FILTRI): Ekran tepasidagi soat va tarmoq qatori tushmagan bo'lsa
+        if not facts.get("is_status_bar_visible", False):
+            logger.info("Status bar ko'rinmayapti -> To'liq ekran talab qilinadi.")
+            return INCOMPLETE_SCREEN_REPLY, None, detected_inn
+
+        # 2-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
         matched_rule = error_manager.match_error(facts)
         if matched_rule:
             return (
@@ -98,11 +104,7 @@ Foydalanuvchi izohi: "{user_caption}"
                 detected_inn
             )
 
-        # 2-BOSQICH (STATUS BAR FILTRI): Agar maxsus xatolik bo'lmasa va status bar ko'rinmasa
-        if not facts.get("is_status_bar_visible", False) and not detected_inn:
-            return INCOMPLETE_SCREEN_REPLY, None, None
-
-        # Agar maxsus qoida topilmasa, lo'nda umumiy xulosa
+        # 3-BOSQICH: Agar maxsus qoida topilmasa, lo'nda umumiy xulosa
         summary = facts.get("screen_text_summary")
         if summary and summary.lower() != "none":
             return f"ℹ️ <b>Ekrandagi holat:</b> {summary}\nNosozlik davom etsa, korxona INN raqamini yuboring.", None, detected_inn
