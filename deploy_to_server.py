@@ -19,6 +19,7 @@ def deploy():
         'bot.py',
         'catalog.py',
         'catalog_manager.py',
+        'image_analyzer.py',
         'data/video_catalog.json'
     ]
     

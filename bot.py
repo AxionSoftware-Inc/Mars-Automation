@@ -15,7 +15,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from excel_manager import excel_manager, DATA_DIR
-from ai_helper import generate_ai_reply, analyze_pos_image
+from ai_helper import generate_ai_reply
+from image_analyzer import analyze_pos_screen
 from catalog_manager import catalog_manager
 from state_manager import get_last_file_message_id, set_last_file_message_id
 
@@ -181,18 +182,34 @@ async def handle_photo(message: types.Message, bot: Bot):
                 logger.error(f"Qo'llanma yuborishda xatolik: {e}")
         return
 
-    # Kengaytirilgan Agent tahlili: Ekrandagi xatolik kodlari va nosozlikni aniqlash
+    # Kengaytirilgan Android POS ekran tahlili: Soat, internet, xatolik kodi
     try:
         photo = message.photo[-1]
         file_io = io.BytesIO()
         await bot.download(photo, destination=file_io)
         image_bytes = file_io.getvalue()
         
-        reply_text = analyze_pos_image(image_bytes=image_bytes, user_caption=caption)
-        await message.reply(reply_text, parse_mode="HTML")
+        reply_text, video_id = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
+        
+        try:
+            await message.reply(reply_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(reply_text)
+
+        # Agar xatolik bo'yicha yechim videosi aniqlansa (masalan soat/vaqt uchun 141)
+        if video_id:
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=video_id,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.error(f"Tashxis videosini yuborishda xatolik: {e}")
     except Exception as e:
         logger.error(f"Rasmni tahlil qilishda xatolik: {e}")
-        await message.reply("Assalomu alaykum! Apparat ekranidagi xatolikni aniqroq rasmga olib yuborsangiz, yordam beramiz.")
+        await message.reply("Apparat ekranidagi xatolikni aniqroq rasmga olib yuborsangiz, yordam beramiz.")
 
 # 4. BUYRUQ ORQALI TEKSHIRISH (/tekshir 123456789)
 @dp.message(Command("tekshir"))
