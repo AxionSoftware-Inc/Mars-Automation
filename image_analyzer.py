@@ -1,26 +1,17 @@
 import os
 import re
 import json
+import base64
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Optional, Tuple, Dict, Any
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = "gemini-3.5-flash-lite"
-
-client = None
-if GEMINI_API_KEY:
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        logger.error(f"ImageAnalyzer: Gemini client xatoligi: {e}")
+from openrouter_client import openrouter_client
 
 INCOMPLETE_SCREEN_REPLY = (
     "⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\n"
@@ -40,12 +31,6 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     
     Qaytaradi: (qisqa_tashxis_matni, video_id yoki None, detected_inn yoki None)
     """
-    if not client:
-        return (
-            "Apparat ekranidagi nosozlikni aniqlash uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
-            None,
-            None
-        )
 
     # Hozirgi real O'zbekiston (Toshkent) vaqti
     now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
@@ -60,7 +45,7 @@ HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
 JAVOB FORMATI FAQAT JSON BO'LISHI SHART:
 {{
-  "is_real_pos_device": true/false, // Rasmda kamerada olingan haqiqiy jismoniy POS apparati bormi? (Banner, illyustratsiya, chizma, skrinshot, hayvon, taom bo'lsa false)
+  "is_real_pos_device": true/false, // Rasmda Smart POS kassa apparati, uning ekrani yoki kassa ilovasi ko'ringanmi? (Faqat apparatga aloqasiz hayvon, tabiat, taom, selfi bo'lsa false)
   "is_status_bar_visible": true/false, // Ekran tepasidagi soat yoki tarmoq/internet status bar qatori tushganmi?
   "time_mismatch": true/false, // Ekrandagi soat hozirgi real Toshkent vaqtidan ({current_hour_min}) 10 daqiqadan ko'pga farq qiladimi?
   "has_internet": true/false, // Status bardagi Wi-Fi yoki mobil tarmoq ulanganmi?
@@ -73,21 +58,24 @@ Foydalanuvchi izohi: "{user_caption}"
 """
 
     try:
-        contents = [
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            prompt
+        b64_img = base64.b64encode(image_bytes).decode("utf-8")
+        image_url = f"data:{mime_type};base64,{b64_img}"
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]
+            }
         ]
 
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                temperature=0.1,
-                response_mime_type="application/json"
-            )
-        )
-
-        raw_json = response.text.strip() if (response and response.text) else "{}"
+        raw_json = openrouter_client.chat_completion(
+            messages=messages,
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        ) or "{}"
         try:
             facts = json.loads(raw_json)
         except Exception:
@@ -95,17 +83,13 @@ Foydalanuvchi izohi: "{user_caption}"
             match = re.search(r"\{.*\}", raw_json, re.DOTALL)
             facts = json.loads(match.group(0)) if match else {}
 
-        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati fotosurati emasmi?
-        if not facts.get("is_real_pos_device", False):
-            return "", None, None
-
-        # 1-BOSQICH (STATUS BAR FILTRI): Ekran tepasi kesilganmi?
-        if not facts.get("is_status_bar_visible", False):
-            return INCOMPLETE_SCREEN_REPLY, None, None
-
         detected_inn = facts.get("detected_inn")
 
-        # 2-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
+        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati/ekrani emasmi?
+        if not facts.get("is_real_pos_device", False) and not detected_inn:
+            return "", None, None
+
+        # 1-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
         matched_rule = error_manager.match_error(facts)
         if matched_rule:
             return (
@@ -113,6 +97,10 @@ Foydalanuvchi izohi: "{user_caption}"
                 matched_rule.get("video_id"),
                 detected_inn
             )
+
+        # 2-BOSQICH (STATUS BAR FILTRI): Agar maxsus xatolik bo'lmasa va status bar ko'rinmasa
+        if not facts.get("is_status_bar_visible", False) and not detected_inn:
+            return INCOMPLETE_SCREEN_REPLY, None, None
 
         # Agar maxsus qoida topilmasa, lo'nda umumiy xulosa
         summary = facts.get("screen_text_summary")

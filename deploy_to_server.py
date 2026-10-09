@@ -15,6 +15,8 @@ def deploy():
     sftp = ssh.open_sftp()
     
     files_to_upload = [
+        '.env',
+        'openrouter_client.py',
         'ai_helper.py',
         'bot.py',
         'catalog.py',

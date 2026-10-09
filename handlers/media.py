@@ -104,10 +104,6 @@ async def handle_pos_photo(message: types.Message, bot: Bot):
         
         reply_text, video_id, detected_inn = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
         
-        # Agar rasm haqiqiy kassa apparatiga tegishli bo'lmasa -> E'tiborsiz qoldiriladi
-        if not reply_text:
-            return
-
         # 1. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> bazadan ham darhol tekshirish
         if detected_inn:
             results = excel_manager.search(detected_inn)
@@ -117,28 +113,31 @@ async def handle_pos_photo(message: types.Message, bot: Bot):
             user_memory.set_last_id(chat_id, user_id, detected_inn, org_name=org_name, debt=total_debt)
             user_memory.set_last_topic(chat_id, user_id, "photo_analysis_with_inn")
 
-            if results:
-                debt_resp = format_debt_response(results)
-                combined_resp = f"{reply_text}\n\n──────────────\n{debt_resp}"
+            debt_resp = format_debt_response(results)
+            combined_resp = f"{reply_text}\n\n──────────────\n{debt_resp}" if reply_text else debt_resp
+            try:
+                await message.reply(combined_resp, parse_mode="HTML")
+            except Exception:
+                await message.reply(combined_resp)
+
+            user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] INN: {detected_inn}")
+            user_memory.add_assistant_message(chat_id, user_id, combined_resp)
+
+            if total_debt > 0:
                 try:
-                    await message.reply(combined_resp, parse_mode="HTML")
-                except Exception:
-                    await message.reply(combined_resp)
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=148,
+                        reply_to_message_id=message.message_id
+                    )
+                except Exception as e:
+                    logger.error(f"To'lov videosini yuborishda xatolik: {e}")
+            return
 
-                user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] INN: {detected_inn}")
-                user_memory.add_assistant_message(chat_id, user_id, combined_resp)
-
-                if total_debt > 0:
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=148,
-                            reply_to_message_id=message.message_id
-                        )
-                    except Exception as e:
-                        logger.error(f"To'lov videosini yuborishda xatolik: {e}")
-                return
+        # Agar rasm haqiqiy kassa apparatiga tegishli bo'lmasa -> E'tiborsiz qoldiriladi
+        if not reply_text:
+            return
 
         # 2. Oddiy holatda AI tahlil matnini yuborish
         try:

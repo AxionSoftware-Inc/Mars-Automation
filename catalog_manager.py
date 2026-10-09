@@ -4,24 +4,14 @@ import json
 import logging
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+from openrouter_client import openrouter_client
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 CATALOG_FILE = os.path.join(DATA_DIR, "video_catalog.json")
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = "gemini-3.5-flash-lite"
-
-ai_client = None
-if GEMINI_API_KEY:
-    try:
-        ai_client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        logger.error(f"CatalogManager: Gemini client xatoligi: {e}")
 
 class CatalogManager:
     def __init__(self, catalog_path: str = CATALOG_FILE):
@@ -144,13 +134,11 @@ Agar foydalanuvchi shunchaki salomlashgan bo'lsa, apparati ishlamay qolgani bo'y
 
 Javob: FAQAT bitta son (masalan 140 yoki 0):
 """
-            resp = ai_client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.0)
-            )
-            result_str = resp.text.strip()
-            matched = re.search(r"\b(\d+)\b", result_str)
+            result_str = openrouter_client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0
+            ) or ""
+            matched = re.search(r"\b(\d+)\b", result_str.strip())
             if matched:
                 val = int(matched.group(1))
                 if val > 0 and any(p["id"] == val for p in self.posts):
@@ -174,10 +162,6 @@ Javob: FAQAT bitta son (masalan 140 yoki 0):
             logger.info(f"Post {post_id} allaqachon katalogda bor.")
             return False
 
-        if not ai_client:
-            logger.warning("Gemini AI client mavjud emas, yangi post indekslanmadi.")
-            return False
-
         try:
             prompt = f"""
 Siz POS kassa apparatlari kanali (@POS_Terminal_UzSmart_Bank) uchun yangi postni indekslovchisiz.
@@ -193,15 +177,12 @@ Vazifa: Ushbu post uchun quyidagi JSON formatida qisqa ma'lumot tayyorlang:
 }}
 Javobingiz FAQAT toza JSON bo'lsin:
 """
-            resp = ai_client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1
-                )
-            )
-            new_entry = json.loads(resp.text)
+            resp_str = openrouter_client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                response_format={"type": "json_object"}
+            ) or "{}"
+            new_entry = json.loads(resp_str)
             self.posts.append(new_entry)
             self.save_catalog()
             logger.info(f"✅ Yangi post avtomatik indekslandi: ID={post_id}, Title='{new_entry.get('title')}'")

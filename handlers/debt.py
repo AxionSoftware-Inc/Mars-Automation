@@ -103,7 +103,18 @@ DEBT_INQUIRY_KEYWORDS = [
     "qayerdan kelib chiqdi", "summa noto'g'ri", "notogri qarz", "qarzim yo'q"
 ]
 
-@router.message(F.text.func(lambda text: any(kw in text.lower() for kw in DEBT_INQUIRY_KEYWORDS)))
+def is_debt_inquiry(message: types.Message) -> bool:
+    if not message.text:
+        return False
+    t = message.text.lower()
+    return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
+
+def has_inn_in_text(message: types.Message) -> bool:
+    if not message.text:
+        return False
+    return bool(re.search(r"\b(\d{14}|\d{9})\b", message.text))
+
+@router.message(is_debt_inquiry)
 async def handle_debt_inquiry(message: types.Message):
     """Foydalanuvchi qarzdan e'tiroz bildirsa yoki to'lov tarixini so'rasa"""
     user_id = message.from_user.id if message.from_user else 0
@@ -141,10 +152,10 @@ async def handle_debt_inquiry(message: types.Message):
 
 
 # 2. TO'G'RIDAN-TO'G'RI INN / JSHSHIR YUBORILGANDA
-@router.message(F.text.regexp(r"\b(\d{14}|\d{9})\b"))
+@router.message(has_inn_in_text)
 async def handle_inn_query(message: types.Message, bot: Bot):
     """Matnda 9 xonali INN yoki 14 xonali JSHSHIR aniqlanganda qarz tekshirish"""
-    text = message.text.strip()
+    text = (message.text or "").strip()
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", text)
     if not found_nums:
         return

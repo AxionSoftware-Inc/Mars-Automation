@@ -3,22 +3,12 @@ import re
 import logging
 from typing import Optional, Tuple
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = "gemini-3.5-flash-lite"
-
-client = None
-if GEMINI_API_KEY:
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        logger.error(f"Gemini Client yaratishda xatolik: {e}")
+from openrouter_client import openrouter_client
 
 COMPANY_SYSTEM_INSTRUCTION = """
 Siz "Mars" kompaniyasining Smart POS kassa apparatlariga servis xizmati ko'rsatuvchi rasmiy AI yordamchisisiz.
@@ -67,12 +57,6 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
     Kontekst asosida, lo'nda va suhbat zanjirini buzmagan holda AI javobi berish.
     Natija: (javob_matni, video_id yoki None)
     """
-    if not client:
-        return (
-            "Qarzdorlikni tekshirish uchun korxona <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
-            None
-        )
-
     try:
         content_prompt = user_message.strip()
         if context_history:
@@ -81,15 +65,13 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
                 f"Mijozning hozirgi xabari: {user_message.strip()}"
             )
 
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=[content_prompt],
-            config=types.GenerateContentConfig(
-                system_instruction=COMPANY_SYSTEM_INSTRUCTION,
-                temperature=0.2
-            )
-        )
-        full_text = response.text.strip() if (response and response.text) else ""
+        messages = [
+            {"role": "system", "content": COMPANY_SYSTEM_INSTRUCTION.strip()},
+            {"role": "user", "content": content_prompt}
+        ]
+
+        full_text = openrouter_client.chat_completion(messages=messages, temperature=0.2) or ""
+        full_text = full_text.strip()
         
         # [VIDEO:xxx] tegini ajratish
         video_id = None
