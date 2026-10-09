@@ -197,55 +197,108 @@ class ExcelManager:
 
     def format_payment_history(self, results: List[Dict[str, Any]]) -> str:
         """
-        Qarzdorlik e'tirozi yoki 'nimaga qarzman' savoliga oylar kesimidagi to'lov va hisob-kitob tarixini chiqarish
+        Qarzdorlik e'tirozi yoki 'nimaga qarzman' savoliga oylar kesimidagi to'lov va hisob-kitob tarixini lo'nda va aniq chiqarish.
+        - To'langan oylar: ✅
+        - To'lanmagan (qarzdor) oylar: ❌
+        - Ko'p apparatli bo'lsa: N ta apparat x 100,000 so'm = N00,000 so'm/oy
         """
         if not results:
-            return "Kechirasiz, to'lovlar tarixini ko'rish uchun avval INN yoki JSHSHIR raqamingizni yuboring."
+            return "Kechirasiz, to'lovlar tarixini ko'rish uchun avval korxona INN yoki JSHSHIR raqamini yuboring."
 
         first = results[0]
         name = first.get("name", "Noma'lum")
         stir = first.get("stir", "-")
         jshshir = first.get("jshshir", "-")
+        device_count = len(results)
         total_debt = sum(item.get("debt", 0.0) for item in results)
 
-        id_str = f"INN: {stir}" if stir != "-" else f"JSHSHIR: {jshshir}"
-        text = f"📊 <b>To'lovlar va hisob-kitob tarixi:</b>\n🏢 <b>Korxona:</b> {name} ({id_str})\n"
-        text += f"🔴 <b>Joriy qarzdorlik: {total_debt:,.0f} so'm</b>\n"
-        text += "────────────────────\n"
+        id_str = f"INN: <code>{stir}</code>" if stir != "-" else f"JSHSHIR: <code>{jshshir}</code>"
 
-        # Har bir apparat uchun to'lovlar
-        for idx, rec in enumerate(results, 1):
-            terminal = rec.get("terminal", "-")
-            old_debt = rec.get("old_debt_2026", 0.0)
-            payments_2026 = rec.get("payments_2026", {})
-            payments_2025 = rec.get("payments_2025", {})
+        # Barcha yozuvlardan oylik to'lovlar va hisoblarni birlashtirish
+        MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
+        
+        agg_charges_2026: Dict[str, float] = {}
+        agg_payments_2026: Dict[str, float] = {}
+        total_old_debt_2026 = 0.0
 
-            if len(results) > 1:
-                text += f"\n📟 <b>Apparat #{idx} (ID: {terminal}):</b>\n"
+        for rec in results:
+            total_old_debt_2026 += rec.get("old_debt_2026", 0.0)
+            for m, s in rec.get("charges_2026", {}).items():
+                agg_charges_2026[m] = agg_charges_2026.get(m, 0.0) + s
+            for m, s in rec.get("payments_2026", {}).items():
+                agg_payments_2026[m] = agg_payments_2026.get(m, 0.0) + s
 
-            if old_debt > 0:
-                text += f"• <i>2026-yil 1-yanvar holatiga o'tgan qarz:</i> {old_debt:,.0f} so'm\n"
+        # Oylik abonent narxi (agar topilsa, odatda apparat_soni * 100,000)
+        sample_monthly_rate = 100000.0 * device_count
+        for s in agg_charges_2026.values():
+            if s > 0:
+                sample_monthly_rate = s
+                break
 
-            # 2026 to'lovlari
-            if payments_2026:
-                text += "<b>2026-yil to'lovlari:</b>\n"
-                for m, s in payments_2026.items():
-                    text += f"  ✅ {m}: {s:,.0f} so'm\n"
+        # Oylar bo'yicha balans tahlili
+        # Har bir hisoblangan oy bo'yicha to'lov yetarlimi?
+        monthly_status = []
+        unpaid_months = []
+        paid_months_count = 0
+
+        # Jami tushgan to'lov fondi (2026)
+        payment_pool = sum(agg_payments_2026.values())
+        # Eski qarzni to'lov fondidan chegirish
+        effective_pool = payment_pool - max(0.0, total_old_debt_2026)
+
+        for m in MONTHS:
+            if m not in agg_charges_2026:
+                continue
+            charge = agg_charges_2026[m]
+            paid_in_month = agg_payments_2026.get(m, 0.0)
+
+            # Agar jami to'lov yetgan bo'lsa yoki shu oyda to'langan bo'lsa
+            if effective_pool >= charge or paid_in_month >= charge:
+                monthly_status.append(f"  ✅ <b>{m}:</b> to'langan ({paid_in_month:,.0f} so'm)")
+                paid_months_count += 1
+                effective_pool -= charge
+            elif effective_pool > 0:
+                # Qisman to'langan
+                diff = charge - effective_pool
+                monthly_status.append(f"  ⚠️ <b>{m}:</b> qisman to'langan (qarz: {diff:,.0f} so'm)")
+                unpaid_months.append(f"{m} ({diff:,.0f} so'm)")
+                effective_pool = 0
             else:
-                text += "• <i>2026-yilda hali to'lov qayd etilmagan.</i>\n"
+                monthly_status.append(f"  ❌ <b>{m}:</b> to'lanmagan (qarz: {charge:,.0f} so'm)")
+                unpaid_months.append(m)
 
-            # 2025 oxirgi to'lovlari (agar 2026 da kam bo'lsa)
-            if payments_2025 and len(payments_2026) < 3:
-                last_2025_items = list(payments_2025.items())[-3:]
-                text += "<b>2025-yil oxirgi to'lovlari:</b>\n"
-                for m, s in last_2025_items:
-                    text += f"  • {m}: {s:,.0f} so'm\n"
+        # Xabar tuzish
+        text = f"📊 <b>To'lovlar va qarzdorlik hisob-kitobi:</b>\n"
+        text += f"🏢 <b>Korxona:</b> {name}\n"
+        text += f"🆔 {id_str} | 📟 <b>Apparatlar soni:</b> {device_count} ta\n"
+        if device_count > 1:
+            text += f"ℹ️ <i>({device_count} ta apparat uchun oylik to'lov: {sample_monthly_rate:,.0f} so'm)</i>\n"
+        text += f"────────────────────\n"
 
-        text += "────────────────────\n"
+        # Qarz xulosasi
+        if total_debt > 0:
+            months_unpaid_count = len(unpaid_months)
+            if months_unpaid_count > 0:
+                unpaid_str = ", ".join(unpaid_months)
+                text += f"🔴 <b>Qarzdorlik sababi:</b> {months_unpaid_count} oylik to'lov to'lanmagan!\n"
+                text += f"📌 <b>Qarzdor oylar:</b> {unpaid_str}\n"
+            elif total_old_debt_2026 > 0:
+                text += f"🔴 <b>Qarzdorlik sababi:</b> 2026-yil 1-yanvardan o'tgan eski qarz ({total_old_debt_2026:,.0f} so'm) hisobiga.\n"
+            text += f"💰 <b>Jami qarz summasi: {total_debt:,.0f} so'm</b>\n"
+        else:
+            text += "🟢 <b>Barcha oylar to'liq to'langan, qarzdorlik yo'q!</b>\n"
+
+        text += f"────────────────────\n"
+        text += "<b>2026-yil oylari holati:</b>\n"
+        text += "\n".join(monthly_status) + "\n"
+
+        if total_old_debt_2026 > 0:
+            text += f"\n• <i>Eski yildan o'tgan qarz: {total_old_debt_2026:,.0f} so'm</i>\n"
+
+        text += f"────────────────────\n"
         text += (
-            "💡 <i>Eslatma: Oylik abonent to'lovi har oy hisoblanadi. "
-            "Agar to'lov qilgan bo'lsangiz-u, ro'yxatda chiqmagan bo'lsa, "
-            "to'lov chekini guruhga yuboring, mutaxassislarimiz bazani tekshirib yangilab berishadi.</i>"
+            "💡 <i>Agar to'lov qilgan bo'lsangiz, to'lov chekini ushbu guruhga tashlang. "
+            "Operatorlarimiz tekshirib, tizimni yangilab berishadi.</i>"
         )
         return text
 
