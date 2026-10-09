@@ -16,6 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from excel_manager import excel_manager, DATA_DIR
 from ai_helper import generate_ai_reply, analyze_pos_image
+from catalog import find_video_post
 from state_manager import get_last_file_message_id, set_last_file_message_id
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -236,16 +237,14 @@ async def handle_text(message: types.Message, bot: Bot):
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
             return
 
-    # 2-QADAM: SUN'IY INTELLEKT ORQALI KONTEKSTGA ASOSLANGAN KORXONA JAVOBI
-    reply_text, video_id = generate_ai_reply(text)
-    logger.info(f"AI Context Reply: Matn='{text[:30]}...' -> VideoID={video_id}")
+    # 2-QADAM: AGAR VIDEO-QO'LLANMA BO'LSA — FAQAT SHU POSTNI UZATISH (MATN YOZILMAYDI)
+    video_id = find_video_post(text)
+    reply_text = None
 
-    try:
-        await message.reply(reply_text, parse_mode="HTML")
-    except Exception:
-        await message.reply(reply_text)
+    if not video_id:
+        reply_text, video_id = generate_ai_reply(text)
 
-    # Agar savolga tegishli video-qo'llanma mavjud bo'lsa, uni ham yuborish
+    # Mos video post topilsa -> FAQAT kanal postini uzatamiz va to'xtatamiz
     if video_id:
         try:
             await bot.copy_message(
@@ -253,8 +252,18 @@ async def handle_text(message: types.Message, bot: Bot):
                 from_chat_id=SOURCE_CHANNEL_ID,
                 message_id=video_id
             )
+            return
         except Exception as e:
             logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
+
+    # 3-QADAM: AGAR VIDEO BO'LMASA — AI NING QISQA VA LO'NDA JAVOBINI MATN SIFATIDA YUBORISH
+    if not reply_text:
+        reply_text, _ = generate_ai_reply(text)
+
+    try:
+        await message.reply(reply_text, parse_mode="HTML")
+    except Exception:
+        await message.reply(reply_text)
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
