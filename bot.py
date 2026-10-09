@@ -178,6 +178,9 @@ async def handle_photo(message: types.Message, bot: Bot):
     # Rasm tagida INN bormi?
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", caption)
     if found_nums:
+        user_id = message.from_user.id if message.from_user else 0
+        chat_id = message.chat.id
+        user_memory.set_last_id(chat_id, user_id, found_nums[0])
         results = excel_manager.search(found_nums[0])
         resp = format_debt_response(results)
         await message.reply(resp, parse_mode="HTML")
@@ -212,6 +215,7 @@ async def handle_photo(message: types.Message, bot: Bot):
 
         # 1. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> darhol bazadan tekshirish
         if detected_inn:
+            user_memory.set_last_id(chat_id, user_id, detected_inn)
             results = excel_manager.search(detected_inn)
             if results:
                 debt_resp = format_debt_response(results)
@@ -302,6 +306,9 @@ async def handle_text(message: types.Message, bot: Bot):
         is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
         # Guruhda son yozilsa yoki so'rov bo'lsa javob berish
         if not is_group or results or (text == query_num) or len(text) <= 25:
+            # Ushbu foydalanuvchi qidirgan INN/JSHSHIRni eslab qolish
+            user_memory.set_last_id(chat_id, user_id, query_num)
+            
             resp = format_debt_response(results)
             await message.reply(resp, parse_mode="HTML")
             
@@ -321,6 +328,25 @@ async def handle_text(message: types.Message, bot: Bot):
                 except Exception as e:
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
             return
+
+    # 1.5-QADAM: FOYDALANUVCHI QARZDORLIKDAN E'TIROZ BILDIRSA YOKI "NIMAGA QARZMAN / QACHON TO'LAGANMAN" DEB SO'RASA
+    lower_text = text.lower()
+    debt_inquiry_keywords = [
+        "nimaga qarz", "nega qarz", "qayerdan qarz", "qanaqa qarz", "qanaqasiga qarz",
+        "to'laganman", "tolaganman", "to'lagandim", "tolagandim", "to'laganmanku", "tolaganmanku",
+        "pul to'laganman", "oylik to'laganman", "to'lov qilganman", "tolov qilganman",
+        "to'lov tarixi", "tolov tarixi", "qachon to'laganman", "qaysi oy", "qaysi oylar"
+    ]
+    if any(kw in lower_text for kw in debt_inquiry_keywords):
+        last_id = user_memory.get_last_id(chat_id, user_id)
+        if last_id:
+            results = excel_manager.search(last_id)
+            if results:
+                history_resp = excel_manager.format_payment_history(results)
+                await message.reply(history_resp, parse_mode="HTML")
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, history_resp)
+                return
 
     # 2-QADAM: AGAR TO'LIQ KATALOGDAGI 50+ TA POSTDAN MOSI BO'LSA — FAQAT SHU POSTNI UZATISH
     video_id = catalog_manager.find_matching_post(text)

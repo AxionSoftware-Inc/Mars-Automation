@@ -22,6 +22,7 @@ def deploy():
         'image_analyzer.py',
         'error_manager.py',
         'user_memory.py',
+        'excel_manager.py',
         'data/video_catalog.json',
         'data/screen_errors.json'
     ]

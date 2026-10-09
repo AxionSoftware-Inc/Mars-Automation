@@ -59,6 +59,19 @@ class UserMemoryManager:
             if len(session["history"]) > self.max_turns * 2:
                 session["history"] = session["history"][-(self.max_turns * 2):]
 
+    def set_last_id(self, chat_id: int, user_id: int, identifier: str):
+        """Foydalanuvchi qidirgan oxirgi INN/JSHSHIR raqamini eslab qolish"""
+        key = self._get_key(chat_id, user_id)
+        if key in self.sessions:
+            self.sessions[key]["last_id"] = identifier
+
+    def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
+        """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
+        key = self._get_key(chat_id, user_id)
+        if key in self.sessions:
+            return self.sessions[key].get("last_id")
+        return None
+
     def get_user_history(self, chat_id: int, user_id: int) -> List[Dict[str, str]]:
         """Aynan shu foydalanuvchining eskirib qolmagan suhbat tarixini olish"""
         self._cleanup_expired()

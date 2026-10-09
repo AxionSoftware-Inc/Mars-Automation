@@ -44,6 +44,8 @@ class ExcelManager:
             new_terminal = {}
             count = 0
 
+            MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
+
             # 3-qatordan boshlab o'qish (1 va 2-qator sarlavhalar)
             for row in sheet.iter_rows(min_row=3, values_only=True):
                 # Ustunlar:
@@ -53,7 +55,11 @@ class ExcelManager:
                 # 3: ЖШШИР (JSHSHIR - YaTT uchun 14 xonali)
                 # 4: Корхона номи
                 # 5: Онлайн-НКМ (Terminal ID / Apparat)
+                # 7..18: 2025 Hisoblandi
+                # 20..31: 2025 To'lov
                 # 33: Qarz 2026 yil 1-yanvar
+                # 34..45: 2026 Hisoblandi
+                # 47..58: 2026 To'landi
                 # 60: Joriy qoldiq (Колдик)
                 # 62: Tuman
                 
@@ -64,6 +70,7 @@ class ExcelManager:
                 phone_raw = row[0] if len(row) > 0 else None
                 debt_raw = row[60] if len(row) > 60 else None
                 tuman_raw = row[62] if len(row) > 62 else None
+                old_debt_raw = row[33] if len(row) > 33 else 0
 
                 stir = self.clean_digits(stir_raw)
                 jshshir = self.clean_digits(jshshir_raw)
@@ -80,6 +87,48 @@ class ExcelManager:
                 except (ValueError, TypeError):
                     debt_val = 0.0
 
+                old_debt = 0.0
+                try:
+                    if old_debt_raw is not None:
+                        old_debt = float(old_debt_raw)
+                except (ValueError, TypeError):
+                    old_debt = 0.0
+
+                # 2026 yil to'lovlari (col 47..58)
+                payments_2026 = {}
+                charges_2026 = {}
+                for m_idx, m_name in enumerate(MONTHS):
+                    # To'langan
+                    p_col = 47 + m_idx
+                    if len(row) > p_col and row[p_col]:
+                        try:
+                            val = float(row[p_col])
+                            if val > 0:
+                                payments_2026[m_name] = val
+                        except (ValueError, TypeError):
+                            pass
+                    # Hisoblangan
+                    c_col = 34 + m_idx
+                    if len(row) > c_col and row[c_col]:
+                        try:
+                            val = float(row[c_col])
+                            if val > 0:
+                                charges_2026[m_name] = val
+                        except (ValueError, TypeError):
+                            pass
+
+                # 2025 yil to'lovlari (col 20..31)
+                payments_2025 = {}
+                for m_idx, m_name in enumerate(MONTHS):
+                    p_col = 20 + m_idx
+                    if len(row) > p_col and row[p_col]:
+                        try:
+                            val = float(row[p_col])
+                            if val > 0:
+                                payments_2025[m_name] = val
+                        except (ValueError, TypeError):
+                            pass
+
                 record = {
                     "phone": str(phone_raw or "-").strip(),
                     "stir": stir or "-",
@@ -87,7 +136,11 @@ class ExcelManager:
                     "name": str(name_raw or "Noma'lum").strip(),
                     "terminal": terminal or "-",
                     "debt": debt_val,
-                    "tuman": str(tuman_raw or "-").strip()
+                    "tuman": str(tuman_raw or "-").strip(),
+                    "old_debt_2026": old_debt,
+                    "payments_2026": payments_2026,
+                    "charges_2026": charges_2026,
+                    "payments_2025": payments_2025
                 }
 
                 if stir:
@@ -141,5 +194,59 @@ class ExcelManager:
             return self.terminal_index[clean_q]
 
         return []
+
+    def format_payment_history(self, results: List[Dict[str, Any]]) -> str:
+        """
+        Qarzdorlik e'tirozi yoki 'nimaga qarzman' savoliga oylar kesimidagi to'lov va hisob-kitob tarixini chiqarish
+        """
+        if not results:
+            return "Kechirasiz, to'lovlar tarixini ko'rish uchun avval INN yoki JSHSHIR raqamingizni yuboring."
+
+        first = results[0]
+        name = first.get("name", "Noma'lum")
+        stir = first.get("stir", "-")
+        jshshir = first.get("jshshir", "-")
+        total_debt = sum(item.get("debt", 0.0) for item in results)
+
+        id_str = f"INN: {stir}" if stir != "-" else f"JSHSHIR: {jshshir}"
+        text = f"📊 <b>To'lovlar va hisob-kitob tarixi:</b>\n🏢 <b>Korxona:</b> {name} ({id_str})\n"
+        text += f"🔴 <b>Joriy qarzdorlik: {total_debt:,.0f} so'm</b>\n"
+        text += "────────────────────\n"
+
+        # Har bir apparat uchun to'lovlar
+        for idx, rec in enumerate(results, 1):
+            terminal = rec.get("terminal", "-")
+            old_debt = rec.get("old_debt_2026", 0.0)
+            payments_2026 = rec.get("payments_2026", {})
+            payments_2025 = rec.get("payments_2025", {})
+
+            if len(results) > 1:
+                text += f"\n📟 <b>Apparat #{idx} (ID: {terminal}):</b>\n"
+
+            if old_debt > 0:
+                text += f"• <i>2026-yil 1-yanvar holatiga o'tgan qarz:</i> {old_debt:,.0f} so'm\n"
+
+            # 2026 to'lovlari
+            if payments_2026:
+                text += "<b>2026-yil to'lovlari:</b>\n"
+                for m, s in payments_2026.items():
+                    text += f"  ✅ {m}: {s:,.0f} so'm\n"
+            else:
+                text += "• <i>2026-yilda hali to'lov qayd etilmagan.</i>\n"
+
+            # 2025 oxirgi to'lovlari (agar 2026 da kam bo'lsa)
+            if payments_2025 and len(payments_2026) < 3:
+                last_2025_items = list(payments_2025.items())[-3:]
+                text += "<b>2025-yil oxirgi to'lovlari:</b>\n"
+                for m, s in last_2025_items:
+                    text += f"  • {m}: {s:,.0f} so'm\n"
+
+        text += "────────────────────\n"
+        text += (
+            "💡 <i>Eslatma: Oylik abonent to'lovi har oy hisoblanadi. "
+            "Agar to'lov qilgan bo'lsangiz-u, ro'yxatda chiqmagan bo'lsa, "
+            "to'lov chekini guruhga yuboring, mutaxassislarimiz bazani tekshirib yangilab berishadi.</i>"
+        )
+        return text
 
 excel_manager = ExcelManager()
