@@ -78,13 +78,16 @@ Foydalanuvchi sizga apparat ekranining fotosuratini yubordi.
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
 VAZIFANGIZ RASMNI QUYIDAGI BOSQICHLARDA TEKSHIRISH:
-0. EKRANNING BUTUNLIGI, TEPASI VA SIFATINI QAT'IY TEKSHIRISH (ENG BIRINCHI VA SHART BO'LGAN TALAB):
-   - DIQQAT: Kassa apparatining o'zi va uning BUTUN EKRANI to'liq ko'rinib turishi SHART!
-   - Agar rasm tepasi biroz bo'lsa ham kesilgan bo'lsa (ya'ni yuqori paneldagi soat yoki internet/Wi-Fi/tarmoq belgisi ko'rinmay qolgan bo'lsa);
-   - Yoki rasm juda yaqindan olingan, ekranning faqat bir qismi/burchagi tushgan, apparat chala ko'ringan bo'lsa;
-   - Yoki ekran xira/qorong'u bo'lib yuqori qismi o'qilmasa:
-     Boshqa HECH QANDAY tahlil yozmang! DARHOL quyidagicha javob bering va to'xtating:
-     "⚠️ <b>Apparat ekrani to'liq ko'rinmayapti.</b>\nTo'g'ri tashxis qo'yishimiz uchun apparatning yuqori qismidagi <b>soat va internet/tarmoq belgilari</b> ham ko'rinishi shart.\n\nIltimos, <b>kassa apparatini va uning butun ekranini to'liq</b> ko'rinadigan qilib qayta rasmga olib yuboring."
+0. APPARAT VA EKRANNING BUTUNLIGI (TEPA, PAST, YON TOMONLARI KESILMAGANLIGI)NI QAT'IY TEKSHIRISH:
+   - DIQQAT! Diagnostika qilish uchun kassa apparatining o'zi va uning BUTUN EKRANI to'liq (tepasi, pasti va ikki yoni kesilmagan holda) ko'rinishi SHART!
+   - Agar quyidagi holatlardan birontasi bo'lsa:
+     * Rasm TEPASI kesilgan bo'lsa (yuqori paneldagi soat, Wi-Fi, internet yoki tarmoq belgisi to'liq ko'rinmayotgan bo'lsa);
+     * Rasm PASTI kesilgan bo'lsa (pastki menyu yoki navigatsiya qismlari ko'rinmayotgan bo'lsa);
+     * Rasm YON TOMONLARI kesilgan yoki faqat ekranning o'rtasi/burchagi yaqinlashtirib (zoom) olingan bo'lsa;
+     * Apparatning o'zi to'liq kadrga sig'magan, yoki ekran xira/qorong'u bo'lsa:
+     
+     Boshqa HECH QANDAY tahlil, sabab yoki taxmin yozmang! DARHOL quyidagicha javob bering va to'xtating:
+     "⚠️ <b>Kassa apparati to'liq ko'rinmayapti.</b>\nApparatning tepasi, pasti yoki yon tomonlari kesilib qolgan. Aniq tashxis qo'yishimiz uchun ekrandagi <b>soat va internet/Wi-Fi belgilari</b>, hamda pastki qismlari ham to'liq ko'rinishi shart.\n\nIltimos, <b>kassa apparatini va uning butun ekranini to'liq (tepa, past va yonlari kesilmagan holda)</b> rasmga olib qayta yuboring."
 
 1. SOAT VA VAQT TEKSHIRUVI:
    - Ekran tepasidagi (Android status bar) yoki kassa ilovasidagi soat/sanani toping.
