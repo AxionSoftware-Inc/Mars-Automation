@@ -20,8 +20,10 @@ def deploy():
         'catalog.py',
         'catalog_manager.py',
         'image_analyzer.py',
+        'error_manager.py',
         'user_memory.py',
-        'data/video_catalog.json'
+        'data/video_catalog.json',
+        'data/screen_errors.json'
     ]
     
     for filename in files_to_upload:

@@ -27,6 +27,8 @@ INCOMPLETE_SCREEN_REPLY = (
     "Aniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 )
 
+from error_manager import error_manager
+
 def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int], Optional[str]]:
     """
     Android POS apparati ekranini professional tashxis qilish:
@@ -34,6 +36,7 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     2. Ekrandagi soat va sanani real Toshkent vaqti bilan solishtirish.
     3. Internet / Wi-Fi / Tarmoq holatini tekshirish.
     4. Ekrandagi xatolik kodlari va xabarlarini aniqlash.
+    5. XULOSA VA JAVOB ErrorManager QOIDALARI ASOSIDA NAZORAT QILINADI.
     
     Qaytaradi: (qisqa_tashxis_matni, video_id yoki None, detected_inn yoki None)
     """
@@ -50,64 +53,21 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     current_hour_min = now_uzb.strftime("%H:%M")
 
     prompt = f"""
-Siz "Mars" servis markazining Smart POS kassa apparatlarini rasmdan diagnostika qiluvchi qat'iy texnik muhandisisiz.
-Foydalanuvchi fotosurat yubordi.
+Siz "Mars" servis markazining kassa apparati ekranidan FAKTLARNI TEKSHIRUVCHI AI analizatorisiz.
+O'zingizcha xulosa yoki maslahat to'qimang! Faqat quyidagi savollarga aniq va haqqoniy faktlar asosida JSON formatida javob bering.
 
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
-DIQQAT! SHARTLARNI QAT'IY KETMA-KETLIKDA (IYERARXIYA BO'YICHA) TEKSHIRING:
-
-=============================================================
-0-BOSQICH (ENG AVVALO): FAQAT HAQIQIY JISMONIY APPARAT FOTOGRAFISI BO'LISHI SHART!
-=============================================================
-Siz FAQAT va FAQAT kamerada jonli olingan HAQIQIY JISMONIY Smart POS kassa apparatini (UzSmart, Pax, Sunmi) tekshirasiz!
-
-AGAR QUYIDAGILARNING BIRONTASI BO'LSA — E'TIBORSIZ QOLDIRING (JAVOB BERILMAYDI):
-- Reklama banneri, e'lon, afisha yoki flayer rasmi;
-- Grafik rasm, vektor (vektornaya grafika), illyustratsiya, chizma yoki 3D render;
-- Skrinshot (telefon ekranining skrinshoti) yoki veb-sayt sahifasi;
-- Hayvonlar (it, mushuk), mashina, taom, tabiat, odamlar (selfi) yoki kassa apparatiga aloqasi bo'lmagan har qanday narsa.
-
-Bunday holatda DARHOL VA FAQAT quyidagi kodni qaytaring, ortiqcha hech narsa yozmang:
-[NOT_POS]
-
-=============================================================
-1-BOSQICH: HAQIQIY APPARAT EKRANI TEPASINING TO'LIQLIGI (STATUS BAR)
-=============================================================
-(Faqat haqiqiy apparat fotosurati bo'lsagina):
-Ekranning eng yuqori qismidagi Android status bar (soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) rasmda tushganmi?
-- Agar rasm tepasi kesilgan bo'lsa;
-- Agar soat va tarmoq qatori ko'rinmay qolgan bo'lsa;
-- Agar rasm juda xira yoki ekranning faqat bir burchagi/o'rtasi olingan bo'lsa:
-
-DARHOL TO'XTANG! HECH QANDAY TASHXIS QO'YMANG, INN SO'RAMANG VA VIDEO QO'YMANG!
-Faqat va faqat quyidagi matnni bering:
-"⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\nAniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
-
-=============================================================
-2-BOSQICH: FAQAT 1-BOSQICH TO'G'RI BO'LGANDAGINA (SOAT QATORI ANIQ KO'RINSA):
-=============================================================
-Ketma-ket quyidagilarni tekshiring:
-
-A) SOAT VA SANA TEKSHIRUVI:
-   - Ekrandagi soatni o'qing. Hozirgi real Toshkent vaqti: {current_hour_min}.
-   - Agar bir necha daqiqa (1-10 min) farq bo'lsa — bu normal holat (xato emas).
-   - Agar apparatdagi soat bir necha soatga xato bo'lsa yoki sana noto'g'ri bo'lsa:
-     "⚠️ Apparatdagi soat/vaqt noto'g'ri. Kassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak." deb yozing va oxiriga [VIDEO:141] qo'ying.
-     (Bu holda INN so'rash kerak emas!)
-
-B) INTERNET VA TARMOQ TEKSHIRUVI:
-   - Status bardagi Wi-Fi belgisi yoki SIM karta tarmog'ini tekshiring.
-   - Agar apparat internetga ulanmagan bo'lsa:
-     "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
-     (Bu holda INN so'rash kerak emas!)
-
-C) EKRANDAGI XATOLIK KODI, BLOK YOKI QARZDORLIK:
-   - Agar soat to'g'ri, internet ulangan bo'lsa, endi ekrandagi yozuv va holatni o'qing.
-   - Agar ekranda korxona STIR (INN) yoki JSHSHIR raqami ko'rinib turgan bo'lsa, javob oxiriga [INN:123456789] shaklida qo'shing.
-   - Agar apparat bloklangan bo'lsa, to'xtagan bo'lsa, to'lov yoki abonent qarzdorligi bo'lishi mumkinligi ko'rinsa:
-     "⚠️ Apparat to'xtagan yoki abonent to'lovidan qarzdorlik bo'lishi mumkin. Bazadan tekshirishimiz uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring." deb so'rang.
-   - Boshqa texnik xatolik bo'lsa, uning sababi va yechimini 1-2 gapda lo'nda tushuntiring.
+JAVOB FORMATI FAQAT JSON BO'LISHI SHART:
+{{
+  "is_real_pos_device": true/false, // Rasmda kamerada olingan haqiqiy jismoniy POS apparati bormi? (Banner, illyustratsiya, chizma, skrinshot, hayvon, taom bo'lsa false)
+  "is_status_bar_visible": true/false, // Ekran tepasidagi soat yoki tarmoq/internet status bar qatori tushganmi?
+  "time_mismatch": true/false, // Ekrandagi soat hozirgi real Toshkent vaqtidan ({current_hour_min}) 10 daqiqadan ko'pga farq qiladimi?
+  "has_internet": true/false, // Status bardagi Wi-Fi yoki mobil tarmoq ulanganmi?
+  "error_type": "debt" | "fiscal_module" | "update" | "paper" | "none", // Ekrandagi asosiy muammo turi
+  "detected_inn": "123456789" yoki null, // Ekranda STIR/INN yoki JSHSHIR raqami ko'rinib turgan bo'lsa
+  "screen_text_summary": "ekrandagi xatolik yoki ko'ringan yozuvlar qisqacha"
+}}
 
 Foydalanuvchi izohi: "{user_caption}"
 """
@@ -121,38 +81,45 @@ Foydalanuvchi izohi: "{user_caption}"
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=contents,
-            config=types.GenerateContentConfig(temperature=0.1)
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json"
+            )
         )
 
-        full_text = response.text.strip() if (response and response.text) else ""
+        raw_json = response.text.strip() if (response and response.text) else "{}"
+        try:
+            facts = json.loads(raw_json)
+        except Exception:
+            # Fallback regex if markdown wrappers
+            match = re.search(r"\{.*\}", raw_json, re.DOTALL)
+            facts = json.loads(match.group(0)) if match else {}
 
-        # 0-BOSQICH FILTRI: Agar rasm kassa apparatiga tegishli bo'lmasa -> E'tiborsiz qoldiriladi
-        if "[NOT_POS]" in full_text or full_text == "[NOT_POS]":
+        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati fotosurati emasmi?
+        if not facts.get("is_real_pos_device", False):
             return "", None, None
 
-        # 1-BOSQICH FILTRI (Majburiy tepa qismi tekshiruvi):
-        lower_resp = full_text.lower()
-        if any(w in lower_resp for w in [
-            "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring",
-            "kesilib", "kesilgan", "ko'rinmayapti", "korinmayapti"
-        ]) and any(w in lower_resp for w in ["ekran", "soat", "tarmoq", "tepa"]):
+        # 1-BOSQICH (STATUS BAR FILTRI): Ekran tepasi kesilganmi?
+        if not facts.get("is_status_bar_visible", False):
             return INCOMPLETE_SCREEN_REPLY, None, None
 
-        # [INN:xxx] tegini ajratish
-        detected_inn = None
-        inn_match = re.search(r"\[INN:(\d{9}|\d{14})\]", full_text)
-        if inn_match:
-            detected_inn = inn_match.group(1)
-            full_text = re.sub(r"\[INN:\d+\]", "", full_text).strip()
+        detected_inn = facts.get("detected_inn")
 
-        # [VIDEO:xxx] tegini ajratish
-        video_id = None
-        match = re.search(r"\[VIDEO:(\d+)\]", full_text)
-        if match:
-            video_id = int(match.group(1))
-            full_text = re.sub(r"\[VIDEO:\d+\]", "", full_text).strip()
+        # 2-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
+        matched_rule = error_manager.match_error(facts)
+        if matched_rule:
+            return (
+                matched_rule.get("response_text", ""),
+                matched_rule.get("video_id"),
+                detected_inn
+            )
 
-        return full_text, video_id, detected_inn
+        # Agar maxsus qoida topilmasa, lo'nda umumiy xulosa
+        summary = facts.get("screen_text_summary")
+        if summary and summary.lower() != "none":
+            return f"ℹ️ <b>Ekrandagi holat:</b> {summary}\nNosozlik davom etsa, korxona INN raqamini yuboring.", None, detected_inn
+
+        return "", None, detected_inn
 
     except Exception as e:
         logger.error(f"Image screen analysis error: {e}")

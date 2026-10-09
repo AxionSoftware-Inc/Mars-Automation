@@ -1,0 +1,50 @@
+[
+  {
+    "id": "time_error",
+    "name": "Sana va vaqt noto'g'ri",
+    "screen_keywords": ["vaqt noto'g'ri", "sana noto'g'ri", "time mismatch", "soat xato"],
+    "response_text": "⚠️ <b>Apparatdagi soat yoki sana noto'g'ri.</b>\nKassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak.",
+    "video_id": 141,
+    "require_inn": false
+  },
+  {
+    "id": "no_internet",
+    "name": "Internet aloqasi yo'q",
+    "screen_keywords": ["tarmoq xatosi", "internet yo'q", "offline", "aloqa yo'q", "no internet", "подключение к сети", "tarmoqqa ulanish"],
+    "response_text": "⚠️ <b>Apparat internetga ulanmagan.</b>\nIltimos, Wi-Fi yoki SIM-karta internetini tekshiring.",
+    "video_id": null,
+    "require_inn": false
+  },
+  {
+    "id": "debt_blocked",
+    "name": "Abonent to'lovi qarzdorligi / Blok",
+    "screen_keywords": ["blok", "to'xtatilgan", "abonent", "qarzdorlik", "bloklandi", "muddati tugagan", "заблокирован"],
+    "response_text": "⚠️ <b>Apparat to'xtatilgan yoki abonent to'lovidan qarzdorlik mavjud bo'lishi mumkin.</b>\nBazadan tekshirishimiz uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
+    "video_id": null,
+    "require_inn": true
+  },
+  {
+    "id": "fiscal_module_error",
+    "name": "Fiskal modul xatoligi",
+    "screen_keywords": ["fiskal modul", "fiskal xotira", "fm xatolik", "fm javob bermayapti", "фискальный модуль"],
+    "response_text": "⚠️ <b>Fiskal modul ilovasida nosozlik aniqlandi.</b>\nIlovani qayta aktivlashtirish yoki qayta o'rnatish lozim.",
+    "video_id": 134,
+    "require_inn": false
+  },
+  {
+    "id": "update_required",
+    "name": "Dasturni yangilash zarur",
+    "screen_keywords": ["obnovleniya", "yangilash", "yangi versiya", "обновление", "update required"],
+    "response_text": "⚠️ <b>Kassa apparati dasturini yangilash (обновление) talab qilinmoqda.</b>",
+    "video_id": 125,
+    "require_inn": false
+  },
+  {
+    "id": "paper_out",
+    "name": "Qog'oz / lenta tugagan",
+    "screen_keywords": ["qog'oz tugadi", "lenta yo'q", "lentani tekshiring", "chek qog'ozi", "нет бумаги"],
+    "response_text": "⚠️ <b>Kassa apparatida qog'oz (lenta) tugagan yoki qopqoq ochiq qolgan.</b>\nIltimos, yangi lenta solib qopqoqni mahkam yoping.",
+    "video_id": null,
+    "require_inn": false
+  }
+]
