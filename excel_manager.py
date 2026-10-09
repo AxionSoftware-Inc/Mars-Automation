@@ -318,13 +318,6 @@ class ExcelManager:
                 prepaid_diff = abs(total_debt) if total_debt < 0 else 0.0
                 year_end_needed = max(0.0, future_charges - prepaid_diff)
                 text += f"💡 <b>Yil oxirigacha (Dekabrgacha) apparat uzluksiz ishlashi uchun to'lov:</b> <code>{year_end_needed:,.0f}</code> so'm\n"
-
-        text += f"────────────────────\n"
-        text += (
-            "📲 <b>Click orqali to'lash:</b>\n"
-            "Xizmatlar -> «Mars Elektron Texnika» -> INN kiritiladi.\n\n"
-            "💬 <i>To'lov qilgan bo'lsangiz, to'lov chekini ushbu chatga tashlang. Operatorlarimiz tekshirib, tizimni yangilab berishadi.</i>"
-        )
         return text
 
 excel_manager = ExcelManager()
