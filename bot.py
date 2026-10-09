@@ -3,19 +3,20 @@ import re
 import io
 import logging
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Env o'zgaruvchilarini eng avval yuklash
+load_dotenv()
+
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
 from aiogram.enums import ChatType
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from dotenv import load_dotenv
 
 from excel_manager import excel_manager, DATA_DIR
 from ai_helper import generate_ai_reply, analyze_pos_image
-from catalog import find_video_post, normalize
 from state_manager import get_last_file_message_id, set_last_file_message_id
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -23,6 +24,19 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DESTINATION_CHANNEL_ID = -1003784534841  # marsfayllar
 SOURCE_CHANNEL_ID = -1001641871516       # @POS_Terminal_UzSmart_Bank
+
+# Kanaldagi video postlar xaritasi
+POST_MAP = {
+    "post_148": 148,  # Oylik to'lovni Click orqali to'lash videosi
+    "post_145": 145,  # Yillik to'lov
+    "post_140": 140,  # Narx o'zgartirish
+    "post_141": 141,  # Sana va vaqtni to'g'irlash
+    "post_125": 125,  # Dasturni yangilash
+    "post_137": 137,  # Fiskal modul aktivlashtirish
+    "post_134": 134,  # Fiskal modulni o'chirib qayta o'rnatish
+    "post_138": 138,  # Ma'lumotlarni yuklash
+    "post_136": 136,  # Analitika
+}
 
 dp = Dispatcher()
 scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
@@ -86,7 +100,6 @@ async def handle_document(message: types.Message, bot: Bot):
     doc = message.document
     if doc.file_name and (doc.file_name.endswith(".xlsx") or doc.file_name.endswith(".xls")):
         try:
-            # Agar asosiy kanalga kelgan bo'lsa, avvalgi eski fayl xabarini kanaldan o'chirish (tozalash)
             if message.chat.id == DESTINATION_CHANNEL_ID:
                 last_msg_id = get_last_file_message_id()
                 if last_msg_id and last_msg_id != message.message_id:
@@ -140,7 +153,7 @@ async def handle_source_channel_post(message: types.Message, bot: Bot):
 async def handle_photo(message: types.Message, bot: Bot):
     caption = message.caption or ""
     
-    # Rasm tagidagi matnda INN bormi?
+    # Rasm tagida INN bormi?
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", caption)
     if found_nums:
         results = excel_manager.search(found_nums[0])
@@ -157,19 +170,6 @@ async def handle_photo(message: types.Message, bot: Bot):
             except Exception as e:
                 logger.error(f"Qo'llanma yuborishda xatolik: {e}")
         return
-
-    # Video qo'llanma so'ralgan bo'lsa
-    video_id = find_video_post(caption)
-    if video_id:
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=video_id
-            )
-            return
-        except Exception as e:
-            logger.error(f"Video yuborishda xatolik: {e}")
 
     # Kengaytirilgan Agent tahlili: Ekrandagi xatolik kodlari va nosozlikni aniqlash
     try:
@@ -207,24 +207,20 @@ async def cmd_tekshir(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Qo'llanma postini jo'natishda xatolik: {e}")
 
-# 5. MATNLI XABARLARNI GIBRID BOSHQARISH
+# 5. MATNLI XABARLARNI PURE AI SEMANTIC ROUTER ASOSIDA BOSHQARISH
 @dp.message(F.text)
 async def handle_text(message: types.Message, bot: Bot):
     text = message.text.strip()
-    t_norm = normalize(text)
     
-    # 1. AGAR MATNDA 9 XONALI INN YOKI 14 XONALI JSHSHIR BO'LSA
+    # 1-QADAM: Agar matnda 9 xonali INN yoki 14 xonali JSHSHIR bo'lsa -> Excel bazadan tekshirish
     found_nums = re.findall(r"\b(\d{14}|\d{9})\b", text)
     if found_nums:
         query_num = found_nums[0]
         results = excel_manager.search(query_num)
         
         is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
-        keywords = ["inn", "stir", "инн", "стир", "qarz", "tekshir", "ishlamay", "ishlamayapti", "apparat", "terminal"]
-        has_kw = any(k in text.lower() for k in keywords)
-        is_pure_num = (text == query_num)
-        
-        if not is_group or results or is_pure_num or has_kw:
+        # Guruhda son yozilsa yoki so'rov bo'lsa javob berish
+        if not is_group or results or (text == query_num) or len(text) <= 25:
             resp = format_debt_response(results)
             await message.reply(resp, parse_mode="HTML")
             
@@ -238,45 +234,27 @@ async def handle_text(message: types.Message, bot: Bot):
                     )
                 except Exception as e:
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
-        return
+            return
 
-    # 2. KANALNING BARCHA VIDEOLARI BILAN SOLISHTIRISH
-    video_id = find_video_post(text)
+    # 2-QADAM: SUN'IY INTELLEKT ORQALI KONTEKSTGA ASOSLANGAN KORXONA JAVOBI
+    reply_text, video_id = generate_ai_reply(text)
+    logger.info(f"AI Context Reply: Matn='{text[:30]}...' -> VideoID={video_id}")
+
+    try:
+        await message.reply(reply_text, parse_mode="HTML")
+    except Exception:
+        await message.reply(reply_text)
+
+    # Agar savolga tegishli video-qo'llanma mavjud bo'lsa, uni ham yuborish
     if video_id:
-        logger.info(f"Video qo'llanma topildi (ID: {video_id}) so'rov: '{text}'")
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=SOURCE_CHANNEL_ID,
                 message_id=video_id
             )
-            return
         except Exception as e:
-            logger.error(f"Video postni uzatishda xatolik: {e}")
-
-    # 3. APPARAT ISHLAMAY QOLGAN YOKI QARZDORLIKNI BILMOQCHI BO'LSA
-    debt_keywords = [
-        "ishlamay", "ishlamadi", "ishlamayapti", "ochilmay", "ochilmayapti",
-        "qarzim", "qarz bormi", "qarzdorlik", "kassa ochilmay", "blok bo'ldi",
-        "bloklandi", "chek chiqmay", "terminal ishlamay", "aparat ishlamay"
-    ]
-    if any(k in t_norm for k in debt_keywords):
-        await message.reply(
-            "Assalomu alaykum! Apparatingiz holatini va abonent qarzdorligini tekshirish uchun, "
-            "iltimos, korxonangizning 9 xonali <b>INN (STIR)</b> yoki 14 xonali <b>JSHSHIR</b> raqamini yozib yuboring.",
-            parse_mode="HTML"
-        )
-        return
-
-    # 4. BOSHQACHA SAVOLLAR VA GAPLAR
-    is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
-    if not is_group:
-        ai_reply = generate_ai_reply(text)
-        await message.reply(ai_reply, parse_mode="HTML")
-    else:
-        if any(w in t_norm for w in ["kassa", "apparat", "pos", "terminal", "salom"]):
-            ai_reply = generate_ai_reply(text)
-            await message.reply(ai_reply, parse_mode="HTML")
+            logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
@@ -286,7 +264,7 @@ async def main():
         args=[bot]
     )
     scheduler.start()
-    logger.info("Bot va ertalabki 09:00 vazifalar jadvali muvaffaqiyatli ishga tushdi...")
+    logger.info("Bot sof AI semantik kontekst tizimi bilan ishga tushirildi...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
