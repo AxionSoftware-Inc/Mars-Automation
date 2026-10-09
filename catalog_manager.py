@@ -111,7 +111,7 @@ class CatalogManager:
                 return None
 
         # 2-bosqich: AI yordamida chuqur semantik moslashtirish
-        if not ai_client or len(user_text.strip()) < 4:
+        if not openrouter_client or len(user_text.strip()) < 4:
             return None
 
         try:

@@ -1,6 +1,8 @@
 import os
 import re
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Optional, Dict, Any, List
 import openpyxl
 
@@ -295,10 +297,33 @@ class ExcelManager:
         if total_old_debt_2026 > 0:
             text += f"\n• <i>Eski yildan o'tgan qarz: {total_old_debt_2026:,.0f} so'm</i>\n"
 
+        # Qarz bo'yicha to'lov tavsiyasi hisoblash (shu oy va yil oxirigacha)
+        now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
+        current_month_idx = now_uzb.month  # 1..12
+        current_month_name = MONTHS[current_month_idx - 1]
+        remaining_months_to_year_end = max(0, 12 - current_month_idx)
+
+        pay_current_month = max(0.0, total_debt)
+        future_charges = remaining_months_to_year_end * sample_monthly_rate
+        pay_year_end = pay_current_month + future_charges
+
+        text += f"────────────────────\n"
+        if total_debt > 0:
+            text += f"💡 <b>Apparat uzluksiz ishlashi uchun to'lov miqdori:</b>\n"
+            text += f"🔹 <b>Shu oy ({current_month_name}) ishlashi uchun:</b> <code>{pay_current_month:,.0f}</code> so'm\n"
+            if remaining_months_to_year_end > 0:
+                text += f"🔹 <b>Yil oxirigacha (Dekabrgacha) ishlashi uchun:</b> <code>{pay_year_end:,.0f}</code> so'm\n"
+        else:
+            if remaining_months_to_year_end > 0:
+                prepaid_diff = abs(total_debt) if total_debt < 0 else 0.0
+                year_end_needed = max(0.0, future_charges - prepaid_diff)
+                text += f"💡 <b>Yil oxirigacha (Dekabrgacha) apparat uzluksiz ishlashi uchun to'lov:</b> <code>{year_end_needed:,.0f}</code> so'm\n"
+
         text += f"────────────────────\n"
         text += (
-            "💡 <i>Agar to'lov qilgan bo'lsangiz, to'lov chekini ushbu guruhga tashlang. "
-            "Operatorlarimiz tekshirib, tizimni yangilab berishadi.</i>"
+            "📲 <b>Click orqali to'lash:</b>\n"
+            "Xizmatlar -> «Mars Elektron Texnika» -> INN kiritiladi.\n\n"
+            "💬 <i>To'lov qilgan bo'lsangiz, to'lov chekini ushbu chatga tashlang. Operatorlarimiz tekshirib, tizimni yangilab berishadi.</i>"
         )
         return text
 

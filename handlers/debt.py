@@ -1,5 +1,7 @@
 import re
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
 from excel_manager import excel_manager
@@ -41,8 +43,21 @@ def format_debt_response(results: list) -> str:
     total_debt = sum(item.get("debt", 0.0) for item in results)
 
     if total_debt > 0:
+        now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
+        MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
+        current_month_idx = now_uzb.month
+        current_month_name = MONTHS[current_month_idx - 1]
+        remaining_months = max(0, 12 - current_month_idx)
+        monthly_rate = 100000.0 * device_count
+        pay_year_end = total_debt + (remaining_months * monthly_rate)
+
         text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
         text += "⚠️ <i>Apparat ishlamay qolganining sababi oylik abonent to'lovidagi qarzdorlik!</i>\n\n"
+        text += "💡 <b>Apparat uzluksiz ishlashi uchun to'lov miqdori:</b>\n"
+        text += f"🔹 <b>Shu oy ({current_month_name}) ishlashi uchun:</b> <code>{total_debt:,.0f}</code> so'm\n"
+        if remaining_months > 0:
+            text += f"🔹 <b>Yil oxirigacha (Dekabrgacha) ishlashi uchun:</b> <code>{pay_year_end:,.0f}</code> so'm\n"
+        text += "\n"
         text += (
             "💳 <b>To'lov uchun bank rekvizitlari:</b>\n"
             "🏢 <b>Kompaniya:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
