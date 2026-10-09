@@ -58,22 +58,27 @@ HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 DIQQAT! SHARTLARNI QAT'IY KETMA-KETLIKDA (IYERARXIYA BO'YICHA) TEKSHIRING:
 
 =============================================================
-0-BOSQICH (ENG AVVALO): RASM MAVZUSINI TEKSHIRISH (GUARDRAIL)
+0-BOSQICH (ENG AVVALO): FAQAT HAQIQIY JISMONIY APPARAT FOTOGRAFISI BO'LISHI SHART!
 =============================================================
-Rasmda haqiqatan ham Smart POS kassa apparati (UzSmart, Pax, Sunmi yoki shunga o'xshash kassa terminali) bormi?
-- Agar rasmda kassa apparati BO'LMASA (masalan: hayvonlar, it, mushuk, tabiat, mashina, taom, selfi yoki boshqa mutlaqo aloqasiz narsalar bo'lsa):
-DARHOL VA FAQAT quyidagi bitta so'zni qaytaring:
+Siz FAQAT va FAQAT kamerada jonli olingan HAQIQIY JISMONIY Smart POS kassa apparatini (UzSmart, Pax, Sunmi) tekshirasiz!
+
+AGAR QUYIDAGILARNING BIRONTASI BO'LSA — E'TIBORSIZ QOLDIRING (JAVOB BERILMAYDI):
+- Reklama banneri, e'lon, afisha yoki flayer rasmi;
+- Grafik rasm, vektor (vektornaya grafika), illyustratsiya, chizma yoki 3D render;
+- Skrinshot (telefon ekranining skrinshoti) yoki veb-sayt sahifasi;
+- Hayvonlar (it, mushuk), mashina, taom, tabiat, odamlar (selfi) yoki kassa apparatiga aloqasi bo'lmagan har qanday narsa.
+
+Bunday holatda DARHOL VA FAQAT quyidagi kodni qaytaring, ortiqcha hech narsa yozmang:
 [NOT_POS]
-(Boshqa hech qanday so'z, harf yoki belgi yozmang!)
 
 =============================================================
-1-BOSQICH: EKRAN TEPASINING TO'LIQLIGI (STATUS BAR)
+1-BOSQICH: HAQIQIY APPARAT EKRANI TEPASINING TO'LIQLIGI (STATUS BAR)
 =============================================================
-(Faqat rasmda kassa apparati bo'lsa tekshiring):
-Ekranning eng yuqori qismidagi qator (Android status bar: soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) tushganmi?
+(Faqat haqiqiy apparat fotosurati bo'lsagina):
+Ekranning eng yuqori qismidagi Android status bar (soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) rasmda tushganmi?
 - Agar rasm tepasi kesilgan bo'lsa;
 - Agar soat va tarmoq qatori ko'rinmay qolgan bo'lsa;
-- Agar rasm xira, qorong'u yoki ekranning faqat bir burchagi/o'rtasi olingan bo'lsa:
+- Agar rasm juda xira yoki ekranning faqat bir burchagi/o'rtasi olingan bo'lsa:
 
 DARHOL TO'XTANG! HECH QANDAY TASHXIS QO'YMANG, INN SO'RAMANG VA VIDEO QO'YMANG!
 Faqat va faqat quyidagi matnni bering:
