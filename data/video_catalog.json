@@ -1,0 +1,220 @@
+[
+  {
+    "id": 2,
+    "title": "Chek urish, X va Z hisobot (otchet) olish tartibi",
+    "description": "Kassa apparatda chek chiqarish, kunlik X va Z hisobotlarni olish, tovar qo'shish va eng ko'p uchraydigan muammolar",
+    "keywords": [
+      "chek urish", "chek chiqarish", "chek berish", "chek", "chik", "z hisobot", "z otchet", "zotchet", "z otchot", 
+      "x hisobot", "x otchet", "xotchet", "kunlik yopish", "smena yopish", "kun yakuni", "atchoyt", "otchyot"
+    ]
+  },
+  {
+    "id": 15,
+    "title": "Tovarlarni qo'shish va MXIK kod kiritish",
+    "description": "Kassa apparatiga yangi tovarlarni qo'shish va ularga MXIK kodini to'g'ri biriktirish",
+    "keywords": [
+      "tovar qo'shish", "tovar qushish", "yangi tovar", "mxik kod", "mixk kod", "mxik kiritish", "tovar kiritish", "mxik biriktirish"
+    ]
+  },
+  {
+    "id": 17,
+    "title": "Tovarlardagi MXIK kodni tekshirish",
+    "description": "Soliq jarimalaridan saqlanish uchun tovarlarning MXIK kodlari to'g'riligini tekshirish",
+    "keywords": [
+      "mxik tekshirish", "mixk tekshirish", "kodni tekshirish", "mxik to'g'rilash", "mxik jarima"
+    ]
+  },
+  {
+    "id": 18,
+    "title": "Kunlik savdo summasi va davriy hisobotni bilish",
+    "description": "Ma'lum bir kun oralig'ida yoki bir kunda qancha savdo qilinganini kassa apparatidan ko'rish",
+    "keywords": [
+      "qancha savdo", "savdo summasi", "kunlik savdo", "savdoni bilish", "tushum", "kassadagi pul", "hisobot ko'rish"
+    ]
+  },
+  {
+    "id": 27,
+    "title": "2D qo'l skaneri (ruchkoy skaner)ni ulash va ishlatish",
+    "description": "2D shtrix-kod skanerini kassa apparatiga ulash, ishlatish va tovarlarni skaner orqali kiritish",
+    "keywords": [
+      "skaner", "skaner ulash", "2d skaner", "ruchkoy skaner", "shtrix kod", "skaner ishlatish", "skaner sozlash"
+    ]
+  },
+  {
+    "id": 28,
+    "title": "MXIK kodlarni Tasnif.soliq.uz saytidan qidirish",
+    "description": "Tasnif.soliq.uz orqali tovar va xizmatlarning rasmiy MXIK kodlarini tezkor topish",
+    "keywords": [
+      "tasnif", "tasnif soliq", "mxik topish", "mxik qidirish", "kod qidirish"
+    ]
+  },
+  {
+    "id": 34,
+    "title": "Yillik fiskal modul to'lovi uchun bank hisob raqami (shot)",
+    "description": "Yangi Texnologiyalar DUK fiskal modul to'lovi uchun bank rekvizitlari va hisob raqam",
+    "keywords": [
+      "yillik shot", "fiskal modul shot", "yangi texnologiyalar", "yillik rekvizit", "440000", "yillik hisob raqam"
+    ]
+  },
+  {
+    "id": 46,
+    "title": "2D skanerdan foydalanish va soliq imtiyozi",
+    "description": "2D skaner xaridi bo'yicha soliqdan chegirib qolish imtiyozi va qulayliklari",
+    "keywords": [
+      "skaner imtiyoz", "soliq chegirish", "skaner narxi"
+    ]
+  },
+  {
+    "id": 53,
+    "title": "Tovarni otkaz (bekor) qilish va qaytadan to'g'rilab urish",
+    "description": "Xato urilgan tovarni yoki chekni bekor qilish (otkaz qilish) va qaytadan urish",
+    "keywords": [
+      "otkaz", "atkas", "otkaz qilish", "bekor qilish", "chekni bekor qilish", "xato urilgan chek", "qaytarish", "chekni qaytarish", "tovarni o'chirish"
+    ]
+  },
+  {
+    "id": 85,
+    "title": "Click orqali oylik to'lovni rekvizit bilan to'lash tartibi",
+    "description": "Click ilovasida Mars Elektron Texnika hisob raqamiga oylik abonent to'lovini o'tkazish tartibi",
+    "keywords": [
+      "rekvizit bo'yicha to'lov", "click rekvizit", "mars elektron texnika shot", "oylik shot"
+    ]
+  },
+  {
+    "id": 101,
+    "title": "Kassa apparatini Humo terminal sifatida ishlatish (Banklar)",
+    "description": "Milliybank, Aloqabank, Ipak yo'li bank va boshqa banklar bilan Humo to'lovlarini qabul qilish",
+    "keywords": [
+      "humo terminal", "bank ulash", "karta olish", "humo karta", "terminal qilish", "bank pro"
+    ]
+  },
+  {
+    "id": 109,
+    "title": "Humo kartadan yechishda korxona yoki shaxsiy karta tanlash",
+    "description": "Humo kartalardan mablag' yechilayotganda korxona yoki shaxsiy karta turini tanlash sozlamasi",
+    "keywords": [
+      "humo karta tanlash", "shaxsiy karta", "korxona karta", "mablag' yechish"
+    ]
+  },
+  {
+    "id": 116,
+    "title": "Markirovka mahsulotlari (dorixona, alkogol, maishiy texnika)",
+    "description": "Markirovkali mahsulotlarni Asllik belgisi tizimida ro'yxatdan o'tkazish va sotish qoidalari",
+    "keywords": [
+      "asllik belgisi", "dorixona markirovka", "alkogol markirovka", "tamaki markirovka"
+    ]
+  },
+  {
+    "id": 119,
+    "title": "Alkogol va tamaki mahsulotlarini bloklab urish",
+    "description": "Kassada alkogol va tamaki mahsulotlarini sotish va bloklab urish tartibi",
+    "keywords": [
+      "alkogol bloklab", "tamaki bloklab", "sigaret urish", "aroq urish"
+    ]
+  },
+  {
+    "id": 125,
+    "title": "Kassa apparati dasturini yangilash (obnovleniya)",
+    "description": "Kassa apparatining ichki dasturini eng so'nggi versiyaga yangilash (obnovit qilish)",
+    "keywords": [
+      "dasturni yangilash", "yangilash", "obnovleniya", "obnovit", "obnavleniya", "aparatni yangilash", "programmani yangilash", "versiya yangilash"
+    ]
+  },
+  {
+    "id": 126,
+    "title": "Tovarlar o'lchov birliklarini to'g'irlash",
+    "description": "Tovarlar tarkibidagi o'lchov birliklarini (dona, kg, metr va h.k.) to'g'irlash bo'yicha yo'riqnoma",
+    "keywords": [
+      "o'lchov birligi", "ulchov birlik", "dona", "kg", "metr", "birlikni to'g'irlash"
+    ]
+  },
+  {
+    "id": 130,
+    "title": "Oylik abonent to'lovi muddati va 6-sanada o'chishi haqida",
+    "description": "Abonent to'lovi har oyning 6-sanasigacha to'lanishi, aks holda apparat o'chishi haqida ogohlantirish",
+    "keywords": [
+      "qachon o'chadi", "nechanchi sana o'chadi", "6 sana", "6-sana", "oylik muddat", "nechida o'chadi", "qachon blokka tushadi", "bloklanish sanasi"
+    ]
+  },
+  {
+    "id": 134,
+    "title": "Fiskal modul ilovasini o'chirib qayta o'rnatish",
+    "description": "Kassa apparatidagi fiskal modul ilovasida xatolik bo'lsa, uni o'chirib qayta o'rnatish videosi",
+    "keywords": [
+      "fiskal modul o'chirish", "modulni o'chirib qayta o'rnatish", "modulni qayta o'rnatish", "qayta yuklash", "feskal modul ochirish", "modul ochirish"
+    ]
+  },
+  {
+    "id": 136,
+    "title": "Kassa analitika va hisobotlar bo'limi",
+    "description": "Kassa apparatidagi analitika bo'limi orqali hisobotlar, savdo va statistikani ko'rish",
+    "keywords": [
+      "analitika", "hisobotlar", "savdo statistikasi", "otchet", "statistika"
+    ]
+  },
+  {
+    "id": 137,
+    "title": "Fiskal modul ilovasini aktivlashtirish (faollashtirish)",
+    "description": "Yangi yoki to'xtab qolgan fiskal modul ilovasini aktiv holatga keltirish videosi",
+    "keywords": [
+      "aktivlashtirish", "fiskal modul aktiv", "aktiv qilish", "feskal aktiv", "modulni faollashtirish", "aktivatsiya"
+    ]
+  },
+  {
+    "id": 138,
+    "title": "Kassa apparatiga ma'lumotlar va tovarlar bazasini yuklash",
+    "description": "Kassaga tovarlar ro'yxatini, narxlarni va bazani yuklab olish tartibi",
+    "keywords": [
+      "ma'lumotlarni yuklash", "malumot yuklash", "baza yuklash", "tovar bazasi", "tovarlarni yuklab olish"
+    ]
+  },
+  {
+    "id": 139,
+    "title": "Markirovkani o'chirish",
+    "description": "Kassa apparati sozlamalaridan markirovka funksiyasini o'chirish tartibi",
+    "keywords": [
+      "markirovkani o'chirish", "markirofkani ochirish", "markirovka o'chirish", "markirovkani bekor qilish"
+    ]
+  },
+  {
+    "id": 140,
+    "title": "Tovarlar narxini o'zgartirish qo'llanmasi",
+    "description": "Kassa apparatida mahsulot yoki tovar narxini tahrirlash va yangi narx qo'yish tartibi",
+    "keywords": [
+      "narx", "narxni o'zgartirish", "narx uzgartirish", "narxini almashtirish", "yangi narx", "narx qo'yish", "narx qanday o'zgaradi"
+    ]
+  },
+  {
+    "id": 141,
+    "title": "Sana va vaqtni to'g'irlash bo'yicha qo'llanma",
+    "description": "Kassa apparatida soat, sana yoki vaqt noto'g'ri bo'lib qolganda uni to'g'irlash",
+    "keywords": [
+      "vaqt", "soat", "sana", "vaqt noto'g'ri", "soat noto'g'ri", "vaqtni to'g'irlash", "vaqt togirlash", "soatni to'g'irlash", "vaqt adashgan"
+    ]
+  },
+  {
+    "id": 142,
+    "title": "Dasturni yangilash videosi (2-versiya)",
+    "description": "Kassa apparati dasturini yangilash (обновление) bo'yicha video-qo'llanma",
+    "keywords": [
+      "dastur yangilash video", "kassa obnovit", "yangilash videosi"
+    ]
+  },
+  {
+    "id": 145,
+    "title": "Yillik fiskal modul to'lovini Click orqali to'lash",
+    "description": "Fiskal modulning yillik to'lovini Click dasturi orqali to'lash bo'yicha video-qo'llanma",
+    "keywords": [
+      "yillik to'lov", "yillik tolov", "yillik tulov", "yillik to'lash", "yillik click", "fiskal modul to'lov", "feskal modul tulov", "yillik qanday to'lanadi"
+    ]
+  },
+  {
+    "id": 148,
+    "title": "Oylik abonent to'lovini Click orqali to'lash videosi",
+    "description": "Oylik abonent to'lovini Click orqali xatosiz to'lash bo'yicha to'liq video-qo'llanma",
+    "keywords": [
+      "oylik to'lov", "oylik tolov", "oylik tulov", "clickdan to'lash", "clickdan tulash", "qanday to'layman", "qanday tolayman", 
+      "qanday to'lasa bo'ladi", "to'lash videosi", "tolov videosi", "videoni tashlang", "video tashlang", "rekvizit", "click to'lov"
+    ]
+  }
+]

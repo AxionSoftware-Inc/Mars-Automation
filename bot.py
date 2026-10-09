@@ -16,7 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from excel_manager import excel_manager, DATA_DIR
 from ai_helper import generate_ai_reply, analyze_pos_image
-from catalog import find_video_post
+from catalog_manager import catalog_manager
 from state_manager import get_last_file_message_id, set_last_file_message_id
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -149,6 +149,14 @@ async def handle_source_channel_post(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Postni kanalga uzatishda xatolik: {e}")
 
+        # YANGI KANAL POSTINI AVTOMATIK INDEKSLASH
+        try:
+            post_text = message.text or message.caption or ""
+            if post_text:
+                catalog_manager.auto_index_new_post(post_id=message.message_id, post_text=post_text)
+        except Exception as e:
+            logger.error(f"Yangi postni avto-indekslashda xatolik: {e}")
+
 # 3. RASM BILAN KELGAN XABARLAR (AGENT VIZUAL TAHLIL VA XATOLIK KODI BO'YICHA)
 @dp.message(F.photo)
 async def handle_photo(message: types.Message, bot: Bot):
@@ -237,14 +245,10 @@ async def handle_text(message: types.Message, bot: Bot):
                     logger.error(f"To'lov videosini yuborishda xatolik: {e}")
             return
 
-    # 2-QADAM: AGAR VIDEO-QO'LLANMA BO'LSA — FAQAT SHU POSTNI UZATISH (MATN YOZILMAYDI)
-    video_id = find_video_post(text)
-    reply_text = None
+    # 2-QADAM: AGAR TO'LIQ KATALOGDAGI 50+ TA POSTDAN MOSI BO'LSA — FAQAT SHU POSTNI UZATISH
+    video_id = catalog_manager.find_matching_post(text)
 
-    if not video_id:
-        reply_text, video_id = generate_ai_reply(text)
-
-    # Mos video post topilsa -> FAQAT kanal postini uzatamiz va to'xtatamiz
+    # Mos video post topilsa -> FAQAT kanal postini uzatamiz va to'xtatamiz (matn yozilmaydi!)
     if video_id:
         try:
             await bot.copy_message(
@@ -257,8 +261,7 @@ async def handle_text(message: types.Message, bot: Bot):
             logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
     # 3-QADAM: AGAR VIDEO BO'LMASA — AI NING QISQA VA LO'NDA JAVOBINI MATN SIFATIDA YUBORISH
-    if not reply_text:
-        reply_text, _ = generate_ai_reply(text)
+    reply_text, _ = generate_ai_reply(text)
 
     try:
         await message.reply(reply_text, parse_mode="HTML")

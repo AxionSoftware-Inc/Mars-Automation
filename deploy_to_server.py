@@ -18,6 +18,8 @@ def deploy():
         'ai_helper.py',
         'bot.py',
         'catalog.py',
+        'catalog_manager.py',
+        'data/video_catalog.json'
     ]
     
     for filename in files_to_upload:
