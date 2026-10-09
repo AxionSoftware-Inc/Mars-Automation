@@ -48,7 +48,8 @@ def format_debt_response(results: list) -> str:
     if not results:
         return (
             "❌ <b>Bazada ushbu raqam bo'yicha ma'lumot topilmadi.</b>\n\n"
-            "Iltimos, INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingiz to'g'ri kiritilganini tekshirib qayta yuboring."
+            "Iltimos, INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingiz to'g'ri kiritilganini tekshirib qayta yuboring.\n"
+            "📸 <i>Agar apparatingiz xatolik berayotgan bo'lsa, ekranini rasmga olib yuborsangiz, nosozlik sababini aniqlab beramiz.</i>"
         )
 
     first = results[0]
@@ -77,10 +78,12 @@ def format_debt_response(results: list) -> str:
         text += "👇 <i>Quyida to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
     elif total_debt < 0:
         text += f"🟢 <b>Oldindan ortiqcha to'lov mavjud: {abs(total_debt):,.0f} so'm</b>\n\n"
-        text += "✅ <i>Abonent to'lovidan qarzdorlik yo'q. Agar apparat baribir ishlamayotgan bo'lsa, internet aloqasi yoki apparat sozlamalarini tekshiring.</i>"
+        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
+        text += "📸 <i>Agar apparatingiz ishlamayotgan bo'lsa, iltimos, <b>apparat ekranidagi xatolikni rasmga olib yuboring</b>. Nosozlik sababini (soat, internet yoki xatolik kodi) darhol aniqlab beramiz.</i>"
     else:
         text += "✅ <b>Qarzdorlik mavjud emas (0 so'm).</b>\n\n"
-        text += "ℹ️ <i>Abonent to'lovidan qarz yo'q. Agar apparat ishlamayotgan bo'lsa, texnik nosozlik yoki internet aloqasini tekshiring.</i>"
+        text += "ℹ️ <b>Abonent to'lovidan qarz yo'q.</b>\n\n"
+        text += "📸 <i>Agar apparatingiz ishlamayotgan bo'lsa, iltimos, <b>apparat ekranidagi xatolikni rasmga olib yuboring</b>. Nosozlik sababini (soat, internet yoki xatolik kodi) darhol aniqlab beramiz.</i>"
 
     return text
 
