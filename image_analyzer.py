@@ -50,31 +50,49 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     current_hour_min = now_uzb.strftime("%H:%M")
 
     prompt = f"""
-Siz Smart POS kassa apparatlarini rasmdan diagnostika qiluvchi qat'iy texnik mutaxassissiz.
+Siz Smart POS kassa apparatlarini rasmdan diagnostika qiluvchi qat'iy texnik muhandissiz.
 Foydalanuvchi sizga apparatning fotosuratini yubordi.
 
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
-ASOSIY QOIDA (TEKSHIRISH SHARTI):
-- Ekran tepasidagi qator (status bar: soat yoki internet/Wi-Fi/tarmoq belgisi ko'rinadigan qism) rasmda ko'ringan bo'lsa BO'LDI — DARHOL TEKSHIRISHGA O'TING!
-- Butun korpus yoki pastki qismlar to'liq tushishi shart emas.
-- FAQAT rasmda ekran tepasidagi soat/status bar qatori umuman ko'rinmay qolgan, butunlay kesilib ketgan yoki rasm o'qib bo'lmaydigan darajada xira bo'lsagina quyidagi qisqa xabarni bering (hech qanday video tegisiz):
+DIQQAT! SHARTLARNI QAT'IY KETMA-KETLIKDA (IYERARXIYA BO'YICHA) TEKSHIRING:
+
+-------------------------------------------------------------
+1-BOSQICH (ENG BIRINCHI VA MAJBURIY SHART): EKRAN TEPASINING TO'LIQLIGI
+-------------------------------------------------------------
+Avvalo rasmga qarang: Ekranning eng yuqori qismidagi qator (Android status bar: soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) tushganmi?
+- Agar rasm tepasi kesilgan bo'lsa;
+- Agar soat va tarmoq qatori ko'rinmay qolgan bo'lsa;
+- Agar rasm xira, qorong'u yoki ekranning faqat bir burchagi/o'rtasi olingan bo'lsa:
+
+DARHOL TO'XTANG! HECH QANDAY TASHXIS QO'YMANG, INN SO'RAMANG VA VIDEO QO'YMANG!
+Faqat va faqat quyidagi matnni bering:
 "⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\nAniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 
-AGAR EKRAN TEPASIDAGI SOAT/STATUS BAR QATORI KO'RINGAN BO'LSA — TEKSHIRISH:
-1. SOAT VA VAQT TEKSHIRUVI:
-   - Ekran tepasidagi (Android status bar) soatni o'qing. Hozirgi real Toshkent vaqti: {current_hour_min}.
-   - Agar bir necha daqiqa (1-10 min) farq bo'lsa — bu to'g'ri (xato emas).
-   - Agar apparatdagi soat bir necha soatga xato bo'lsa yoki sana noto'g'ri bo'lsa — "⚠️ Apparatdagi soat/vaqt noto'g'ri. Kassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak." deb yozing va oxiriga [VIDEO:141] qo'ying.
-2. INTERNET VA TARMOQ TEKSHIRUVI:
+-------------------------------------------------------------
+2-BOSQICH: FAQAT VA FAQAT 1-BOSQICH TO'G'RI BO'LGANDAGINA (SOAT QATORI ANIQ KO'RINSA):
+-------------------------------------------------------------
+Ketma-ket quyidagilarni tekshiring:
+
+A) SOAT VA SANA TEKSHIRUVI:
+   - Ekrandagi soatni o'qing. Hozirgi real Toshkent vaqti: {current_hour_min}.
+   - Agar bir necha daqiqa (1-10 min) farq bo'lsa — bu normal holat (xato emas).
+   - Agar apparatdagi soat bir necha soatga xato bo'lsa yoki sana noto'g'ri bo'lsa:
+     "⚠️ Apparatdagi soat/vaqt noto'g'ri. Kassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak." deb yozing va oxiriga [VIDEO:141] qo'ying.
+     (Bu holda INN so'rash kerak emas!)
+
+B) INTERNET VA TARMOQ TEKSHIRUVI:
    - Status bardagi Wi-Fi belgisi yoki SIM karta tarmog'ini tekshiring.
-   - Agar internet yo'q bo'lsa — "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
-3. EKRANDAGI XATOLIK KODI, BLOK YOKI QARZDORLIK:
-   - Ekrandagi xatolik xabari, bloklanish yoki yozuvlarni o'qing.
+   - Agar apparat internetga ulanmagan bo'lsa:
+     "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
+     (Bu holda INN so'rash kerak emas!)
+
+C) EKRANDAGI XATOLIK KODI, BLOK YOKI QARZDORLIK:
+   - Agar soat to'g'ri, internet ulangan bo'lsa, endi ekrandagi yozuv va holatni o'qing.
    - Agar ekranda korxona STIR (INN) yoki JSHSHIR raqami ko'rinib turgan bo'lsa, javob oxiriga [INN:123456789] shaklida qo'shing.
    - Agar apparat bloklangan bo'lsa, to'xtagan bo'lsa, to'lov yoki abonent qarzdorligi bo'lishi mumkinligi ko'rinsa:
      "⚠️ Apparat to'xtagan yoki abonent to'lovidan qarzdorlik bo'lishi mumkin. Bazadan tekshirishimiz uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring." deb so'rang.
-   - Boshqa texnik nosozlik bo'lsa, sababi va yechimini qisqa va lo'nda (1-2 gapda) tushuntiring.
+   - Boshqa texnik xatolik bo'lsa, uning sababi va yechimini 1-2 gapda lo'nda tushuntiring.
 
 Foydalanuvchi izohi: "{user_caption}"
 """
@@ -91,6 +109,18 @@ Foydalanuvchi izohi: "{user_caption}"
             config=types.GenerateContentConfig(temperature=0.1)
         )
 
+        full_text = response.text.strip() if (response and response.text) else ""
+
+        # QAT'IY XAVFSIZLIK FILTRI (1-BOSQICHGA MUTLOQ USTUVORLIK):
+        # Agar javobda soat/status bar ko'rinmaganligi aytilgan bo'lsa ->
+        # HECH QANDAY INN so'ralmaydi, HECH QANDAY VIDEO qo'yilmaydi!
+        lower_resp = full_text.lower()
+        if any(w in lower_resp for w in [
+            "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring",
+            "kesilib", "kesilgan", "ko'rinmayapti", "korinmayapti"
+        ]) and any(w in lower_resp for w in ["ekran", "soat", "tarmoq", "tepa"]):
+            return INCOMPLETE_SCREEN_REPLY, None, None
+
         # [INN:xxx] tegini ajratish
         detected_inn = None
         inn_match = re.search(r"\[INN:(\d{9}|\d{14})\]", full_text)
@@ -104,16 +134,6 @@ Foydalanuvchi izohi: "{user_caption}"
         if match:
             video_id = int(match.group(1))
             full_text = re.sub(r"\[VIDEO:\d+\]", "", full_text).strip()
-
-        # QAT'IY XAVFSIZLIK FILTRI:
-        # Agar javobda soat/status bar ko'rinmaganligi aytilgan bo'lsa -> HECH QANDAY VIDEO BIRIKTIRILMAYDI!
-        lower_resp = full_text.lower()
-        if any(w in lower_resp for w in [
-            "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring"
-        ]):
-            video_id = None
-            detected_inn = None
-            full_text = INCOMPLETE_SCREEN_REPLY
 
         return full_text, video_id, detected_inn
 
