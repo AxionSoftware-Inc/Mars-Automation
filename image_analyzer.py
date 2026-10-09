@@ -23,15 +23,14 @@ if GEMINI_API_KEY:
         logger.error(f"ImageAnalyzer: Gemini client xatoligi: {e}")
 
 INCOMPLETE_SCREEN_REPLY = (
-    "⚠️ <b>Kassa ekrani to'liq ko'rinmayapti.</b>\n"
-    "Ekranning tepasi (soat/internet) yoki chetlari kesilgan. "
-    "Iltimos, apparat ekranini va chetini to'liq ko'rinadigan qilib qayta rasm yuboring."
+    "⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\n"
+    "Aniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 )
 
 def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int]]:
     """
     Android POS apparati ekranini professional tashxis qilish:
-    1. Ekran to'liqligi (ekranning 4 burchagi, tepa status bar va chetki qismlari) tekshiruvi.
+    1. Ekran tepasidagi status bar (soat, internet/tarmoq) ko'ringanligini tekshirish.
     2. Ekrandagi soat va sanani real Toshkent vaqti bilan solishtirish.
     3. Internet / Wi-Fi / Tarmoq holatini tekshirish.
     4. Ekrandagi xatolik kodlari va xabarlarini aniqlash.
@@ -55,31 +54,23 @@ Foydalanuvchi sizga apparatning fotosuratini yubordi.
 
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
-1-BOSQICH (ENG MUHIM): EKRANNING TO'LIQLIGINI TEKSHIRISH
-MUHIM QOIDA: Butun apparat korpusi to'liq tushishi SHART EMAS! 
-Lekin EKRANNING O'ZI 100% TO'LIQ (barcha 4 burchagi) VA EKRANDAN TASHQARI KORPUSNING BIROZ QISMI (romka/cheti) rasmda aniq ko'rinishi shart!
+ASOSIY QOIDA (TEKSHIRISH SHARTI):
+- Ekran tepasidagi qator (status bar: soat yoki internet/Wi-Fi/tarmoq belgisi ko'rinadigan qism) rasmda ko'ringan bo'lsa BO'LDI — DARHOL TEKSHIRISHGA O'TING!
+- Butun korpus yoki pastki qismlar to'liq tushishi shart emas.
+- FAQAT rasmda ekran tepasidagi soat/status bar qatori umuman ko'rinmay qolgan, butunlay kesilib ketgan yoki rasm o'qib bo'lmaydigan darajada xira bo'lsagina quyidagi qisqa xabarni bering (hech qanday video tegisiz):
+"⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\nAniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 
-Agar quyidagi holatlardan BIRONTASI bo'lsa:
-- Ekran TEPASI kesilgan bo'lsa (Android status bar: soat yoki Wi-Fi/internet/SIM belgisi ko'rinmay qolgan bo'lsa);
-- Ekran PASTI kesilgan bo'lsa (pastki menyu yoki navigatsiya qismlari tushmagan bo'lsa);
-- Ekran YON TOMONLARI kesilgan bo'lsa yoki faqat ekranning o'rtasi/burchagi yaqinlashtirib (zoom) olingan bo'lsa;
-- Rasm xira, qorong'u yoki ekran chetlari ko'rinmay qolgan bo'lsa:
-
-Boshqa HECH QANDAY tashxis, sabab, maslahat yoki taxmin yozish MUMKIN EMAS!
-Javobni uzun qilib yozmang, qisqa qilib DARHOL faqat quyidagi matnni qaytaring, HECH QANDAY video tegi qo'ymang:
-"⚠️ <b>Kassa ekrani to'liq ko'rinmayapti.</b>\nEkranning tepasi (soat/internet) yoki chetlari kesilgan. Iltimos, apparat ekranini va chetini to'liq ko'rinadigan qilib qayta rasm yuboring."
-
-2-BOSQICH: FAQAT BUTUN EKRAN VA UNING ROMKASI TO'LIQ KO'RINGAN HOLATDAGINA TASHXIS QO'YING:
+AGAR EKRAN TEPASIDAGI SOAT/STATUS BAR QATORI KO'RINGAN BO'LSA — TEKSHIRISH:
 1. SOAT VA VAQT TEKSHIRUVI:
    - Ekran tepasidagi (Android status bar) soatni o'qing. Hozirgi real Toshkent vaqti: {current_hour_min}.
    - Agar bir necha daqiqa (1-10 min) farq bo'lsa — bu to'g'ri (xato emas).
    - Agar apparatdagi soat bir necha soatga xato bo'lsa yoki sana noto'g'ri bo'lsa — "⚠️ Apparatdagi soat/vaqt noto'g'ri. Kassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak." deb yozing va oxiriga [VIDEO:141] qo'ying.
 2. INTERNET VA TARMOQ TEKSHIRUVI:
-   - Wi-Fi belgisi yoki SIM karta tarmog'ini tekshiring.
+   - Status bardagi Wi-Fi belgisi yoki SIM karta tarmog'ini tekshiring.
    - Agar internet yo'q bo'lsa — "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
 3. EKRANDAGI XATOLIK KODI YOKI BLOKLANISH:
    - Ekrandagi xatolik xabarini o'qing.
-   - Sababi va yechimini qisqa va aniq (1-2 gapda) tushuntiring.
+   - Sababi va yechimini qisqa va lo'nda (1-2 gapda) tushuntiring.
    - Agar blok yoki qarz bo'lsa, korxona INN yoki JSHSHIR raqamini so'rang.
 
 Foydalanuvchi izohi: "{user_caption}"
@@ -107,11 +98,10 @@ Foydalanuvchi izohi: "{user_caption}"
             full_text = re.sub(r"\[VIDEO:\d+\]", "", full_text).strip()
 
         # QAT'IY XAVFSIZLIK FILTRI:
-        # Agar javobda ekran to'liq emasligi haqida aytilgan bo'lsa -> HECH QANDAY VIDEO BIRIKTIRILMAYDI!
+        # Agar javobda soat/status bar ko'rinmaganligi aytilgan bo'lsa -> HECH QANDAY VIDEO BIRIKTIRILMAYDI!
         lower_resp = full_text.lower()
         if any(w in lower_resp for w in [
-            "to'liq ko'rinmayapti", "toliq korinmayapti", "to'liq tushmagan", "toliq tushmagan",
-            "kesilib", "kesilgan", "qayta rasm", "butun ekranini to'liq", "butun ekrani"
+            "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring"
         ]):
             video_id = None
             full_text = INCOMPLETE_SCREEN_REPLY
