@@ -75,8 +75,16 @@ def format_debt_response(results: list) -> str:
 
     if total_debt > 0:
         text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
-        text += "⚠️ <i>Apparat ishlamay qolganining sababi oylik abonent to'lovidagi qarzdorlik!</i>\n"
-        text += "👇 <i>Quyida to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
+        text += "⚠️ <i>Apparat ishlamay qolganining sababi oylik abonent to'lovidagi qarzdorlik!</i>\n\n"
+        text += (
+            "💳 <b>To'lov uchun bank rekvizitlari:</b>\n"
+            "🏢 <b>Kompaniya:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
+            "🏦 <b>Hisob raqam (X/R):</b> <code>20208000800208044003</code>\n"
+            "🏛 <b>Bank:</b> «Ipak Yo'li» AITB Shahrisabz filiali\n"
+            "🔢 <b>MFO:</b> <code>01048</code> | <b>INN:</b> <code>302568138</code>\n"
+            "📝 <b>To'lov maqsadi:</b> Abonent to'lov (korxona nomingiz yoki INN ko'rsatilsin)\n\n"
+            "👇 <i>Quyida Click orqali to'lash bo'yicha video-qo'llanma yuborildi:</i>"
+        )
     elif total_debt < 0:
         text += f"🟢 <b>Oldindan ortiqcha to'lov mavjud: {abs(total_debt):,.0f} so'm</b>\n\n"
         text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
@@ -196,8 +204,37 @@ async def handle_photo(message: types.Message, bot: Bot):
         await bot.download(photo, destination=file_io)
         image_bytes = file_io.getvalue()
         
-        reply_text, video_id = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
+        reply_text, video_id, detected_inn = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
         
+        # 1. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> darhol bazadan tekshirish
+        if detected_inn:
+            results = excel_manager.search(detected_inn)
+            if results:
+                debt_resp = format_debt_response(results)
+                combined_resp = f"{reply_text}\n\n──────────────\n{debt_resp}"
+                try:
+                    await message.reply(combined_resp, parse_mode="HTML")
+                except Exception:
+                    await message.reply(combined_resp)
+
+                # Xotiraga saqlash
+                user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] INN: {detected_inn}")
+                user_memory.add_assistant_message(chat_id, user_id, combined_resp)
+
+                total_debt = sum(item.get("debt", 0.0) for item in results)
+                if total_debt > 0:
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=148,
+                            reply_to_message_id=message.message_id
+                        )
+                    except Exception as e:
+                        logger.error(f"To'lov videosini yuborishda xatolik: {e}")
+                return
+
+        # 2. Oddiy holatda AI tahlil matnini yuborish
         try:
             await message.reply(reply_text, parse_mode="HTML")
         except Exception:

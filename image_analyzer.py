@@ -27,7 +27,7 @@ INCOMPLETE_SCREEN_REPLY = (
     "Aniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 )
 
-def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int]]:
+def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int], Optional[str]]:
     """
     Android POS apparati ekranini professional tashxis qilish:
     1. Ekran tepasidagi status bar (soat, internet/tarmoq) ko'ringanligini tekshirish.
@@ -35,11 +35,12 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     3. Internet / Wi-Fi / Tarmoq holatini tekshirish.
     4. Ekrandagi xatolik kodlari va xabarlarini aniqlash.
     
-    Qaytaradi: (qisqa_tashxis_matni, video_id yoki None)
+    Qaytaradi: (qisqa_tashxis_matni, video_id yoki None, detected_inn yoki None)
     """
     if not client:
         return (
             "Apparat ekranidagi nosozlikni aniqlash uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
+            None,
             None
         )
 
@@ -68,10 +69,12 @@ AGAR EKRAN TEPASIDAGI SOAT/STATUS BAR QATORI KO'RINGAN BO'LSA — TEKSHIRISH:
 2. INTERNET VA TARMOQ TEKSHIRUVI:
    - Status bardagi Wi-Fi belgisi yoki SIM karta tarmog'ini tekshiring.
    - Agar internet yo'q bo'lsa — "⚠️ Apparat internetga ulanmagan. Iltimos, Wi-Fi yoki SIM-karta internetini tekshiring." deb ayting.
-3. EKRANDAGI XATOLIK KODI YOKI BLOKLANISH:
-   - Ekrandagi xatolik xabarini o'qing.
-   - Sababi va yechimini qisqa va lo'nda (1-2 gapda) tushuntiring.
-   - Agar blok yoki qarz bo'lsa, korxona INN yoki JSHSHIR raqamini so'rang.
+3. EKRANDAGI XATOLIK KODI, BLOK YOKI QARZDORLIK:
+   - Ekrandagi xatolik xabari, bloklanish yoki yozuvlarni o'qing.
+   - Agar ekranda korxona STIR (INN) yoki JSHSHIR raqami ko'rinib turgan bo'lsa, javob oxiriga [INN:123456789] shaklida qo'shing.
+   - Agar apparat bloklangan bo'lsa, to'xtagan bo'lsa, to'lov yoki abonent qarzdorligi bo'lishi mumkinligi ko'rinsa:
+     "⚠️ Apparat to'xtagan yoki abonent to'lovidan qarzdorlik bo'lishi mumkin. Bazadan tekshirishimiz uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring." deb so'rang.
+   - Boshqa texnik nosozlik bo'lsa, sababi va yechimini qisqa va lo'nda (1-2 gapda) tushuntiring.
 
 Foydalanuvchi izohi: "{user_caption}"
 """
@@ -88,8 +91,13 @@ Foydalanuvchi izohi: "{user_caption}"
             config=types.GenerateContentConfig(temperature=0.1)
         )
 
-        full_text = response.text.strip()
-        
+        # [INN:xxx] tegini ajratish
+        detected_inn = None
+        inn_match = re.search(r"\[INN:(\d{9}|\d{14})\]", full_text)
+        if inn_match:
+            detected_inn = inn_match.group(1)
+            full_text = re.sub(r"\[INN:\d+\]", "", full_text).strip()
+
         # [VIDEO:xxx] tegini ajratish
         video_id = None
         match = re.search(r"\[VIDEO:(\d+)\]", full_text)
@@ -104,13 +112,15 @@ Foydalanuvchi izohi: "{user_caption}"
             "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring"
         ]):
             video_id = None
+            detected_inn = None
             full_text = INCOMPLETE_SCREEN_REPLY
 
-        return full_text, video_id
+        return full_text, video_id, detected_inn
 
     except Exception as e:
         logger.error(f"Image screen analysis error: {e}")
         return (
             "Apparat ekranidagi xatolikni aniqlash uchun korxonangizning <b>INN</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
+            None,
             None
         )
