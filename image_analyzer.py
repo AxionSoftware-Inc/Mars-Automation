@@ -78,10 +78,13 @@ Foydalanuvchi sizga apparat ekranining fotosuratini yubordi.
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
 VAZIFANGIZ RASMNI QUYIDAGI BOSQICHLARDA TEKSHIRISH:
-0. EKRAN TO'LIQLIGI VA SIFATINI TEKSHIRISH:
-   - Rasmda kassa apparatining butun ekrani to'liq tushganmi?
-   - Agar ekran kesilgan, faqat bir burchagi, faqat klaviatura tushgan bo'lsa yoki ekran xira bo'lib yozuvlar/soat ko'rinmasa:
-     Darhol: "⚠️ <b>Kassa apparati ekrani to'liq tushmagan.</b>\nAniq nosozlikni aniqlashimiz uchun, iltimos, <b>butun kassa ekranini (soat ko'rsatkichi va xatolik yozuvlari bilan birga) to'liq</b> rasmga olib qayta yuboring." deb javob bering va boshqa tahlil yozmang.
+0. EKRANNING BUTUNLIGI, TEPASI VA SIFATINI QAT'IY TEKSHIRISH (ENG BIRINCHI VA SHART BO'LGAN TALAB):
+   - DIQQAT: Kassa apparatining o'zi va uning BUTUN EKRANI to'liq ko'rinib turishi SHART!
+   - Agar rasm tepasi biroz bo'lsa ham kesilgan bo'lsa (ya'ni yuqori paneldagi soat yoki internet/Wi-Fi/tarmoq belgisi ko'rinmay qolgan bo'lsa);
+   - Yoki rasm juda yaqindan olingan, ekranning faqat bir qismi/burchagi tushgan, apparat chala ko'ringan bo'lsa;
+   - Yoki ekran xira/qorong'u bo'lib yuqori qismi o'qilmasa:
+     Boshqa HECH QANDAY tahlil yozmang! DARHOL quyidagicha javob bering va to'xtating:
+     "⚠️ <b>Apparat ekrani to'liq ko'rinmayapti.</b>\nTo'g'ri tashxis qo'yishimiz uchun apparatning yuqori qismidagi <b>soat va internet/tarmoq belgilari</b> ham ko'rinishi shart.\n\nIltimos, <b>kassa apparatini va uning butun ekranini to'liq</b> ko'rinadigan qilib qayta rasmga olib yuboring."
 
 1. SOAT VA VAQT TEKSHIRUVI:
    - Ekran tepasidagi (Android status bar) yoki kassa ilovasidagi soat/sanani toping.
