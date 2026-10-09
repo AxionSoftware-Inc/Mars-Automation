@@ -206,6 +206,10 @@ async def handle_photo(message: types.Message, bot: Bot):
         
         reply_text, video_id, detected_inn = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
         
+        # Agar rasm kassa apparatiga tegishli bo'lmasa (it, mushuk, begona rasm) -> E'TIBORSIZ QOLDIRILADI
+        if not reply_text:
+            return
+
         # 1. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> darhol bazadan tekshirish
         if detected_inn:
             results = excel_manager.search(detected_inn)
@@ -257,7 +261,6 @@ async def handle_photo(message: types.Message, bot: Bot):
                 logger.error(f"Tashxis videosini yuborishda xatolik: {e}")
     except Exception as e:
         logger.error(f"Rasmni tahlil qilishda xatolik: {e}")
-        await message.reply("Apparat ekranidagi xatolikni aniqroq rasmga olib yuborsangiz, yordam beramiz.")
 
 # 4. BUYRUQ ORQALI TEKSHIRISH (/tekshir 123456789)
 @dp.message(Command("tekshir"))

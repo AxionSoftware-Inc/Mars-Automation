@@ -50,17 +50,27 @@ def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: st
     current_hour_min = now_uzb.strftime("%H:%M")
 
     prompt = f"""
-Siz Smart POS kassa apparatlarini rasmdan diagnostika qiluvchi qat'iy texnik muhandissiz.
-Foydalanuvchi sizga apparatning fotosuratini yubordi.
+Siz "Mars" servis markazining Smart POS kassa apparatlarini rasmdan diagnostika qiluvchi qat'iy texnik muhandisisiz.
+Foydalanuvchi fotosurat yubordi.
 
 HOZIRGI REAL VAQT VA SANA (Toshkent vaqti): {current_time_str}
 
 DIQQAT! SHARTLARNI QAT'IY KETMA-KETLIKDA (IYERARXIYA BO'YICHA) TEKSHIRING:
 
--------------------------------------------------------------
-1-BOSQICH (ENG BIRINCHI VA MAJBURIY SHART): EKRAN TEPASINING TO'LIQLIGI
--------------------------------------------------------------
-Avvalo rasmga qarang: Ekranning eng yuqori qismidagi qator (Android status bar: soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) tushganmi?
+=============================================================
+0-BOSQICH (ENG AVVALO): RASM MAVZUSINI TEKSHIRISH (GUARDRAIL)
+=============================================================
+Rasmda haqiqatan ham Smart POS kassa apparati (UzSmart, Pax, Sunmi yoki shunga o'xshash kassa terminali) bormi?
+- Agar rasmda kassa apparati BO'LMASA (masalan: hayvonlar, it, mushuk, tabiat, mashina, taom, selfi yoki boshqa mutlaqo aloqasiz narsalar bo'lsa):
+DARHOL VA FAQAT quyidagi bitta so'zni qaytaring:
+[NOT_POS]
+(Boshqa hech qanday so'z, harf yoki belgi yozmang!)
+
+=============================================================
+1-BOSQICH: EKRAN TEPASINING TO'LIQLIGI (STATUS BAR)
+=============================================================
+(Faqat rasmda kassa apparati bo'lsa tekshiring):
+Ekranning eng yuqori qismidagi qator (Android status bar: soat raqamlari yoki Wi-Fi / tarmoq / SIM-karta belgisi) tushganmi?
 - Agar rasm tepasi kesilgan bo'lsa;
 - Agar soat va tarmoq qatori ko'rinmay qolgan bo'lsa;
 - Agar rasm xira, qorong'u yoki ekranning faqat bir burchagi/o'rtasi olingan bo'lsa:
@@ -69,9 +79,9 @@ DARHOL TO'XTANG! HECH QANDAY TASHXIS QO'YMANG, INN SO'RAMANG VA VIDEO QO'YMANG!
 Faqat va faqat quyidagi matnni bering:
 "⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\nAniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
 
--------------------------------------------------------------
-2-BOSQICH: FAQAT VA FAQAT 1-BOSQICH TO'G'RI BO'LGANDAGINA (SOAT QATORI ANIQ KO'RINSA):
--------------------------------------------------------------
+=============================================================
+2-BOSQICH: FAQAT 1-BOSQICH TO'G'RI BO'LGANDAGINA (SOAT QATORI ANIQ KO'RINSA):
+=============================================================
 Ketma-ket quyidagilarni tekshiring:
 
 A) SOAT VA SANA TEKSHIRUVI:
@@ -111,9 +121,11 @@ Foydalanuvchi izohi: "{user_caption}"
 
         full_text = response.text.strip() if (response and response.text) else ""
 
-        # QAT'IY XAVFSIZLIK FILTRI (1-BOSQICHGA MUTLOQ USTUVORLIK):
-        # Agar javobda soat/status bar ko'rinmaganligi aytilgan bo'lsa ->
-        # HECH QANDAY INN so'ralmaydi, HECH QANDAY VIDEO qo'yilmaydi!
+        # 0-BOSQICH FILTRI: Agar rasm kassa apparatiga tegishli bo'lmasa -> E'tiborsiz qoldiriladi
+        if "[NOT_POS]" in full_text or full_text == "[NOT_POS]":
+            return "", None, None
+
+        # 1-BOSQICH FILTRI (Majburiy tepa qismi tekshiruvi):
         lower_resp = full_text.lower()
         if any(w in lower_resp for w in [
             "tepa qismi", "tepasi ko'rinmayapti", "soat va tarmoq qatori", "qayta rasm yuboring",
@@ -139,8 +151,4 @@ Foydalanuvchi izohi: "{user_caption}"
 
     except Exception as e:
         logger.error(f"Image screen analysis error: {e}")
-        return (
-            "Apparat ekranidagi xatolikni aniqlash uchun korxonangizning <b>INN</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
-            None,
-            None
-        )
+        return "", None, None

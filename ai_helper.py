@@ -56,17 +56,6 @@ QAT'IY TALABLAR:
    - Nechanchi sana o'chadi / qachon o'chadi deb so'ralsa -> [VIDEO:130]
 """
 
-IMAGE_ERROR_ANALYSIS_PROMPT = """
-Siz Mars kompaniyasining Smart POS kassa apparatlari bo'yicha texnik muhandisisiz.
-Foydalanuvchi kassa apparati ekranining rasmini yubordi.
-
-Talablar:
-1. Ekrandagi xatolik kodi yoki nosozlikni aniqlang.
-2. Sababi va yechimini 2-3 ta qisqa, tushunarli gapda bering.
-3. Agar to'lov yoki bloklanganlik bo'lsa, INN yoki JSHSHIR raqamini so'rang.
-4. Juda lo'nda va qisqa yozing.
-"""
-
 def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str, Optional[int]]:
     """
     Kontekst asosida, lo'nda va qisqa javob qaytarish.
@@ -95,7 +84,7 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
                 temperature=0.2
             )
         )
-        full_text = response.text.strip()
+        full_text = response.text.strip() if (response and response.text) else ""
         
         # [VIDEO:xxx] tegini qidirish va ajratish
         video_id = None
@@ -111,33 +100,4 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
         return (
             "Savolingiz bo'yicha qarzni tekshirish uchun korxona <b>INN</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
             None
-        )
-
-def analyze_pos_image(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> str:
-    """Apparat ekrani rasmini qisqa va lo'nda tahlil qilish"""
-    if not client:
-        return (
-            "Apparatdagi nosozlikni aniqlash uchun, iltimos, "
-            "korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring."
-        )
-
-    try:
-        contents = [
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            user_caption.strip() if user_caption else "Ushbu apparat ekranidagi xatolikni aniqlab bering."
-        ]
-
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=IMAGE_ERROR_ANALYSIS_PROMPT,
-                temperature=0.2,
-            )
-        )
-        return response.text.strip()
-    except Exception as e:
-        logger.error(f"Image analysis error: {e}")
-        return (
-            "Apparat ekranidagi xatolikni aniqlash uchun korxonangizning <b>INN</b> yoki <b>JSHSHIR</b> raqamini yuboring."
         )
