@@ -118,10 +118,21 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         context_summary = user_memory.get_context_summary(chat_id, user_id)
         reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
 
+        if not reply_text or not reply_text.strip():
+            reply_text = (
+                "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
+                "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
+            )
+
+        logger.info(f"📤 AI JAVOBI (Kontekst) [chat_id={chat_id}]: {reply_text[:120]}")
         try:
             await message.reply(reply_text, parse_mode="HTML")
-        except Exception:
-            await message.reply(reply_text)
+        except Exception as e1:
+            logger.warning(f"HTML parse_mode xatosi: {e1}, oddiy matnda yuborilmoqda...")
+            try:
+                await message.reply(reply_text)
+            except Exception as e2:
+                logger.error(f"Xabar yuborishda jiddiy xatolik: {e2}")
 
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_text)
@@ -159,10 +170,21 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     context_summary = user_memory.get_context_summary(chat_id, user_id)
     reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
 
+    if not reply_text or not reply_text.strip():
+        reply_text = (
+            "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
+            "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
+        )
+
+    logger.info(f"📤 AI JAVOBI (Umumiy) [chat_id={chat_id}]: {reply_text[:120]}")
     try:
         await message.reply(reply_text, parse_mode="HTML")
-    except Exception:
-        await message.reply(reply_text)
+    except Exception as e1:
+        logger.warning(f"HTML parse_mode xatosi: {e1}, oddiy matnda yuborilmoqda...")
+        try:
+            await message.reply(reply_text)
+        except Exception as e2:
+            logger.error(f"Xabar yuborishda jiddiy xatolik: {e2}")
 
     # Suhbat xotirasiga yozish
     user_memory.add_user_message(chat_id, user_id, text)

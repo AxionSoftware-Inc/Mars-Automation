@@ -100,6 +100,12 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
             video_id = int(match.group(1))
             full_text = re.sub(r"\[VIDEO:\d+\]", "", full_text).strip()
 
+        if not full_text:
+            full_text = (
+                "Savolingiz bo'yicha to'liq ma'lumot olish uchun korxonangiz INN raqamini yuboring "
+                "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
+            )
+
         return full_text, video_id
 
     except Exception as e:

@@ -1,5 +1,6 @@
-from aiogram import Router, BaseMiddleware
+import logging
 from typing import Callable, Dict, Any, Awaitable
+from aiogram import Router, BaseMiddleware, types
 from aiogram.types import TelegramObject, User
 
 from admin_manager import admin_manager
@@ -9,6 +10,8 @@ from handlers.media import router as media_router
 from handlers.debt import router as debt_router
 from handlers.channel import router as channel_router
 from handlers.chat import router as chat_router
+
+logger = logging.getLogger(__name__)
 
 class AdminAutoRegisterMiddleware(BaseMiddleware):
     """
@@ -25,6 +28,13 @@ class AdminAutoRegisterMiddleware(BaseMiddleware):
         user: User = data.get("event_from_user")
         if user and user.username:
             admin_manager.check_and_register_username(user.id, user.username)
+
+        if isinstance(event, types.Message):
+            logger.info(
+                f"📥 XABAR KELDI [chat_id={event.chat.id}, type={event.chat.type}, user={user.id if user else None} (@{user.username if user else None})]: "
+                f"text={repr(event.text)}, caption={repr(event.caption)}, photo={bool(event.photo)}, doc={bool(event.document)}"
+            )
+
         return await handler(event, data)
 
 main_router = Router(name="main_router")

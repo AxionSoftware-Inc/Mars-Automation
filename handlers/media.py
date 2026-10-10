@@ -255,7 +255,6 @@ async def _process_image_content(
     else:
         if device_facts and device_facts.extraction_error:
             logger.warning(f"Tasvir sensori xatoligi: {device_facts.extraction_error}")
-            # Agar foydalanuvchi biror izoh bilan yuborgan bo'lsa, xatolik haqida xabar berish
             if caption or message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
                 try:
                     await message.reply(
@@ -266,7 +265,22 @@ async def _process_image_content(
                 except Exception:
                     pass
             return
-        logger.info("Guardrail: Rasm kassa apparati ham, to'lov cheki ham emas. E'tiborsiz qoldiriladi.")
+
+        # Agar shaxsiy chat bo'lsa yoki rasm bilan izoh yozilgan bo'lsa -> jim turmaslik!
+        if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP] or caption:
+            try:
+                await message.reply(
+                    "📸 <b>Kechirasiz, yuborilgan tasvirdan kassa apparati ekrani yoki to'lov kvitansiyasini aniqlab bo'lmadi.</b>\n\n"
+                    "📌 <b>Iltimos:</b>\n"
+                    "🔹 Agar bu <b>kassa apparati</b> bo'lsa, ekranidagi xatolikni (soat va tarmoq qatori bilan) yaqinroqdan rasmga olib yuboring.\n"
+                    "🔹 Agar bu <b>to'lov cheki</b> bo'lsa, to'lov kvitansiyasini aniq qilib yuboring yoki korxonangiz <b>INN (STIR)</b> raqamini yozing.",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+            return
+
+        logger.info("Guardrail: Guruhda kassa apparati ham, to'lov cheki ham bo'lmagan begona rasm e'tiborsiz qoldiriladi.")
         return
 
 
@@ -297,3 +311,10 @@ async def handle_photo(message: types.Message, bot: Bot):
         )
     except Exception as e:
         logger.error(f"Media handler ijrosida xatolik: {e}")
+        if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP] or caption:
+            try:
+                await message.reply(
+                    "⚠️ Rasmni qayta ishlashda texnik nosozlik yuz berdi. Iltimos, qaytadan yuborib ko'ring yoki korxona INN raqamini yozing."
+                )
+            except Exception:
+                pass

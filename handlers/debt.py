@@ -117,7 +117,15 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_memory.set_last_topic(chat_id, user_id, "debt_checked")
 
     resp = format_debt_response(results)
-    await message.reply(resp, parse_mode="HTML")
+    logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")
+    try:
+        await message.reply(resp, parse_mode="HTML")
+    except Exception as e1:
+        logger.warning(f"HTML formatlash xatosi: {e1}, oddiy matnda yuborilmoqda...")
+        try:
+            await message.reply(resp)
+        except Exception as e2:
+            logger.error(f"Qarz xabarini yuborishda xatolik: {e2}")
 
     # Suhbat tarixiga yozish
     user_memory.add_user_message(chat_id, user_id, f"Mening INN/JSHSHIR raqamim: {query_num}")

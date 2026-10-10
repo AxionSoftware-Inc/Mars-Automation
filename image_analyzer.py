@@ -64,12 +64,14 @@ TASVIR TOIFALARI VA QAT'IY BELGILASH QOIDALARI:
    - Unda to'langan summa (masalan 100 000 so'm), tranzaksiya raqami, sana/vaqt yoki to'lov rekvizitlari ko'rinib turadi.
    MUHIM QOIDA: Agar rasm to'lov ilovasi (Click, Payme va h.k.) skrinshoti bo'lsa va tepasida telefon soati/batareyasi ko'rinsa ham, bu BARIBIR "receipt" hisoblanadi! Smart POS apparati EMAS!
 
-2. "pos_device" (SMART POS KASSA TERMINALI APPARATI EKRANI):
-   - Jismoniy Smart POS terminali (Pax A930, Pax D210, UzSmart, Sunmi va h.k.) yoki undagi kassa dasturining asosiy menyusi, xatolik ekrani (masalan Kod 102, Kod 201, Kod 204, Kod 300, Tamper, Fiskal modul xatosi, Qog'oz tugadi, Smena ochish, Sertifikat muddati tugagan va h.k.).
+2. "pos_device" (SMART POS APPARATI, KASSA TERMINALI YOKI KASSA DASTURI EKRANI):
+   - Jismoniy Smart POS terminali (Pax A930, Pax D210, UzSmart, Sunmi va h.k.) YOKI kassa dasturi o'rnatilgan smartfon, planshet, kompyuter/kassa ekrani.
+   - Har qanday kassa dasturi (UzSmart, Mars va h.k.) menyusi, ogohlantirishlari (masalan "До остановки работы программы осталось...", "Hisobni to'ldiring"), xatolik ekrani (Kod 102, Kod 201, Kod 204, Kod 300, Tamper, Fiskal modul, Qog'oz tugadi, Smena ochish/yopish, Z-hisobot va h.k.).
+   - Agar ekranda kassa dasturi yoki apparat xatoligi ko'rinsa — bu har doim "pos_device" hisoblanadi!
    - Maqsad: Apparatdagi texnik nosozlikni aniqlash va tuzatish.
 
-3. "other" (BEGONA TASVIR):
-   - Inson, avtomobil, tabiat, hayvon, taom, rasmga aloqasiz xona, to'lovga aloqasiz hujjat, stiker yoki begona foto.
+3. "other" (MUTLAQO BEGONA TASVIR):
+   - Faqatgina kassa apparati, dasturi yoki to'lovga umuman hech qanday aloqasi bo'lmagan tasvirlar (odam, tabiat, hayvon, mashina, taom, stiker).
 
 JAVOB FORMATI FAQAT JSON BO'LISHI SHART (boshqa hech qanday so'z qo'shmang):
 {{
@@ -122,6 +124,7 @@ Foydalanuvchi izohi: "{user_caption}"
             temperature=0.1,
             response_format={"type": "json_object"}
         ) or "{}"
+        logger.info(f"OpenRouter Vision tahlili: {raw_json}")
 
         try:
             facts = json.loads(raw_json)
