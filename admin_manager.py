@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 ADMIN_CONFIG_PATH = os.path.join(DATA_DIR, "admin_config.json")
 
+DEFAULT_ADMIN_USERNAMES = ["yashnarbek_butaev"]
+
 DEFAULT_CONTACTS = [
+    {
+        "name": "Bosh administrator (Eskalatsiya va to'lovlar)",
+        "phone": "@Yashnarbek_butaev",
+        "role": "Bosh admin"
+    },
     {
         "name": "Texnik xizmat ko'rsatish bo'limi",
         "phone": "+998 75 522 75 00",
@@ -27,10 +34,12 @@ DEFAULT_CONTACTS = [
 class AdminManager:
     """
     Adminlar, mas'ul xodimlar kontaktlari va xabarnomalar (Notification/Escalation) boshqaruvchisi.
+    Bosh admin: @Yashnarbek_butaev
     """
     def __init__(self, config_path: str = ADMIN_CONFIG_PATH):
         self.config_path = config_path
         self.admin_ids: List[int] = []
+        self.admin_usernames: List[str] = [u.lower().replace("@", "") for u in DEFAULT_ADMIN_USERNAMES]
         self.contacts: List[Dict[str, str]] = []
         self.notification_channel_id: Optional[int] = None
         self.load_config()
@@ -54,6 +63,8 @@ class AdminManager:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     file_admin_ids = data.get("admin_ids", [])
+                    file_usernames = data.get("admin_usernames", DEFAULT_ADMIN_USERNAMES)
+                    self.admin_usernames = list(set([u.lower().replace("@", "") for u in file_usernames] + self.admin_usernames))
                     self.contacts = data.get("contacts", DEFAULT_CONTACTS)
                     self.notification_channel_id = data.get("notification_channel_id")
                     
@@ -69,7 +80,7 @@ class AdminManager:
             self.contacts = DEFAULT_CONTACTS
             self.save_config()
 
-        logger.info(f"AdminManager yuklandi: {len(self.admin_ids)} ta admin, {len(self.contacts)} ta kontakt.")
+        logger.info(f"AdminManager yuklandi: {len(self.admin_ids)} ta admin ID, {self.admin_usernames} usernames, {len(self.contacts)} ta kontakt.")
 
     def save_config(self):
         """Konfiguratsiyani saqlash"""
@@ -77,6 +88,7 @@ class AdminManager:
             os.makedirs(DATA_DIR, exist_ok=True)
             data = {
                 "admin_ids": self.admin_ids,
+                "admin_usernames": self.admin_usernames,
                 "contacts": self.contacts,
                 "notification_channel_id": self.notification_channel_id
             }
@@ -85,9 +97,32 @@ class AdminManager:
         except Exception as e:
             logger.error(f"Admin konfiguratsiyasini saqlashda xatolik: {e}")
 
-    def is_admin(self, user_id: int) -> bool:
-        """Foydalanuvchi admin ekanligini tekshirish"""
-        return user_id in self.admin_ids
+    def check_and_register_username(self, user_id: int, username: Optional[str]) -> bool:
+        """
+        Foydalanuvchi username'i bosh admin (@Yashnarbek_butaev) ekanligini tekshirish
+        va agar mos kelsa, uning ID sini avtomatik adminlar ro'yxatiga qo'shish.
+        """
+        if not username:
+            return False
+        clean_user = username.lower().replace("@", "").strip()
+        if clean_user in self.admin_usernames:
+            if user_id not in self.admin_ids:
+                self.admin_ids.append(user_id)
+                self.save_config()
+                logger.info(f"Bosh admin @{username} Telegram ID {user_id} bilan avtomatik bog'landi!")
+                return True
+        return False
+
+    def is_admin(self, user_id: int, username: Optional[str] = None) -> bool:
+        """Foydalanuvchi admin ekanligini ID yoki username bo'yicha tekshirish"""
+        if user_id in self.admin_ids:
+            return True
+        if username:
+            clean_user = username.lower().replace("@", "").strip()
+            if clean_user in self.admin_usernames:
+                self.check_and_register_username(user_id, username)
+                return True
+        return False
 
     def get_admin_ids(self) -> List[int]:
         """Barcha admin Telegram ID lari"""
@@ -114,7 +149,7 @@ class AdminManager:
     def get_contacts_display(self) -> str:
         """Foydalanuvchilarga ko'rsatiladigan chiroyli formatlangan kontaktlar matni"""
         if not self.contacts:
-            return "📞 <b>Bog'lanish uchun:</b> «Mars Elektron Texnika» servis markazi"
+            return "📞 <b>Bosh admin:</b> @Yashnarbek_butaev\n«Mars Elektron Texnika» servis markazi"
 
         lines = ["📞 <b>Mas'ul mutaxassislar kontaktlari:</b>"]
         for c in self.contacts:
@@ -156,13 +191,16 @@ class AdminManager:
         document_file_id: Optional[str] = None,
         reply_markup: Optional[Any] = None
     ):
-        """Barcha adminlarga xabar yuborish (xatoliklarni xavfsiz ushlagan holda)"""
+        """Barcha adminlarga (shu jumladan @Yashnarbek_butaev) xabar yuborish"""
         targets = list(set(self.admin_ids))
         if self.notification_channel_id:
             targets.append(self.notification_channel_id)
 
         if not targets:
-            logger.warning("Adminga xabarnoma yuborilmadi: Birorta ham admin ID mavjud emas!")
+            logger.warning(
+                "Adminga xabarnoma yuborilmadi: Hali birorta ham admin ID bog'lanmagan. "
+                "@Yashnarbek_butaev botga /start bosishi yoki bir marta yozishi bilan ID avtomatik saqlanadi."
+            )
             return
 
         for target_id in targets:
@@ -203,7 +241,7 @@ class AdminManager:
         file_id: Optional[str] = None,
         is_photo: bool = True
     ):
-        """Yangi to'lov kvitansiyasi bo'yicha adminga to'liq hisobot yuborish"""
+        """Yangi to'lov kvitansiyasi bo'yicha @Yashnarbek_butaev va adminlarga to'liq hisobot yuborish"""
         user_name = user.full_name if user else "Noma'lum"
         user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
         user_id = user.id if user else 0
@@ -227,7 +265,7 @@ class AdminManager:
 
         text = (
             f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
-            f"👤 <b>Yuboruvchi:</b> {user_name} ({user_username})\n"
+            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
             f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
             f"────────────────────\n"
@@ -242,7 +280,7 @@ class AdminManager:
             f"📊 <b>Qarz tahlili:</b>\n"
             f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
             f"▫️ Holat: {status_emoji} {status_text}\n\n"
-            f"⚡️ <i>Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+            f"⚡️ <i>Mas'ul admin (@Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
         )
 
         photo_id = file_id if is_photo else None
@@ -263,14 +301,14 @@ class AdminManager:
     ):
         """
         Apparatda muammo bor, internet ishlab turibdi, lekin qarz yo'q bo'lgan holatlarda
-        adminga zudlik bilan eskalatsiya xabari yuborish.
+        @Yashnarbek_butaev va adminlarga zudlik bilan eskalatsiya xabari yuborish.
         """
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
         user_id = user.id if user else 0
 
         text = (
-            f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA TEZKOR MUROJAAT!</b>\n\n"
+            f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA TEZKOR ESKALATSIYA!</b>\n\n"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
             f"────────────────────\n"
@@ -286,8 +324,8 @@ class AdminManager:
             text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
 
         text += (
-            f"\n⚡️ <i>Diqqat: Ushbu apparatda qarzdorlik yo'q va internet ishlayapti, "
-            f"lekin texnik nosozlik mavjud. Zudlik bilan mijoz bilan bog'laning!</i>"
+            f"\n⚡️ <i>Bosh admin (@Yashnarbek_butaev): Ushbu apparatda qarzdorlik yo'q va internet ishlayapti, "
+            f"lekin texnik muammo bor. Zudlik bilan tekshirish talab etiladi!</i>"
         )
 
         await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)

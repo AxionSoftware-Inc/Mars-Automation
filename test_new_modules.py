@@ -30,11 +30,17 @@ def test_admin_manager():
     assert "Usta Toxir" in contacts_str
     assert "+998901112233" in contacts_str
 
+    # Test @Yashnarbek_butaev auto registration
+    yashnar_test_id = 555444333
+    assert admin_manager.is_admin(yashnar_test_id, username="Yashnarbek_butaev") is True
+    assert yashnar_test_id in admin_manager.get_admin_ids()
+    admin_manager.remove_admin(yashnar_test_id)
+
     # Clean up test admin
     admin_manager.remove_admin(test_admin_id)
     assert admin_manager.is_admin(test_admin_id) is False
     admin_manager.remove_contact("+998901112233")
-    logger.info("✅ AdminManager barcha tekshiruvlardan muvaffaqiyatli o'tdi.")
+    logger.info("✅ AdminManager (@Yashnarbek_butaev bilan) barcha tekshiruvlardan muvaffaqiyatli o'tdi.")
 
 def test_receipt_full_debt_coverage():
     logger.info(">>> 2. KVITANSIYA: QARZ TO'LIQ YOPILISH TESTI...")
@@ -155,7 +161,7 @@ def test_technical_issue_escalation_to_admin():
     assert decision.should_notify_admin is True
     assert decision.admin_alert_type == "tech_issue"
     assert "qarzdorlik yo'q va internet tarmog'i faol" in decision.reply_text
-    assert "servis markazimiz adminlari hamda ustalariga yetkazildi" in decision.reply_text
+    assert "bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi" in decision.reply_text
     assert "Mas'ul mutaxassislar kontaktlari" in decision.reply_text
     logger.info("✅ Qarzsiz va interneti bor apparatdagi nosozlik adminga to'g'ri eskalatsiya qilindi!")
 

@@ -73,7 +73,7 @@ def test_fatal_hardware_escalation():
     assert decision.should_notify_admin is True
     assert decision.admin_alert_type == "tech_issue"
     assert "TAMPER DETECTED" in decision.reply_text
-    assert "servis markazimiz adminlari hamda ustalariga yetkazildi" in decision.reply_text
+    assert "bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi" in decision.reply_text
     logger.info("✅ Jiddiy texnik nosozlik (Tamper) adminga to'g'ri eskalatsiya qilindi!")
 
 def test_add_and_delete_rule():

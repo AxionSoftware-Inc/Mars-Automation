@@ -122,7 +122,7 @@ class CoreEngine:
             escalation_reply = (
                 f"{status_prefix}"
                 f"{diag_text}\n\n"
-                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar servis markazimiz adminlari hamda ustalariga yetkazildi.</b> "
+                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi.</b> "
                 f"Mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
                 f"{contacts_info}"
             )
