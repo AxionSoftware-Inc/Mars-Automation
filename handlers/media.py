@@ -6,7 +6,7 @@ from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
 
 from excel_manager import excel_manager, DATA_DIR
-from image_analyzer import extract_device_facts
+from image_analyzer import analyze_media_image, extract_device_facts
 from receipt_analyzer import extract_receipt_facts
 from admin_manager import admin_manager
 from core import core_engine, ActionType
@@ -127,113 +127,93 @@ async def handle_document(message: types.Message, bot: Bot):
             logger.error(f"PDF kvitansiyani qayta ishlashda xatolik: {e}")
         return
 
+    # C) RASMLI FAYL FORMATIDAGI HUJJATLAR (.PNG, .JPG, .JPEG, .WEBP)
+    if any(file_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+        try:
+            file_io = io.BytesIO()
+            await bot.download(doc, destination=file_io)
+            img_bytes = file_io.getvalue()
+            mime = "image/png" if file_name.endswith(".png") else "image/jpeg"
+            await _process_image_content(
+                message=message,
+                bot=bot,
+                image_bytes=img_bytes,
+                caption=caption,
+                file_id=doc.file_id,
+                is_document=True,
+                mime_type=mime
+            )
+        except Exception as e:
+            logger.error(f"Hujjat rasmini qayta ishlashda xatolik: {e}")
+        return
 
-# 2. RASMLARNI QABUL QILISH (POS EKRANI YOKI KVITANSIYA RASMI)
-@router.message(F.photo)
-async def handle_photo(message: types.Message, bot: Bot):
+
+# 2. MARKAZIY RASM TAHLIL VA QAROR QABUL QILISH FUNKSIYASI
+async def _process_image_content(
+    message: types.Message,
+    bot: Bot,
+    image_bytes: bytes,
+    caption: str,
+    file_id: str,
+    is_document: bool = False,
+    mime_type: str = "image/jpeg"
+):
     """
-    Rasm qabul qiluvchi markaziy handler:
-    1. Agar to'lov kvitansiyasi bo'lsa -> Kvitansiya tahlili + Qarz solishtiruvi + Adminga bildirishnoma
-    2. Agar POS apparati bo'lsa -> Ekran tashxisi + Qarz holati + Nosozlik bo'lsa adminga eskalatsiya
-    3. Agar begona narsa bo'lsa -> Jim turish (Guardrail)
+    Rasmlar (Photo yoki Image Document) uchun yagona tahlilchi:
+    1. analyze_media_image orqali tasvir turini aniqlaydi: "receipt", "pos_device", "other"
+    2. "receipt" bo'lsa -> core_engine.process_receipt_facts
+    3. "pos_device" bo'lsa -> core_engine.process_device_facts
+    4. "other" bo'lsa -> ignore (jim turish)
     """
-    caption = message.caption or ""
-    lower_caption = caption.lower()
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
-    try:
-        photo = message.photo[-1]
-        file_io = io.BytesIO()
-        await bot.download(photo, destination=file_io)
-        image_bytes = file_io.getvalue()
+    media_type, receipt_facts, device_facts = analyze_media_image(
+        image_bytes=image_bytes,
+        user_caption=caption,
+        mime_type=mime_type
+    )
 
-        # Izohda to'lov haqida so'zlar bo'lsa yoki oxirgi mavzu to'lov bo'lsa
-        last_topic = user_memory.get_last_topic(chat_id, user_id)
-        has_receipt_intent = any(kw in lower_caption for kw in RECEIPT_KEYWORDS) or last_topic in ["payment_instruction", "debt_checked"]
+    # 1. TO'LOV KVITANSIYASI
+    if media_type == "receipt" and receipt_facts and receipt_facts.is_receipt:
+        decision = core_engine.process_receipt_facts(
+            facts=receipt_facts,
+            chat_id=chat_id,
+            user_id=user_id,
+            user_comment=caption
+        )
+        if decision.reply_text:
+            try:
+                await message.reply(decision.reply_text, parse_mode="HTML")
+            except Exception:
+                await message.reply(decision.reply_text)
 
-        # A) AGAR KVITANSIYA BO'LISHI EHTIMOLI YUQORI BO'LSA
-        if has_receipt_intent:
-            receipt_facts = extract_receipt_facts(
-                file_bytes=image_bytes,
-                filename="receipt.jpg",
-                mime_type="image/jpeg",
-                user_caption=caption
+            user_memory.add_user_message(chat_id, user_id, f"[To'lov kvitansiyasi] {caption}".strip())
+            user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
+
+        if decision.should_notify_admin and decision.receipt_facts:
+            await admin_manager.notify_receipt_escalation(
+                bot=bot,
+                user=message.from_user,
+                chat_id=chat_id,
+                receipt_facts=decision.receipt_facts,
+                debt_status_info=decision.debt_status_info,
+                file_id=file_id,
+                is_photo=not is_document
             )
-            if receipt_facts.is_receipt:
-                decision = core_engine.process_receipt_facts(
-                    facts=receipt_facts,
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    user_comment=caption
-                )
-                if decision.reply_text:
-                    try:
-                        await message.reply(decision.reply_text, parse_mode="HTML")
-                    except Exception:
-                        await message.reply(decision.reply_text)
+        return
 
-                    user_memory.add_user_message(chat_id, user_id, f"[To'lov kvitansiyasi] {caption}".strip())
-                    user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
-
-                if decision.should_notify_admin and decision.receipt_facts:
-                    await admin_manager.notify_receipt_escalation(
-                        bot=bot,
-                        user=message.from_user,
-                        chat_id=chat_id,
-                        receipt_facts=decision.receipt_facts,
-                        debt_status_info=decision.debt_status_info,
-                        file_id=photo.file_id,
-                        is_photo=True
-                    )
-                return
-
-        # B) KASSA APPARATI EKRANINI TAHLIL QILISH
-        device_facts = extract_device_facts(image_bytes=image_bytes, user_caption=caption)
-
-        # Agar kassa apparati bo'lmasa, har ehtimolga qarshi kvitansiya ekanligini yana bir bor tekshirish
-        if not device_facts.is_real_pos_device and not device_facts.detected_inn:
-            receipt_facts = extract_receipt_facts(
-                file_bytes=image_bytes,
-                filename="check.jpg",
-                mime_type="image/jpeg",
-                user_caption=caption
-            )
-            if receipt_facts.is_receipt:
-                decision = core_engine.process_receipt_facts(
-                    facts=receipt_facts,
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    user_comment=caption
-                )
-                if decision.reply_text:
-                    try:
-                        await message.reply(decision.reply_text, parse_mode="HTML")
-                    except Exception:
-                        await message.reply(decision.reply_text)
-                if decision.should_notify_admin and decision.receipt_facts:
-                    await admin_manager.notify_receipt_escalation(
-                        bot=bot,
-                        user=message.from_user,
-                        chat_id=chat_id,
-                        receipt_facts=decision.receipt_facts,
-                        debt_status_info=decision.debt_status_info,
-                        file_id=photo.file_id,
-                        is_photo=True
-                    )
-                return
-
-            # Begona rasm -> Jim turish
-            logger.info("Guardrail: Rasm kassa apparati ham, to'lov cheki ham emas. Javobsiz qoldirildi.")
-            return
-
-        # Yadro orqali qaror chiqarish
-        decision = core_engine.process_device_facts(device_facts, chat_id=chat_id, user_id=user_id, user_comment=caption)
-
+    # 2. SMART POS KASSA APPARATI
+    elif media_type == "pos_device" and device_facts:
+        decision = core_engine.process_device_facts(
+            facts=device_facts,
+            chat_id=chat_id,
+            user_id=user_id,
+            user_comment=caption
+        )
         if decision.action == ActionType.IGNORE:
             return
 
-        # Foydalanuvchiga javob
         if decision.reply_text:
             try:
                 await message.reply(decision.reply_text, parse_mode="HTML")
@@ -243,7 +223,6 @@ async def handle_photo(message: types.Message, bot: Bot):
             user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
             user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
 
-        # ADMINGA ESKALATSIYA (INTERNET BOR + QARZ YO'Q + NOSOZLIK MAVJUD)
         if decision.should_notify_admin and decision.admin_alert_type == "tech_issue":
             await admin_manager.notify_technical_issue(
                 bot=bot,
@@ -253,10 +232,9 @@ async def handle_photo(message: types.Message, bot: Bot):
                 inn=decision.detected_inn or "",
                 issue_summary=decision.admin_alert_text or "Texnik nosozlik",
                 user_comment=caption,
-                photo_file_id=photo.file_id
+                photo_file_id=file_id
             )
 
-        # Video qo'llanma
         if decision.video_id:
             try:
                 await bot.copy_message(
@@ -267,6 +245,38 @@ async def handle_photo(message: types.Message, bot: Bot):
                 )
             except Exception as e:
                 logger.error(f"Videoni yuborishda xatolik: {e}")
+        return
 
+    # 3. BEGONA TASVIR (GUARDRAIL)
+    else:
+        logger.info("Guardrail: Rasm kassa apparati ham, to'lov cheki ham emas. E'tiborsiz qoldiriladi.")
+        return
+
+
+# 3. RASMLARNI QABUL QILISH (PHOTO HANDLER)
+@router.message(F.photo)
+async def handle_photo(message: types.Message, bot: Bot):
+    """
+    Rasm qabul qiluvchi markaziy handler:
+    1. Agar to'lov kvitansiyasi bo'lsa -> Kvitansiya tahlili + Qarz solishtiruvi + Adminga bildirishnoma
+    2. Agar POS apparati bo'lsa -> Ekran tashxisi + Qarz holati + Nosozlik bo'lsa adminga eskalatsiya
+    3. Agar begona narsa bo'lsa -> Jim turish (Guardrail)
+    """
+    caption = message.caption or ""
+    try:
+        photo = message.photo[-1]
+        file_io = io.BytesIO()
+        await bot.download(photo, destination=file_io)
+        image_bytes = file_io.getvalue()
+
+        await _process_image_content(
+            message=message,
+            bot=bot,
+            image_bytes=image_bytes,
+            caption=caption,
+            file_id=photo.file_id,
+            is_document=False,
+            mime_type="image/jpeg"
+        )
     except Exception as e:
         logger.error(f"Media handler ijrosida xatolik: {e}")

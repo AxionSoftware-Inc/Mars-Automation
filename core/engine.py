@@ -61,6 +61,41 @@ class CoreEngine:
                 log_reason="Not a real POS device image"
             )
 
+        # Maxsus xavfsizlik filtri: Agar tasvir to'lov kvitansiyasiga oid bo'lsa,
+        # status bar (soat) so'ramasdan to'g'ridan-to'g'ri kvitansiya protsessoriga yo'naltirish
+        summary_lower = (facts.screen_text_summary or "").lower()
+        caption_lower = (user_comment or "").lower()
+        receipt_signals = [
+            "to'lov", "tolov", "chek", "kvitansiya", "click", "payme", "oplata",
+            "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma", "munis", "uzum"
+        ]
+        if any(sig in summary_lower for sig in receipt_signals) or any(sig in caption_lower for sig in receipt_signals):
+            logger.info("Ekrandagi yozuv to'lov kvitansiyasiga tegishli ekanligi aniqlandi -> Kvitansiya rejimiga yo'naltiriladi.")
+            
+            detected_amount = 0.0
+            sum_matches = re.findall(r"(\d[\d\s]{2,}\d)\s*(?:so['`]?m|sum)", summary_lower)
+            if sum_matches:
+                try:
+                    detected_amount = float(sum_matches[0].replace(" ", ""))
+                except Exception:
+                    detected_amount = 0.0
+
+            receipt_facts = ReceiptFacts(
+                is_receipt=True,
+                recipient_account="«Mars Elektron Texnika» MCHJ",
+                is_mars_recipient=True,
+                amount=detected_amount,
+                payer_inn=facts.detected_inn,
+                raw_text=facts.screen_text_summary,
+                raw_facts=facts.raw_facts
+            )
+            return self.process_receipt_facts(
+                facts=receipt_facts,
+                chat_id=chat_id,
+                user_id=user_id,
+                user_comment=user_comment
+            )
+
         # 2-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
         if not facts.is_status_bar_visible:
             logger.info("Pre-condition: Status bar ko'rinmayapti. To'liq ekran talab qilinadi.")

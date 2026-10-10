@@ -40,6 +40,17 @@ def extract_receipt_facts(
     pdf_text = ""
     pdf_image_bytes = None
 
+    if not is_pdf:
+        from image_analyzer import analyze_media_image
+        m_type, r_facts, d_facts = analyze_media_image(
+            image_bytes=file_bytes,
+            user_caption=user_caption,
+            mime_type=mime_type
+        )
+        if r_facts:
+            return r_facts
+        return ReceiptFacts(is_receipt=False, payer_inn=caption_inn)
+
     if is_pdf:
         try:
             reader = pypdf.PdfReader(io.BytesIO(file_bytes))
