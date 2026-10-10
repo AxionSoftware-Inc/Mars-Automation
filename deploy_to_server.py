@@ -16,21 +16,27 @@ def deploy():
     
     files_to_upload = [
         '.env',
+        'requirements.txt',
         'openrouter_client.py',
         'ai_helper.py',
         'bot.py',
         'catalog.py',
         'catalog_manager.py',
         'image_analyzer.py',
+        'receipt_analyzer.py',
+        'admin_manager.py',
         'error_manager.py',
         'user_memory.py',
         'excel_manager.py',
+        'ARCHITECTURE.md',
+        'README.md',
         'data/video_catalog.json',
         'data/screen_errors.json',
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',
         'handlers/__init__.py',
+        'handlers/admin.py',
         'handlers/channel.py',
         'handlers/chat.py',
         'handlers/commands.py',
@@ -49,6 +55,11 @@ def deploy():
     except Exception:
         pass
 
+    try:
+        sftp.mkdir(f"{remote_dir}/data")
+    except Exception:
+        pass
+
     for filename in files_to_upload:
         local_path = os.path.join(os.path.dirname(__file__), filename)
         remote_path = f"{remote_dir}/{filename}"
@@ -57,6 +68,10 @@ def deploy():
         print(f"Uploaded {filename} successfully.")
         
     sftp.close()
+
+    print("\nEnsuring dependencies (pypdf) on remote server...")
+    stdin, stdout, stderr = ssh.exec_command(f"{remote_dir}/venv/bin/pip install pypdf")
+    stdout.channel.recv_exit_status()
     
     print("\nRestarting mars-bot.service...")
     stdin, stdout, stderr = ssh.exec_command("systemctl restart mars-bot.service")

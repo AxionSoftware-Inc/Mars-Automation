@@ -173,21 +173,49 @@ async def cmd_yangi_buyruq(message: types.Message):
 
 ---
 
-## 6. Loyiha Fayllari Mundarijasi
+## 6. Yangi Modullar: Kvitansiya va Admin Eskalatsiyasi
+
+### A. Kvitansiya Tahlil Moduli (`receipt_analyzer.py`)
+- **Formatlar:** Rasm (`photo`) yoki PDF (`.pdf` document).
+- **Sensory Extractor:** `pypdf` va OpenRouter multimodal orqali kvitansiyadan to'lov faktlarini ajratadi:
+  - Qabul qiluvchi hisob raqami (Mars: `20208000800208044003`).
+  - To'langan summa (float).
+  - To'lovchi INN/JSHSHIR raqami, chek ID, sana, to'lov tizimi (Click, Payme, Bank).
+- **Yadroda qarz bilan solishtirish:**
+  - Agar `to'lov >= qarz` bo'lsa -> Qarzdorlik to'liq yopilgani qayd etiladi va adminga apparatni faollashtirish buyrug'i yuboriladi.
+  - Agar `to'lov < qarz` bo'lsa -> Qisman to'lov deb belgilanadi, qolgan qarz ko'rsatiladi.
+  - Agar INN topilmasa -> Kvitansiya vaqtincha xotirada saqlanadi (`pending_receipt`) va foydalanuvchidan INN so'raladi.
+
+### B. Admin Moduli va Eskalatsiya (`admin_manager.py`, `handlers/admin.py`)
+- **Adminlar va kontaktlar:**
+  - `.env` va `data/admin_config.json` orqali admin Telegram ID lari va mas'ul mutaxassislar kontaktlari boshqariladi.
+  - Buyruqlar: `/admin`, `/statistika`, `/admins`, `/add_admin`, `/contacts`, `/add_contact`.
+- **Eskalatsiya holatlari (Avtomatik adminga yuborish):**
+  1. **Kvitansiya kelganda:** Yangi to'lov summasi, korxona nomi, INN, qarz yopilgani va chek nusxasi bilan birga barcha adminlarga hisobot uzatiladi.
+  2. **Texnik nosozlik (Internet bor + Qarz yo'q):** Agar apparatda internet ishlab turgan bo'lsa, qarz bo'lmasa, lekin ekranda nosozlik bo'lsa -> Bot muammoni adminga rasm bilan yetkazadi va mijozga mas'ul xodim kontaktlarini beradi.
+  3. **Mijoz yordam so'raganda:** "operator kerak", "usta yuboring", "hal bo'lmadi" so'zlari yozilganda adminga bildirishnoma boradi.
+
+---
+
+## 7. Loyiha Fayllari Mundarijasi
 
 | Fayl / Papka | Vazifasi |
 | :--- | :--- |
 | `core/engine.py` | 🧠 Markaziy Yadro (Qarorlar chiqaruvchi orkestrator) |
-| `core/models.py` | 📦 Ma'lumot modellari (`DeviceFacts`, `DecisionResult`, `ActionType`) |
+| `core/models.py` | 📦 Ma'lumot modellari (`DeviceFacts`, `ReceiptFacts`, `DecisionResult`, `ActionType`) |
+| `admin_manager.py` | 👨‍💻 Adminlar, mas'ul xodimlar kontaktlari va bildirishnomalar (Escalation) boshqaruvchisi |
+| `receipt_analyzer.py`| 🧾 To'lov kvitansiyalari (rasm / PDF) faktlarini ajratuvchi Sensor |
+| `handlers/admin.py` | ⚙️ Admin boshqaruv paneli (`/admin`, `/statistika`, `/admins`, `/contacts`) |
 | `handlers/commands.py` | 🕹 Barcha Telegram komandalar (`/start`, `/help`, `/tekshir`, `/tolov`, `/tarix`) |
 | `handlers/debt.py` | 💳 Qarz tekshiruvi (INN) va to'lov tarixi so'rovlari |
-| `handlers/media.py` | 📸 Ekran rasmlari va Excel yuklash ijrochisi |
-| `handlers/chat.py` | 💬 Erkin matnli muloqot va video katalog tavsiyasi |
+| `handlers/media.py` | 📸 Ekran rasmlari, to'lov kvitansiyalari (rasm/PDF) va Excel yangilash |
+| `handlers/chat.py` | 💬 Erkin matnli muloqot, video katalog va operator eskalatsiyasi |
 | `handlers/channel.py` | 📢 Kanaldan postlarni forward qilish va avto-indekslash |
-| `image_analyzer.py` | 👁 Tasvirdan sof faktlarni ajratuvchi Sensor |
+| `image_analyzer.py` | 👁 Kassa ekrani tasviridan sof faktlarni ajratuvchi Sensor |
 | `excel_manager.py` | 📊 7,200+ korxona bazasi, qarz va to'lovlar hisob-kitobi |
 | `error_manager.py` | ⚙️ Ekran xatoliklari qoidalari dispetcheri |
 | `catalog_manager.py` | 🎬 50+ video postlar qidiruv mexanizmi |
-| `user_memory.py` | 💾 Ko'p foydalanuvchili 12 soatlik sessiya xotirasi |
+| `user_memory.py` | 💾 Ko'p foydalanuvchili 12 soatlik sessiya va pending kvitansiya xotirasi |
 | `openrouter_client.py`| ⚡️ Gemini 3.5 Flash Lite modeli bilan barqaror aloqa |
-| `bot.py` | 🚀 Botni ishga tushiruvchi 45 qatorlik ixcham dastur |
+| `bot.py` | 🚀 Botni ishga tushiruvchi ixcham dastur |
+

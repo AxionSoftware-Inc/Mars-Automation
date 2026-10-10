@@ -1,0 +1,16 @@
+{
+  "admin_ids": [],
+  "contacts": [
+    {
+      "name": "Texnik xizmat ko'rsatish bo'limi",
+      "phone": "+998 75 522 75 00",
+      "role": "Bosh mutaxassis / Usta"
+    },
+    {
+      "name": "Mijozlar bilan ishlash va to'lovlar bo'limi",
+      "phone": "+998 90 999 00 11",
+      "role": "Bosh operator"
+    }
+  ],
+  "notification_channel_id": null
+}

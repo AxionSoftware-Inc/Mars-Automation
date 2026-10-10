@@ -83,6 +83,29 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
+    # 0. Agar foydalanuvchi avval kvitansiya yuklagan bo'lsa, uni avtomatik bog'lash
+    from core import core_engine
+    from admin_manager import admin_manager
+    receipt_decision = core_engine.resolve_pending_receipt_if_any(query_num, chat_id, user_id)
+    if receipt_decision:
+        try:
+            await message.reply(receipt_decision.reply_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(receipt_decision.reply_text)
+
+        user_memory.add_user_message(chat_id, user_id, f"Mening INN raqamim: {query_num}")
+        user_memory.add_assistant_message(chat_id, user_id, receipt_decision.reply_text)
+
+        if receipt_decision.should_notify_admin and receipt_decision.receipt_facts:
+            await admin_manager.notify_receipt_escalation(
+                bot=bot,
+                user=message.from_user,
+                chat_id=chat_id,
+                receipt_facts=receipt_decision.receipt_facts,
+                debt_status_info=receipt_decision.debt_status_info
+            )
+        return
+
     results = excel_manager.search(query_num)
     org_name = results[0].get("name", "") if results else ""
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0

@@ -120,4 +120,17 @@ class UserMemoryManager:
 
         return "\n".join(parts)
 
+    def set_pending_receipt(self, chat_id: int, user_id: int, receipt_data: Dict[str, Any]):
+        """INN aniqlanmagan kvitansiyani foydalanuvchi INN yozgunicha vaqtincha saqlab turish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["pending_receipt"] = receipt_data
+
+    def get_pending_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("pending_receipt")
+
+    def clear_pending_receipt(self, chat_id: int, user_id: int):
+        session = self._get_or_create_session(chat_id, user_id)
+        session["pending_receipt"] = None
+
 user_memory = UserMemoryManager()
