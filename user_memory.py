@@ -190,4 +190,10 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         session["pending_receipt"] = None
 
+    def clear_context(self, chat_id: int, user_id: int):
+        """Foydalanuvchi suhbat va qarz kontekstini tozalash"""
+        key = self._get_key(chat_id, user_id)
+        if key in self.sessions:
+            del self.sessions[key]
+
 user_memory = UserMemoryManager()

@@ -3,22 +3,13 @@ from aiogram import Router, types, Bot
 from aiogram.filters import Command, CommandStart
 from excel_manager import excel_manager
 from user_memory import user_memory
+from payment_accounts import get_all_payment_accounts_card, MARS_VIDEO_ID, YANGI_TEXNOLOGIYALAR_VIDEO_ID
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="commands_router")
 
 SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
-PAYMENT_INSTRUCTION_TEXT = (
-    "💳 <b>To'lov uchun bank rekvizitlari:</b>\n"
-    "🏢 <b>Kompaniya:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
-    "🏦 <b>Hisob raqam (X/R):</b> <code>20208000800208044003</code>\n"
-    "🏛 <b>Bank:</b> «Ipak Yo'li» AITB Shahrisabz filiali\n"
-    "🔢 <b>MFO:</b> <code>01048</code> | <b>INN:</b> <code>302568138</code>\n"
-    "📝 <b>To'lov maqsadi:</b> Abonent to'lov (korxona nomingiz yoki INN ko'rsatilsin)\n\n"
-    "📲 <b>Click orqali to'lash:</b>\n"
-    "Click ilovasi -> Xizmatlar -> Kommunal va boshqa to'lovlar -> «Mars Elektron Texnika» -> INN kiritiladi."
-)
 
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
@@ -53,14 +44,14 @@ async def cmd_help(message: types.Message):
 
 @router.message(Command("tolov"))
 async def cmd_tolov(message: types.Message, bot: Bot):
-    """To'lov rekvizitlari va Click orqali to'lash videosi"""
-    await message.reply(PAYMENT_INSTRUCTION_TEXT, parse_mode="HTML")
+    """To'lov rekvizitlari (Oylik va Yillik) va Click orqali to'lash videosi"""
+    await message.reply(get_all_payment_accounts_card(), parse_mode="HTML")
     try:
         # Click orqali to'lash videosi (Post 148)
         await bot.copy_message(
             chat_id=message.chat.id,
             from_chat_id=SOURCE_CHANNEL_ID,
-            message_id=148,
+            message_id=MARS_VIDEO_ID,
             reply_to_message_id=message.message_id
         )
     except Exception as e:

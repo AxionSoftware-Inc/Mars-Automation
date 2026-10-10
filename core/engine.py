@@ -245,14 +245,61 @@ class CoreEngine:
                 log_reason="Not a payment receipt"
             )
 
-        # 2. To'lov qabul qiluvchi tekshiruvi
-        if not facts.is_mars_recipient and facts.recipient_account:
+        # 2. To'lov qabul qiluvchi va to'lov toifasi tekshiruvi (Oylik vs Yillik)
+        from payment_accounts import (
+            MARS_ACCOUNT, MARS_ORG_NAME,
+            YANGI_TEXNOLOGIYALAR_ACCOUNT, YANGI_TEXNOLOGIYALAR_ORG_NAME,
+            classify_receipt_target
+        )
+
+        category = getattr(facts, "payment_category", None)
+        if not category or category == "monthly":
+            category = classify_receipt_target(
+                facts.recipient_account, facts.amount, facts.raw_text
+            )
+
+        # A) YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)
+        if category == "annual" or facts.is_annual_fiscal_fee:
+            logger.info("Kvitansiya tahlili: Yillik fiskal modul to'lovi («Yangi Texnologiyalar» DUK) aniqlandi.")
+            annual_reply = (
+                f"🧾 <b>Fiskal modulning yillik to'lov kvitansiyasi qabul qilindi!</b>\n\n"
+                f"🏢 <b>Qabul qiluvchi:</b> {YANGI_TEXNOLOGIYALAR_ORG_NAME} (Davlat Soliq Qo'mitasi)\n"
+                f"🏦 <b>Hisob raqam:</b> <code>{YANGI_TEXNOLOGIYALAR_ACCOUNT}</code>\n"
+                f"💰 <b>To'langan summa:</b> <b>{facts.amount:,.0f} so'm</b>\n"
+                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
+                f"ℹ️ <b>MUHIM MA'LUMOT:</b>\n"
+                f"Ushbu to'lov kassa apparatingizdagi Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun Davlat Soliq Qo'mitasiga («Yangi Texnologiyalar» DUK) to'landi.\n"
+                f"⏳ Soliq tizimi to'lovni <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda avtomatik tasdiqlaydi va fiskal modul muddati uzaytiriladi.\n\n"
+                f"⚠️ <b>Eslatma:</b> «Mars Elektron Texnika» apparatiga har oylik servis xizmati (oylik abonent to'lovi: 100 000 so'm) alohida to'lanadi va ularni adashtirmaslik lozim."
+            )
+            return DecisionResult(
+                action=ActionType.RECEIPT_PROCESSED,
+                reply_text=annual_reply,
+                paid_amount=facts.amount,
+                receipt_facts=facts,
+                file_id=file_id,
+                is_photo=is_photo,
+                should_notify_admin=True,
+                admin_alert_type="annual_receipt",
+                debt_status_info={
+                    "is_annual": True,
+                    "org_name": facts.payer_name or "Yillik to'lov",
+                    "inn": facts.payer_inn or "",
+                    "paid_amount": facts.amount,
+                    "recipient": YANGI_TEXNOLOGIYALAR_ORG_NAME
+                },
+                log_reason="Annual fiscal fee receipt processed"
+            )
+
+        # B) BEGONA TASHKILOT TO'LOVI
+        if not facts.is_mars_recipient and category == "other" and facts.recipient_account:
             warning_text = (
-                f"⚠️ <b>Diqqat: Ushbu to'lov «Mars Elektron Texnika»ga tegishli emasdek ko'rinmoqda.</b>\n\n"
+                f"⚠️ <b>Diqqat: Ushbu to'lov «Mars Elektron Texnika»ga ham, «Yangi Texnologiyalar» DUK ga ham tegishli emasdek ko'rinmoqda.</b>\n\n"
                 f"📌 <b>Kvitansiyadagi qabul qiluvchi:</b> {facts.recipient_account}\n"
                 f"💵 <b>Summa:</b> {facts.amount:,.0f} so'm\n\n"
-                f"«Mars Elektron Texnika» hisob raqami: <code>20208000800208044003</code>\n"
-                f"Iltimos, to'lov ma'lumotlarini tekshiring yoki adminga murojaat qiling."
+                f"🏢 <b>«Mars Elektron Texnika» (Oylik to'lov):</b> <code>{MARS_ACCOUNT}</code>\n"
+                f"🏛 <b>«Yangi Texnologiyalar» DUK (Yillik to'lov):</b> <code>{YANGI_TEXNOLOGIYALAR_ACCOUNT}</code>\n\n"
+                f"Iltimos, to'lov rekvizitlarini tekshiring yoki adminga murojaat qiling."
             )
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
@@ -261,7 +308,7 @@ class CoreEngine:
                 receipt_facts=facts,
                 file_id=file_id,
                 is_photo=is_photo,
-                log_reason="Receipt recipient is not Mars Elektron Texnika"
+                log_reason="Receipt recipient is neither Mars nor Yangi Texnologiyalar"
             )
 
         # 3. To'lovchi korxona INN/JSHSHIR raqamini aniqlash

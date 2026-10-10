@@ -253,35 +253,55 @@ class AdminManager:
         remaining_debt = debt_status_info.get("remaining_debt", 0.0)
         debt_covered = debt_status_info.get("debt_covered", False)
 
-        if debt_covered:
-            status_emoji = "✅"
-            status_text = "<b>QARZ TO'LIQ YOPILDI (Apparatni yoqish mumkin!)</b>"
-        elif prev_debt > 0 and paid_amount < prev_debt:
-            status_emoji = "⚠️"
-            status_text = f"<b>QISMAN TO'LANDI</b> (Qolgan qarz: {remaining_debt:,.0f} so'm)"
+        if debt_status_info.get("is_annual"):
+            status_emoji = "🏛"
+            status_text = "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
+            text = (
+                f"🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
+                f"────────────────────\n"
+                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>INN / JSHSHIR:</b> <code>{inn or '-'}</code>\n"
+                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
+                f"💳 <b>To'lov tizimi:</b> {receipt_facts.payment_system or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{receipt_facts.transaction_id or '-'}</code>\n"
+                f"📅 <b>To'lov vaqti:</b> {receipt_facts.payment_date or '-'}\n"
+                f"────────────────────\n"
+                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
+                f"⏳ <i>Eslatma: Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) to'lovni 2-24 soat ichida faollashtiradi.</i>"
+            )
         else:
-            status_emoji = "🟢"
-            status_text = "<b>AVANS / QARZSIZ TO'LOV</b> (Avval qarz bo'lmagan)"
+            if debt_covered:
+                status_emoji = "✅"
+                status_text = "<b>QARZ TO'LIQ YOPILDI (Apparatni yoqish mumkin!)</b>"
+            elif prev_debt > 0 and paid_amount < prev_debt:
+                status_emoji = "⚠️"
+                status_text = f"<b>QISMAN TO'LANDI</b> (Qolgan qarz: {remaining_debt:,.0f} so'm)"
+            else:
+                status_emoji = "🟢"
+                status_text = "<b>AVANS / QARZSIZ TO'LOV</b> (Avval qarz bo'lmagan)"
 
-        text = (
-            f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
-            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
-            f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
-            f"────────────────────\n"
-            f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-            f"🔢 <b>INN / JSHSHIR:</b> <code>{inn}</code>\n"
-            f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-            f"🏦 <b>Qabul qiluvchi:</b> {receipt_facts.recipient_account or '«Mars Elektron Texnika»'}\n"
-            f"💳 <b>To'lov tizimi:</b> {receipt_facts.payment_system or 'Elektron tolov'}\n"
-            f"🔢 <b>Chek / Tranzaksiya:</b> <code>{receipt_facts.transaction_id or '-'}</code>\n"
-            f"📅 <b>To'lov vaqti:</b> {receipt_facts.payment_date or '-'}\n"
-            f"────────────────────\n"
-            f"📊 <b>Qarz tahlili:</b>\n"
-            f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
-            f"▫️ Holat: {status_emoji} {status_text}\n\n"
-            f"⚡️ <i>Mas'ul admin (@Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
-        )
+            text = (
+                f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+                f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
+                f"────────────────────\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>INN / JSHSHIR:</b> <code>{inn}</code>\n"
+                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"🏦 <b>Qabul qiluvchi:</b> {receipt_facts.recipient_account or '«Mars Elektron Texnika»'}\n"
+                f"💳 <b>To'lov tizimi:</b> {receipt_facts.payment_system or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{receipt_facts.transaction_id or '-'}</code>\n"
+                f"📅 <b>To'lov vaqti:</b> {receipt_facts.payment_date or '-'}\n"
+                f"────────────────────\n"
+                f"📊 <b>Qarz tahlili:</b>\n"
+                f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
+                f"▫️ Holat: {status_emoji} {status_text}\n\n"
+                f"⚡️ <i>Mas'ul admin (@Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+            )
 
         photo_id = file_id if is_photo else None
         doc_id = file_id if not is_photo else None

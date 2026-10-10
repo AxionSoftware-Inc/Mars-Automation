@@ -16,12 +16,12 @@ from core.models import DeviceFacts, ReceiptFacts
 
 from core.models import extract_clean_inn
 
-MARS_ACCOUNT = "20208000800208044003"
-MARS_INN = "302568138"
-MARS_KEYWORDS = [
-    "mars", "марс", "mars elektron texnika", "марс электрон техника",
-    "20208000800208044003", "302568138"
-]
+from payment_accounts import (
+    MARS_ACCOUNT, MARS_INN, MARS_KEYWORDS, MARS_ORG_NAME,
+    YANGI_TEXNOLOGIYALAR_ACCOUNT, YANGI_TEXNOLOGIYALAR_INN,
+    YANGI_TEXNOLOGIYALAR_KEYWORDS, YANGI_TEXNOLOGIYALAR_ORG_NAME,
+    classify_receipt_target
+)
 
 RECEIPT_SIGNALS = [
     "to'lov", "tolov", "chek", "kvitansiya", "click", "payme", "oplata",
@@ -167,17 +167,28 @@ Foydalanuvchi izohi: "{user_caption}"
 
             recipient_acc = str(rec_raw.get("recipient_account", ""))
             combined_text = f"{recipient_acc} {rec_raw.get('summary', '')} {rec_raw.get('payer_name', '')} {dev_summary}".lower()
-            is_mars = bool(rec_raw.get("is_mars_recipient", False)) or any(kw in combined_text for kw in MARS_KEYWORDS)
 
-            # Agar summa > 0 yoki chek deb topilgan bo'lsa va qabul qiluvchi ko'rsatilmagan bo'lsa, standart Mars deb hisoblash
-            if not recipient_acc:
-                recipient_acc = "«Mars Elektron Texnika» MCHJ"
+            category = classify_receipt_target(recipient_acc, amount, raw_text=combined_text)
+            is_annual_fiscal = (category == "annual")
+            if is_annual_fiscal:
+                is_mars = False
+                recipient_org_name = YANGI_TEXNOLOGIYALAR_ORG_NAME
+                recipient_acc = recipient_acc or YANGI_TEXNOLOGIYALAR_ACCOUNT
+            elif category == "monthly":
                 is_mars = True
+                recipient_org_name = MARS_ORG_NAME
+                recipient_acc = recipient_acc or MARS_ACCOUNT
+            else:
+                is_mars = bool(rec_raw.get("is_mars_recipient", False)) or any(kw in combined_text for kw in MARS_KEYWORDS)
+                recipient_org_name = recipient_acc or (MARS_ORG_NAME if is_mars else "Begona tashkilot")
 
             receipt_facts = ReceiptFacts(
                 is_receipt=True,
-                recipient_account=recipient_acc,
+                recipient_account=recipient_acc or recipient_org_name,
                 is_mars_recipient=is_mars,
+                is_annual_fiscal_fee=is_annual_fiscal,
+                payment_category=category,
+                recipient_org_name=recipient_org_name,
                 amount=amount,
                 payer_inn=payer_inn,
                 payer_name=str(rec_raw.get("payer_name", "")),

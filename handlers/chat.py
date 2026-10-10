@@ -3,6 +3,16 @@ from aiogram import Router, types, Bot, F
 from catalog_manager import catalog_manager
 from ai_helper import generate_ai_reply
 from user_memory import user_memory
+from payment_accounts import (
+    classify_payment_intent,
+    is_mxik_intent,
+    get_monthly_payment_card,
+    get_annual_payment_card,
+    get_all_payment_accounts_card,
+    get_mxik_guidance,
+    MARS_VIDEO_ID,
+    YANGI_TEXNOLOGIYALAR_VIDEO_ID
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +55,12 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     """
     Foydalanuvchi bilan ko'p bosqichli (multi-turn) aqlli suhbat:
     0. Matnda INN aniqlansa va qarz/apparat so'ralsa -> Zaxira INN protsessori
-    1. To'lov usuli yoki Click bo'yicha to'g'ridan-to'g'ri so'rovlar -> 148-video va rekvizitlar
-    2. Operator / Usta talab qilinganda -> Adminga to'g'ridan-to'g'ri eskalatsiya
-    3. Davomiy suhbat (qachon qo'shiladi, keyingi to'lov, qarz holati va h.k.) -> AI va boyitilgan xotira
-    4. Faqat maxsus texnik qo'llanma so'ralgandagina -> Video katalogdan qidirish
+    1. To'lov rekvizitlari va hisob raqamlar (Oylik Mars va Yillik Yangi Texnologiyalar ajratilishi)
+    2. MXIK (IKPU / Tasnif / Soliq talablari va tovar qo'shish)
+    3. To'lov usuli yoki Click bo'yicha to'g'ridan-to'g'ri so'rovlar -> 148-video va rekvizitlar
+    4. Operator / Usta talab qilinganda -> Adminga to'g'ridan-to'g'ri eskalatsiya
+    5. Davomiy suhbat (qachon qo'shiladi, keyingi to'lov, qarz holati va h.k.) -> AI va boyitilgan xotira
+    6. Faqat maxsus texnik qo'llanma so'ralgandagina -> Video katalogdan qidirish
     """
     text = message.text.strip()
     lower_text = text.lower()
@@ -63,7 +75,65 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         await process_and_send_debt_result(message, bot, found_inn)
         return
 
-    # 1. AGAR TO'LOV QILISH TARTIBI / CLICK SO'RALSA
+    # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (OYLIK VA YILLIK TO'LOVNING ANIQ AJRATILISHI)
+    payment_intent = classify_payment_intent(text)
+    if payment_intent:
+        if payment_intent == "annual":
+            reply_card = get_annual_payment_card()
+            video_to_send = YANGI_TEXNOLOGIYALAR_VIDEO_ID
+        elif payment_intent == "monthly":
+            reply_card = get_monthly_payment_card()
+            video_to_send = MARS_VIDEO_ID
+        else:
+            reply_card = get_all_payment_accounts_card()
+            video_to_send = MARS_VIDEO_ID
+
+        try:
+            await message.reply(reply_card, parse_mode="HTML")
+        except Exception:
+            await message.reply(reply_card)
+
+        if video_to_send:
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=video_to_send,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"To'lov videosi yuborishda xatolik: {e}")
+
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, reply_card)
+        user_memory.set_last_topic(chat_id, user_id, f"payment_info_{payment_intent}")
+        return
+
+    # 2. MXIK (IKPU / TASNIF / SOLIQ TALABLARI VA TOVAR QO'SHISH)
+    if is_mxik_intent(text):
+        mxik_text, mxik_video_id = get_mxik_guidance(text)
+        try:
+            await message.reply(mxik_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(mxik_text)
+
+        if mxik_video_id:
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=mxik_video_id,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"MXIK videosi yuborishda xatolik: {e}")
+
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, mxik_text)
+        user_memory.set_last_topic(chat_id, user_id, "mxik_guidance")
+        return
+
+    # 3. AGAR TO'LOV QILISH TARTIBI / CLICK SO'RALSA
     if any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS):
         try:
             await bot.copy_message(
@@ -80,7 +150,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"To'lov videosi yuborishda xatolik: {e}")
 
-    # 2. OPERATOR / MUTAXASSIS / USTA TALAB QILINGANDA
+    # 4. OPERATOR / MUTAXASSIS / USTA TALAB QILINGANDA
     if any(kw in lower_text for kw in OPERATOR_KEYWORDS):
         from core import core_engine
         from admin_manager import admin_manager

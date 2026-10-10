@@ -52,6 +52,18 @@ CHANNEL_POSTS = {
         "message_id": 140,
         "title": "Tovarlar narxini o'zgartirish qo'llanmasi",
         "keywords": ["narxni o'zgartirish", "narx uzgartirish", "narx qo'yish"]
+    },
+    # Tovarlarni qo'shish va MXIK kod kiritish
+    "mxik_tovar": {
+        "message_id": 15,
+        "title": "Tovarlarni qo'shish va MXIK kod kiritish",
+        "keywords": ["tovar qo'shish", "tovar qushish", "mxik", "mixk", "ikpu"]
+    },
+    # Tasnif.soliq.uz saytidan MXIK qidirish
+    "tasnif_soliq": {
+        "message_id": 28,
+        "title": "MXIK kodlarni Tasnif.soliq.uz saytidan qidirish",
+        "keywords": ["tasnif", "tasnif soliq", "mxik qidirish", "kod qidirish"]
     }
 }
 
@@ -60,15 +72,21 @@ def find_relevant_post(text: str) -> Optional[int]:
     t = text.lower().strip()
     
     # 1. Yillik fiskal modul to'lovi
-    if any(k in t for k in ["yillik to'lov", "yillik tolov", "yillik tulov", "yillik to'lash", "yillik qanday"]):
+    if any(k in t for k in ["yillik to'lov", "yillik tolov", "yillik tulov", "yillik to'lash", "yillik qanday", "yillik shot"]):
         return CHANNEL_POSTS["yillik_tulov"]["message_id"]
+
+    # 1.5 MXIK va Tasnif
+    if any(k in t for k in ["tasnif", "tasnif soliq"]):
+        return CHANNEL_POSTS["tasnif_soliq"]["message_id"]
+    if any(k in t for k in ["mxik", "mixk", "ikpu", "tovar qo'shish", "tovar qushish"]):
+        return CHANNEL_POSTS["mxik_tovar"]["message_id"]
 
     # 2. Oylik to'lovni qanday to'lash, clickdan to'lash, video qo'llanma so'ralganda
     # DIQQAT: "qarzim bormi", "apparati ishlamayapti" deganida emas, aynan to'lash tartibi so'ralganda!
     if any(k in t for k in [
         "qanday to'layman", "qanday tolash", "qanday to'lasa bo'ladi", 
         "clickdan to'lash", "clickdan qanday", "klikdan", "to'lov qilish videosi", 
-        "rekvizit", "to'lash tartibi", "videoni tashlang", "video tashlang"
+        "rekvizit", "to'lash tartibi", "videoni tashlang", "video tashlang", "oylik shot"
     ]):
         return CHANNEL_POSTS["oylik_tulov"]["message_id"]
 

@@ -79,6 +79,9 @@ class ReceiptFacts:
     is_receipt: bool = False               # Bu to'lov kvitansiyasi / chekmi
     recipient_account: str = ""            # Qabul qiluvchi hisob raqami yoki nomi
     is_mars_recipient: bool = False        # "Mars Elektron Texnika" ga yo'naltirilganmi
+    is_annual_fiscal_fee: bool = False     # "Yangi Texnologiyalar" DUK yillik fiskal modul to'lovimi
+    payment_category: str = "monthly"      # "monthly", "annual", "other"
+    recipient_org_name: str = ""           # Aniqlangan tashkilot nomi
     amount: float = 0.0                    # O'tkazilgan summa (so'm)
     payer_inn: Optional[str] = None        # Kvitansiyada aniqlangan to'lovchi INN/JSHSHIR
     payer_name: str = ""                   # To'lovchi korxona yoki shaxs nomi

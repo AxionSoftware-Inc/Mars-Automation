@@ -15,9 +15,12 @@ from core.models import ReceiptFacts
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-MARS_ACCOUNT = "20208000800208044003"
-MARS_INN = "302568138"
-MARS_KEYWORDS = ["mars", "марс", "mars elektron texnika", "марс электрон техника", "20208000800208044003", "302568138"]
+from payment_accounts import (
+    MARS_ACCOUNT, MARS_INN, MARS_KEYWORDS, MARS_ORG_NAME,
+    YANGI_TEXNOLOGIYALAR_ACCOUNT, YANGI_TEXNOLOGIYALAR_INN,
+    YANGI_TEXNOLOGIYALAR_KEYWORDS, YANGI_TEXNOLOGIYALAR_ORG_NAME,
+    classify_receipt_target
+)
 
 def extract_receipt_facts(
     file_bytes: bytes,
@@ -153,12 +156,7 @@ Foydalanuvchi izohi: "{user_caption}"
                     break
 
         recipient_account = str(facts.get("recipient_account", "")).strip()
-        is_mars_recipient = bool(facts.get("is_mars_recipient", False))
-
-        # Agar sun'iy intellekt Mars deb topmagan bo'lsa ham, kalit so'zlar bilan tekshirish
         combined_text = (pdf_text + " " + recipient_account + " " + user_caption + " " + str(facts.get("summary", ""))).lower()
-        if any(kw in combined_text for kw in MARS_KEYWORDS):
-            is_mars_recipient = True
 
         raw_amount = facts.get("amount", 0.0)
         try:
@@ -166,10 +164,27 @@ Foydalanuvchi izohi: "{user_caption}"
         except (ValueError, TypeError):
             amount = 0.0
 
+        category = classify_receipt_target(recipient_account, amount, raw_text=combined_text)
+        is_annual_fiscal = (category == "annual")
+        if is_annual_fiscal:
+            is_mars_recipient = False
+            recipient_org_name = YANGI_TEXNOLOGIYALAR_ORG_NAME
+            recipient_account = recipient_account or YANGI_TEXNOLOGIYALAR_ACCOUNT
+        elif category == "monthly":
+            is_mars_recipient = True
+            recipient_org_name = MARS_ORG_NAME
+            recipient_account = recipient_account or MARS_ACCOUNT
+        else:
+            is_mars_recipient = bool(facts.get("is_mars_recipient", False)) or any(kw in combined_text for kw in MARS_KEYWORDS)
+            recipient_org_name = recipient_account or "Begona tashkilot"
+
         return ReceiptFacts(
             is_receipt=bool(facts.get("is_receipt", False)),
-            recipient_account=recipient_account or "«Mars Elektron Texnika»",
+            recipient_account=recipient_account or recipient_org_name,
             is_mars_recipient=is_mars_recipient,
+            is_annual_fiscal_fee=is_annual_fiscal,
+            payment_category=category,
+            recipient_org_name=recipient_org_name,
             amount=amount,
             payer_inn=str(payer_inn) if payer_inn else None,
             payer_name=str(facts.get("payer_name", "")),
