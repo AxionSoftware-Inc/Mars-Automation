@@ -8,6 +8,34 @@ logger = logging.getLogger(__name__)
 
 ERROR_RULES_FILE = os.path.join(os.path.dirname(__file__), "data", "screen_errors.json")
 
+CYRILLIC_TO_LATIN = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'j', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'x', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh', 'ъ': '',
+    'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya', 'ў': "o'", 'ғ': "g'",
+    'ҳ': 'h', 'і': 'i', 'ґ': 'g'
+}
+
+def normalize_text(text: str) -> str:
+    """Matnni kirill/lotin va tinish belgilardan tozalash va standartlashtirish"""
+    if not text:
+        return ""
+    text = text.lower()
+    text = text.replace("’", "'").replace("`", "'").replace("‘", "'").replace("ʻ", "'")
+    text = re.sub(r'[\r\n\t]+', ' ', text)
+    
+    # Kirilldan lotinga o'tkazish
+    res = []
+    for ch in text:
+        res.append(CYRILLIC_TO_LATIN.get(ch, ch))
+    normalized = "".join(res)
+    
+    # Belgilar va ortiqcha bo'shliqlarni tozalash (apostrof saqlanadi)
+    normalized = re.sub(r"[^\w\s']", ' ', normalized)
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+    return normalized
+
 class ErrorManager:
     """
     Kassa apparati ekrandagi 20+ turdagi xatoliklarni boshqaruvchi markaziy modul.
@@ -44,23 +72,13 @@ class ErrorManager:
     def match_error(self, screen_facts: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         AI ekranda aniqlagan faktlar bo'yicha mos keluvchi xatolik qoidasini topish:
-        screen_facts = {
-            "time_mismatch": bool,
-            "has_internet": bool,
-            "error_type": str,
-            "screen_text_summary": str,
-            "detected_code_or_text": str
-        }
+        Ustuvorlik:
+        1. Ekrandagi aniq matn, kod yoki modal xatoliklar (Tamper, Kod 204, Smena 24 soat, Abonent to'lovi tugashi va h.k.)
+        2. Agar ekranda maxsus xatolik bo'lmasa -> Internet yo'qligi
+        3. Agar maxsus xatolik bo'lmasa -> Soat/sana farqi (time_mismatch)
+        4. Standart error_type zaxirasi
         """
-        # 1. Soat va sana xatoligi
-        if screen_facts.get("time_mismatch"):
-            return self.get_rule_by_id("time_error")
-
-        # 2. Internet yo'qligi
-        if screen_facts.get("has_internet") is False:
-            return self.get_rule_by_id("no_internet")
-
-        # 3. Ekrandagi umumiy xatolik matnlari va kodlarini to'plash
+        # 1. Ekrandagi umumiy xatolik matnlari va kodlarini to'plash
         raw_text_parts = [
             str(screen_facts.get("detected_code_or_text") or ""),
             str(screen_facts.get("screen_text_summary") or "")
@@ -71,8 +89,9 @@ class ErrorManager:
                 raw_text_parts.append(v)
 
         combined_text = " ".join(raw_text_parts).lower()
+        norm_combined_text = normalize_text(combined_text)
 
-        # 4. Matn va xatolik kodlari bo'yicha kalit so'zlarni solishtirish (Eng uzun/aniq moslik ustuvor)
+        # 2. Matn va xatolik kodlari bo'yicha kalit so'zlarni solishtirish (Eng uzun/aniq moslik ustuvor)
         best_rule = None
         highest_score = 0
 
@@ -80,15 +99,27 @@ class ErrorManager:
             keywords = rule.get("screen_keywords", [])
             for kw in keywords:
                 kw_clean = kw.lower().strip()
-                if kw_clean and kw_clean in combined_text:
-                    # Uzunroq va aniqroq so'z yuqoriroq ball oladi (masalan "kod 204" > "kod")
-                    score = len(kw_clean)
+                if not kw_clean:
+                    continue
+                kw_norm = normalize_text(kw_clean)
+
+                is_match = (kw_clean in combined_text) or (kw_norm and kw_norm in norm_combined_text)
+                if is_match:
+                    score = max(len(kw_clean), len(kw_norm))
                     if score > highest_score:
                         highest_score = score
                         best_rule = rule
 
         if best_rule:
             return best_rule
+
+        # 3. Agar maxsus xatolik matni bo'lmasa: Internet yo'qligi
+        if screen_facts.get("has_internet") is False:
+            return self.get_rule_by_id("no_internet")
+
+        # 4. Agar maxsus xatolik matni bo'lmasa: Soat va sana xatoligi
+        if screen_facts.get("time_mismatch"):
+            return self.get_rule_by_id("time_error")
 
         # 5. Standart error_type toifalari bo'yicha zaxira tanlash
         err_type = str(screen_facts.get("error_type", "")).lower()
@@ -102,6 +133,7 @@ class ErrorManager:
             return self.get_rule_by_id("paper_out")
 
         return None
+
 
     def add_or_update_rule(
         self,

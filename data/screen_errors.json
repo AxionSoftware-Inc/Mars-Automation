@@ -406,5 +406,32 @@
     "video_id": null,
     "require_inn": false,
     "escalate_to_admin": true
+  },
+  {
+    "id": "subscription_pre_warning",
+    "name": "Abonent to'lovi muddati tugamoqda (Dastur to'xtashiga oz qoldi)",
+    "screen_keywords": [
+      "до остановки работы",
+      "до остановки программы",
+      "до остановки",
+      "пополните счет",
+      "пополните счёт",
+      "осталось 3 дней",
+      "осталось 2 дней",
+      "осталось 1 дней",
+      "осталось дней",
+      "номер контракта",
+      "код устройства",
+      "to'xtashiga qoldi",
+      "hisobni to'ldiring",
+      "hisobni toldiring",
+      "to'xtashiga 3 kun",
+      "to'xtashiga 2 kun",
+      "to'xtashiga 1 kun"
+    ],
+    "response_text": "⚠️ <b>Abonent to'lovi muddati tugamoqda (Dastur to'xtashiga oz qoldi)!</b>\n\n📌 <b>Sababi:</b> Kassa dasturining oylik xizmat to'lovi muddati tugash arafasida. Har oyning 6-sanasigacha to'lov qilinmasa, dastur avtomatik to'xtatiladi.\n💡 <b>Yechimi:</b> Apparat to'xtab qolmasligi uchun Click orqali yoki bank rekvizitlariga oylik abonent to'lovini amalga oshiring. Qarz summasini tekshirish uchun korxonangiz <b>INN (STIR)</b> raqamini yuboring.\n\n👇 <i>Quyida Click orqali to'lash videosi yuborildi:</i>",
+    "video_id": 148,
+    "require_inn": true,
+    "escalate_to_admin": false
   }
 ]
