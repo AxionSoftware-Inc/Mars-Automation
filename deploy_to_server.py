@@ -27,6 +27,9 @@ def deploy():
         'excel_manager.py',
         'data/video_catalog.json',
         'data/screen_errors.json',
+        'core/__init__.py',
+        'core/models.py',
+        'core/engine.py',
         'handlers/__init__.py',
         'handlers/channel.py',
         'handlers/chat.py',
@@ -35,9 +38,14 @@ def deploy():
         'handlers/media.py'
     ]
     
-    # Ensure handlers directory exists on remote server
+    # Ensure handlers and core directories exist on remote server
     try:
         sftp.mkdir(f"{remote_dir}/handlers")
+    except Exception:
+        pass
+
+    try:
+        sftp.mkdir(f"{remote_dir}/core")
     except Exception:
         pass
 

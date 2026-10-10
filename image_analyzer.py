@@ -12,25 +12,20 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 from openrouter_client import openrouter_client
+from core.models import DeviceFacts
 
-INCOMPLETE_SCREEN_REPLY = (
-    "⚠️ <b>Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti.</b>\n"
-    "Aniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."
-)
-
-from error_manager import error_manager
-
-def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int], Optional[str]]:
+def extract_device_facts(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> DeviceFacts:
     """
-    Android POS apparati ekranini professional tashxis qilish:
-    1. Ekran tepasidagi status bar (soat, internet/tarmoq) ko'ringanligini tekshirish.
-    2. Ekrandagi soat va sanani real Toshkent vaqti bilan solishtirish.
-    3. Internet / Wi-Fi / Tarmoq holatini tekshirish.
-    4. Ekrandagi xatolik kodlari va xabarlarini aniqlash.
-    5. XULOSA VA JAVOB ErrorManager QOIDALARI ASOSIDA NAZORAT QILINADI.
-    
-    Qaytaradi: (qisqa_tashxis_matni, video_id yoki None, detected_inn yoki None)
+    Rasm sensor moduli (Sensory Extractor):
+    Tasvirdan faqat sof faktlarni ajratib oladi va DeviceFacts modelida qaytaradi.
+    Hech qanday javob matni yozmaydi va qaror chiqarmaydi.
     """
+    # Caption ichidan INN qidirish
+    caption_inn = None
+    if user_caption:
+        found_nums = re.findall(r"\b(\d{14}|\d{9})\b", user_caption)
+        if found_nums:
+            caption_inn = found_nums[0]
 
     # Hozirgi real O'zbekiston (Toshkent) vaqti
     now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
@@ -76,41 +71,50 @@ Foydalanuvchi izohi: "{user_caption}"
             temperature=0.1,
             response_format={"type": "json_object"}
         ) or "{}"
+
         try:
             facts = json.loads(raw_json)
         except Exception:
-            # Fallback regex if markdown wrappers
             match = re.search(r"\{.*\}", raw_json, re.DOTALL)
             facts = json.loads(match.group(0)) if match else {}
 
-        detected_inn = facts.get("detected_inn")
+        detected_inn = facts.get("detected_inn") or caption_inn
 
-        # 0-BOSQICH (GUARDRAIL): Haqiqiy kassa apparati/ekrani bo'lmasa -> E'TIBORSIZ QOLDIRISH
-        if not facts.get("is_real_pos_device", False):
-            logger.info("Guardrail: Rasm kassa apparatiga tegishli emas. E'tiborsiz qoldirildi.")
-            return "", None, None
-
-        # 1-BOSQICH (STATUS BAR FILTRI): Ekran tepasidagi soat va tarmoq qatori tushmagan bo'lsa
-        if not facts.get("is_status_bar_visible", False):
-            logger.info("Status bar ko'rinmayapti -> To'liq ekran talab qilinadi.")
-            return INCOMPLETE_SCREEN_REPLY, None, detected_inn
-
-        # 2-BOSQICH: BIZNING NAZORATIMIZDAGI XATOLIKLAR MODULI (ErrorManager) ORQALI TASHXIS
-        matched_rule = error_manager.match_error(facts)
-        if matched_rule:
-            return (
-                matched_rule.get("response_text", ""),
-                matched_rule.get("video_id"),
-                detected_inn
-            )
-
-        # 3-BOSQICH: Agar maxsus qoida topilmasa, lo'nda umumiy xulosa
-        summary = facts.get("screen_text_summary")
-        if summary and summary.lower() != "none":
-            return f"ℹ️ <b>Ekrandagi holat:</b> {summary}\nNosozlik davom etsa, korxona INN raqamini yuboring.", None, detected_inn
-
-        return "", None, detected_inn
+        return DeviceFacts(
+            is_real_pos_device=bool(facts.get("is_real_pos_device", False)),
+            is_status_bar_visible=bool(facts.get("is_status_bar_visible", False)),
+            time_mismatch=bool(facts.get("time_mismatch", False)),
+            has_internet=bool(facts.get("has_internet", True)),
+            error_type=str(facts.get("error_type", "none")),
+            detected_inn=detected_inn,
+            screen_text_summary=str(facts.get("screen_text_summary", "")),
+            raw_facts=facts,
+            extraction_error=None
+        )
 
     except Exception as e:
-        logger.error(f"Image screen analysis error: {e}")
+        logger.error(f"Image screen analysis extraction error: {e}")
+        # Sensor uzilib qolsa xavfsiz obyekt qaytariladi
+        return DeviceFacts(
+            is_real_pos_device=False,
+            detected_inn=caption_inn,
+            extraction_error=str(e)
+        )
+
+def analyze_pos_screen(image_bytes: bytes, user_caption: str = "", mime_type: str = "image/jpeg") -> Tuple[str, Optional[int], Optional[str]]:
+    """
+    Backwards compatibility interfeysi:
+    Sensordan faktlarni oladi va CoreEngine orqali yakuniy natijani qaytaradi.
+    """
+    from core.engine import core_engine, ActionType
+    facts = extract_device_facts(image_bytes, user_caption=user_caption, mime_type=mime_type)
+    decision = core_engine.process_device_facts(facts, chat_id=0, user_id=0)
+
+    if decision.action == ActionType.IGNORE:
         return "", None, None
+
+    return (
+        decision.reply_text or "",
+        decision.video_id,
+        decision.detected_inn
+    )

@@ -1,14 +1,14 @@
 import os
 import io
-import re
 import logging
 from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
+
 from excel_manager import excel_manager, DATA_DIR
-from image_analyzer import analyze_pos_screen, INCOMPLETE_SCREEN_REPLY
+from image_analyzer import extract_device_facts
+from core import core_engine, ActionType
 from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
-from handlers.debt import format_debt_response
 
 logger = logging.getLogger(__name__)
 
@@ -61,111 +61,57 @@ async def handle_excel_document(message: types.Message, bot: Bot):
         logger.error(f"Faylni yuklashda xatolik: {e}")
 
 
-# 2. POS APPARATI EKRAN RASMLARINI TAHLIL QILISH
+# 2. POS APPARATI EKRAN RASMLARINI TAHLIL QILISH (YADRO ORQALI)
 @router.message(F.photo)
 async def handle_pos_photo(message: types.Message, bot: Bot):
-    """Ekran rasmini AI yordamida professional tashxis qilish"""
+    """
+    Rasm qabul qiluvchi handler:
+    Faqat rasmni yuklab oladi -> Sensorga beradi -> Yadroga uzatadi -> Qarorni Telegramga jo'natadi.
+    Hech qanday ichki if-else chalkashliklarsiz sof orkestratsiya!
+    """
     caption = message.caption or ""
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
-    
-    # Agar rasm tagida INN yozilgan bo'lsa
-    found_nums = re.findall(r"\b(\d{14}|\d{9})\b", caption)
-    if found_nums:
-        query_num = found_nums[0]
-        results = excel_manager.search(query_num)
-        org_name = results[0].get("name", "") if results else ""
-        total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
 
-        user_memory.set_last_id(chat_id, user_id, query_num, org_name=org_name, debt=total_debt)
-        user_memory.set_last_topic(chat_id, user_id, "photo_with_inn")
-
-        resp = format_debt_response(results)
-        await message.reply(resp, parse_mode="HTML")
-
-        if total_debt > 0:
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=148,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.error(f"To'lov videosini yuborishda xatolik: {e}")
-        return
-
-    # Android POS ekran tahlili: Soat, internet, xatolik kodi
     try:
         photo = message.photo[-1]
         file_io = io.BytesIO()
         await bot.download(photo, destination=file_io)
         image_bytes = file_io.getvalue()
-        
-        reply_text, video_id, detected_inn = analyze_pos_screen(image_bytes=image_bytes, user_caption=caption)
-        
-        # 1. Agar rasm haqiqiy kassa apparatiga tegishli bo'lmasa -> E'TIBORSIZ QOLDIRILADI (jim turadi)
-        if not reply_text:
+
+        # 1-BOSQICH (SENSOR): Faktlarni ajratib olish
+        facts = extract_device_facts(image_bytes=image_bytes, user_caption=caption)
+
+        # 2-BOSQICH (YADRO): Markaziy qarorlar tizimi
+        decision = core_engine.process_device_facts(facts, chat_id=chat_id, user_id=user_id)
+
+        # 3-BOSQICH (RUNNER): Yadroning chiqargan qarorini Telegramda ijro etish
+        if decision.action == ActionType.IGNORE:
+            logger.info(f"Yadro qarori: IGNORE ({decision.log_reason}) -> Javobsiz qoldirildi.")
             return
 
-        # 2. Agar apparat tepasida soat va tarmoq qatori ko'rinmasa -> To'liq ekran talab qilish
-        if reply_text == INCOMPLETE_SCREEN_REPLY:
-            await message.reply(INCOMPLETE_SCREEN_REPLY, parse_mode="HTML")
-            return
-
-        # 3. Agar rasmning o'zidan INN/JSHSHIR topilgan bo'lsa -> bazadan ham tekshirish va birga qo'shib berish
-        if detected_inn:
-            results = excel_manager.search(detected_inn)
-            org_name = results[0].get("name", "") if results else ""
-            total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
-
-            user_memory.set_last_id(chat_id, user_id, detected_inn, org_name=org_name, debt=total_debt)
-            user_memory.set_last_topic(chat_id, user_id, "photo_analysis_with_inn")
-
-            debt_resp = format_debt_response(results)
-            combined_resp = f"{reply_text}\n\n──────────────\n{debt_resp}" if reply_text else debt_resp
+        # Matnli javob yuborish
+        if decision.reply_text:
             try:
-                await message.reply(combined_resp, parse_mode="HTML")
+                await message.reply(decision.reply_text, parse_mode="HTML")
             except Exception:
-                await message.reply(combined_resp)
+                await message.reply(decision.reply_text)
 
-            user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] INN: {detected_inn}")
-            user_memory.add_assistant_message(chat_id, user_id, combined_resp)
+            # Xotiraga saqlash
+            user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
+            user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
 
-            if total_debt > 0:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=148,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.error(f"To'lov videosini yuborishda xatolik: {e}")
-            return
-
-        # 4. Oddiy holatda AI tahlil matnini yuborish
-        try:
-            await message.reply(reply_text, parse_mode="HTML")
-        except Exception:
-            await message.reply(reply_text)
-
-        # Xotiraga saqlash
-        user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
-        user_memory.add_assistant_message(chat_id, user_id, reply_text)
-        user_memory.set_last_topic(chat_id, user_id, "photo_diagnosed")
-
-        # Tashxis bo'yicha yechim videosi mavjud bo'lsa (masalan soat uchun 141)
-        if video_id:
+        # Video jo'natish (agar yadro video belgilagan bo'lsa)
+        if decision.video_id:
             try:
                 await bot.copy_message(
                     chat_id=message.chat.id,
                     from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=video_id,
+                    message_id=decision.video_id,
                     reply_to_message_id=message.message_id
                 )
             except Exception as e:
-                logger.error(f"Tashxis videosini yuborishda xatolik: {e}")
+                logger.error(f"Yadro belgilagan videoni yuborishda xatolik (ID: {decision.video_id}): {e}")
 
     except Exception as e:
-        logger.error(f"Rasmni tahlil qilishda xatolik: {e}")
+        logger.error(f"Media handler ijrosida kutilmagan xatolik: {e}")
