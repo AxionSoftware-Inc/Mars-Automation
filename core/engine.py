@@ -111,16 +111,18 @@ class CoreEngine:
                 user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
                 user_memory.set_last_topic(chat_id, user_id, "screen_diagnostics_with_inn")
 
-        # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR)
-        # Foydalanuvchi talabi: "kimnidir apparatida muammo bor internet ishlab turibdi tekshirganda qarzdorlik yo'q
-        # bunday holatda bot adminga xabar yozadi muammoni ko'rsatadi xabarlarni uzatadi... adminga kontaktiga yozadi"
-        if facts.has_internet and total_debt <= 0 and has_error and not facts.time_mismatch:
+        # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR, YOKI JIDDIY APPARAT XATOSI)
+        is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
+        should_escalate = is_fatal_hardware or (facts.has_internet and total_debt <= 0 and has_error and not facts.time_mismatch)
+
+        if should_escalate:
             issue_desc = diag_text or facts.screen_text_summary or "Noma'lum apparat nosozligi"
             contacts_info = admin_manager.get_contacts_display()
+            status_prefix = "✅ <b>Apparatingizda abonent to'lovidan qarzdorlik yo'q va internet tarmog'i faol.</b>\n\n" if not is_fatal_hardware else ""
             escalation_reply = (
-                f"✅ <b>Apparatingizda abonent to'lovidan qarzdorlik yo'q va internet tarmog'i faol.</b>\n\n"
-                f"⚠️ <b>Aniqlangan nosozlik:</b>\n{issue_desc}\n\n"
-                f"👨‍💻 <b>Ushbu texnik masala bo'yicha ma'lumotlar va apparat rasmi servis markazimiz adminlari hamda ustalariga yetkazildi.</b> "
+                f"{status_prefix}"
+                f"{diag_text}\n\n"
+                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar servis markazimiz adminlari hamda ustalariga yetkazildi.</b> "
                 f"Mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
                 f"{contacts_info}"
             )
@@ -135,7 +137,7 @@ class CoreEngine:
                 should_notify_admin=True,
                 admin_alert_type="tech_issue",
                 admin_alert_text=issue_desc,
-                log_reason="Internet active and no debt, but technical error persists -> Escalated to admin"
+                log_reason="Hardware fatal error or Internet active & no debt -> Escalated to admin"
             )
 
         # 6-BOSQICH: ODDIY TASHXIS VA JAVOB SINTEZI

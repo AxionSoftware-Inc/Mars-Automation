@@ -2,49 +2,409 @@
   {
     "id": "time_error",
     "name": "Sana va vaqt noto'g'ri",
-    "screen_keywords": ["vaqt noto'g'ri", "sana noto'g'ri", "time mismatch", "soat xato"],
-    "response_text": "⚠️ <b>Apparatdagi soat yoki sana noto'g'ri.</b>\nKassa to'g'ri ishlashi uchun sana va vaqtni to'g'rilash kerak.",
+    "screen_keywords": [
+      "vaqt noto'g'ri",
+      "sana noto'g'ri",
+      "time mismatch",
+      "soat xato",
+      "soat adashgan",
+      "неверное время",
+      "рассинхронизация времени",
+      "неверная дата",
+      "vaqt xato",
+      "vaqtini to'g'irla"
+    ],
+    "response_text": "⚠️ <b>Apparatdagi soat yoki sana noto'g'ri ko'rsatmoqda!</b>\n\n📌 <b>Sababi:</b> Kassa apparati batareyasi o'chib qolgan yoki internet yo'qligida Toshkent vaqtidan orqada qolgan.\n💡 <b>Yechimi:</b> Sozlamalar (Настройки) -> Sana va vaqt (Дата и время) bo'limiga kiring va vaqtni to'g'rilang.\n\n👇 <i>Quyida soatni to'g'rilash bo'yicha video-qo'llanma yuborildi:</i>",
     "video_id": 141,
-    "require_inn": false
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "shift_exceeded_24h",
+    "name": "Smena 24 soatdan oshgan / Z-hisobot talab qilinadi",
+    "screen_keywords": [
+      "смена превысила 24 часа",
+      "смена более 24 часов",
+      "сделайте z-отчет",
+      "закройте смену",
+      "smena 24 soatdan oshgan",
+      "smena yopilmagan",
+      "smenani yoping",
+      "z hisobot",
+      "z otchet",
+      "z otchyot",
+      "z-hisobot oling",
+      "kunni yopish",
+      "kun yakuni",
+      "смена закрыта"
+    ],
+    "response_text": "⚠️ <b>Smena 24 soatdan oshgan — Z-hisobot olish talab qilinadi!</b>\n\n📌 <b>Sababi:</b> Soliq qonunchiligiga ko'ra 24 soat ichida kamida 1 marta Z-hisobot (kun yopilishi) olinishi shart. Olinmasa apparat chek urishni bloklaydi.\n💡 <b>Yechimi:</b> Asosiy menyudan <b>«Hisobotlar» (Отчеты)</b> bo'limiga kiring va <b>«Z-hisobot olish» (Закрыть смену)</b> tugmasini bosing.\n\n👇 <i>Quyida Z-hisobot chiqarish bo'yicha video-qo'llanma yuborildi:</i>",
+    "video_id": 2,
+    "require_inn": false,
+    "escalate_to_admin": false
   },
   {
     "id": "no_internet",
     "name": "Internet aloqasi yo'q",
-    "screen_keywords": ["tarmoq xatosi", "internet yo'q", "offline", "aloqa yo'q", "no internet", "подключение к сети", "tarmoqqa ulanish"],
-    "response_text": "⚠️ <b>Apparat internetga ulanmagan.</b>\nIltimos, Wi-Fi yoki SIM-karta internetini tekshiring.",
+    "screen_keywords": [
+      "tarmoq xatosi",
+      "internet yo'q",
+      "offline",
+      "aloqa yo'q",
+      "no internet",
+      "подключение к сети",
+      "tarmoqqa ulanish",
+      "нет подключения",
+      "ошибка сети",
+      "сервер недоступен",
+      "tarmoq uzildi",
+      "internet ishlamayapti",
+      "wi-fi yo'q"
+    ],
+    "response_text": "⚠️ <b>Kassa apparati internetga ulanmagan!</b>\n\n📌 <b>Sababi:</b> Wi-Fi tarmog'i uzilgan, SIM-karta balansi yoki trafigi tugagan.\n💡 <b>Yechimi:</b>\n1. Ekranning tepasidan panelni pastga tushirib Wi-Fi yoki Mobil internetni yoqing.\n2. SIM-karta balansini tekshiring.\n3. Apparatni o'chirib qayta yoqing (Restart).",
     "video_id": null,
-    "require_inn": false
-  },
-  {
-    "id": "debt_blocked",
-    "name": "Abonent to'lovi qarzdorligi / Blok",
-    "screen_keywords": ["blok", "to'xtatilgan", "abonent", "qarzdorlik", "bloklandi", "muddati tugagan", "заблокирован"],
-    "response_text": "⚠️ <b>Apparat to'xtatilgan yoki abonent to'lovidan qarzdorlik mavjud bo'lishi mumkin.</b>\nBazadan tekshirishimiz uchun korxonangizning <b>INN (STIR)</b> yoki <b>JSHSHIR</b> raqamini yuboring.",
-    "video_id": null,
-    "require_inn": true
+    "require_inn": false,
+    "escalate_to_admin": false
   },
   {
     "id": "fiscal_module_error",
-    "name": "Fiskal modul xatoligi",
-    "screen_keywords": ["fiskal modul", "fiskal xotira", "fm xatolik", "fm javob bermayapti", "фискальный модуль"],
-    "response_text": "⚠️ <b>Fiskal modul ilovasida nosozlik aniqlandi.</b>\nIlovani qayta aktivlashtirish yoki qayta o'rnatish lozim.",
+    "name": "Fiskal modul ilovasi nosozligi (Kod 204 / 205)",
+    "screen_keywords": [
+      "fiskal modul",
+      "fiskal xotira",
+      "fm xatolik",
+      "fm javob bermayapti",
+      "фискальный модуль",
+      "код 204",
+      "kod 204",
+      "код 205",
+      "kod 205",
+      "ошибка фм",
+      "фм не отвечает",
+      "fm aloqa uzildi",
+      "fm modul"
+    ],
+    "response_text": "⚠️ <b>Fiskal modul ilovasida nosozlik aniqlandi!</b>\n\n📌 <b>Sababi:</b> Fiskal modul ilovasi qotib qolgan yoki xizmat to'xtagan.\n💡 <b>Yechimi:</b> Fiskal modul ilovasini o'chirib qayta o'rnatish yoki qayta aktivlashtirish lozim.\n\n👇 <i>Quyida ilovani qayta o'rnatish va aktivlashtirish videosi yuborildi:</i>",
     "video_id": 134,
-    "require_inn": false
+    "require_inn": false,
+    "escalate_to_admin": false
   },
   {
-    "id": "update_required",
-    "name": "Dasturni yangilash zarur",
-    "screen_keywords": ["obnovleniya", "yangilash", "yangi versiya", "обновление", "update required"],
-    "response_text": "⚠️ <b>Kassa apparati dasturini yangilash (обновление) talab qilinmoqda.</b>",
-    "video_id": 125,
-    "require_inn": false
+    "id": "annual_fm_expired",
+    "name": "Yillik fiskal modul to'lovi muddati tugagan",
+    "screen_keywords": [
+      "yillik to'lov",
+      "yillik shot",
+      "yangi texnologiyalar",
+      "yillik modul",
+      "440000",
+      "yillik rekvizit",
+      "срок действия фм истек",
+      "оплата фм",
+      "yillik qarz"
+    ],
+    "response_text": "⚠️ <b>Fiskal modulning yillik to'lovi (440 000 so'm) muddati tugagan!</b>\n\n📌 <b>Sababi:</b> Davlat soliq qo'mitasining «Yangi Texnologiyalar DUK» hisobiga yillik to'lov to'lanmagan.\n💡 <b>Yechimi:</b> Click ilovasi orqali «Yangi Texnologiyalar DUK» xizmatiga yillik 440 000 so'm to'lovni o'tkazing.\n\n👇 <i>Quyida yillik to'lovni to'lash bo'yicha video-qo'llanma yuborildi:</i>",
+    "video_id": 145,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "debt_blocked",
+    "name": "Abonent to'lovi qarzdorligi / Bloklangan",
+    "screen_keywords": [
+      "blok",
+      "to'xtatilgan",
+      "abonent",
+      "qarzdorlik",
+      "bloklandi",
+      "muddati tugagan",
+      "заблокирован",
+      "оплата услуг",
+      "bloklangan",
+      "to'lov qiling",
+      "aparat o'chgan"
+    ],
+    "response_text": "⚠️ <b>Apparat abonent to'lovi qarzdorligi sababli to'xtatilgan!</b>\n\n📌 <b>Sababi:</b> Oylik servis xizmati to'lovi amalga oshirilmagan.\n💡 <b>Yechimi:</b> Qarzni tekshirish uchun korxonangizning <b>INN (STIR)</b> raqamini yozing. To'lov amalga oshirilgach apparat darhol avtomatik yoqiladi.\n\n👇 <i>Quyida Click orqali to'lash videosi yuborildi:</i>",
+    "video_id": 148,
+    "require_inn": true,
+    "escalate_to_admin": false
   },
   {
     "id": "paper_out",
-    "name": "Qog'oz / lenta tugagan",
-    "screen_keywords": ["qog'oz tugadi", "lenta yo'q", "lentani tekshiring", "chek qog'ozi", "нет бумаги"],
-    "response_text": "⚠️ <b>Kassa apparatida qog'oz (lenta) tugagan yoki qopqoq ochiq qolgan.</b>\nIltimos, yangi lenta solib qopqoqni mahkam yoping.",
+    "name": "Chek qog'ozi (termolenta) tugagan yoki qopqoq ochiq",
+    "screen_keywords": [
+      "qog'oz tugadi",
+      "lenta yo'q",
+      "lentani tekshiring",
+      "chek qog'ozi",
+      "нет бумаги",
+      "крышка открыта",
+      "qopqoq ochiq",
+      "printer xatosi",
+      "lenta soling",
+      "bumaga yoq"
+    ],
+    "response_text": "⚠️ <b>Chek lentasi (qog'oz) tugagan yoki qopqoq ochiq qolgan!</b>\n\n📌 <b>Sababi:</b> Printer ichida qog'oz yo'q, teskari solingan yoki qopqoq to'liq yopilmagan.\n💡 <b>Yechimi:</b> 57 mm lik termolentani to'g'ri tomoni bilan soling va qopqoqni cherttirish ovozi chiqquncha mahkam yoping.",
     "video_id": null,
-    "require_inn": false
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "update_required",
+    "name": "Dasturni yangilash zarur (Обновление)",
+    "screen_keywords": [
+      "obnovleniya",
+      "yangilash",
+      "yangi versiya",
+      "обновление",
+      "update required",
+      "dasturni yangilang",
+      "obnovit",
+      "obnavleniya",
+      "versiya eskirgan"
+    ],
+    "response_text": "⚠️ <b>Kassa apparati dasturini yangilash (Обновление) talab etilmoqda!</b>\n\n📌 <b>Sababi:</b> Soliq tizimi yoki kassa dasturining yangi rasmiy versiyasi chiqqan.\n💡 <b>Yechimi:</b> Internet yoqilgan holda kassa dasturini yangilab oling.\n\n👇 <i>Quyida dasturni yangilash bo'yicha video-qo'llanma yuborildi:</i>",
+    "video_id": 125,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "cancel_check_error",
+    "name": "Chekni bekor qilish / Qaytarish (Возврат / Otkaz)",
+    "screen_keywords": [
+      "vozvrat",
+      "bekor qilish",
+      "chekni qaytarish",
+      "otkaz",
+      "atkas",
+      "возврат чека",
+      "chekni bekor qilish",
+      "xato urilgan chek",
+      "qaytuv",
+      "chek otkaz"
+    ],
+    "response_text": "ℹ️ <b>Chekni bekor qilish yoki tovar qaytarish (Vozvrat) tartibi:</b>\n\n📌 <b>Sababi:</b> Xaridor mahsulotni qaytardi yoki kassa cheki xato summa bilan urildi.\n💡 <b>Yechimi:</b> Asosiy menyudan «Vozvrat» (Qaytarish) bo'limini tanlab, chekdagi fiskal belgini kiritib chekni bekor qiling.\n\n👇 <i>Quyida to'liq video-qo'llanma yuborildi:</i>",
+    "video_id": 53,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "mxik_code_error",
+    "name": "MXIK (IKPU) kod xatosi yoki soliq talabi",
+    "screen_keywords": [
+      "mxik xato",
+      "ikpu xato",
+      "mxik topilmadi",
+      "неверный икпу",
+      "mxik kod",
+      "tovar kodi xato",
+      "tasnif kod",
+      "mxik biriktirish"
+    ],
+    "response_text": "⚠️ <b>Tovarning MXIK (IKPU) kodida xatolik aniqlandi!</b>\n\n📌 <b>Sababi:</b> Tovarga noto'g'ri yoki eskirgan MXIK kodi kiritilgan (Soliq jarimasi xavfi bor).\n💡 <b>Yechimi:</b> Tasnif.soliq.uz saytidan tovaringizga mos 17 xonali MXIK kodni aniqlab, kassa dasturida yangilang.\n\n👇 <i>Quyida MXIK kodni to'g'ri kiritish videosi yuborildi:</i>",
+    "video_id": 17,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "battery_low",
+    "name": "Batareya quvvati kam (Low Battery)",
+    "screen_keywords": [
+      "quvvat past",
+      "low battery",
+      "batareya kam",
+      "quvvati kam",
+      "низкий заряд",
+      "подключите зарядное устройство",
+      "zaryadkam kam",
+      "batareya tugayapti"
+    ],
+    "response_text": "⚠️ <b>Kassa apparati quvvati (zaryadi) juda kam qolgan!</b>\n\n📌 <b>Sababi:</b> Batareya quvvati 10% dan past bo'lsa, xavfsizlik uchun kassa chek chiqarishni to'xtatadi.\n💡 <b>Yechimi:</b> Apparatni zudlik bilan original quvvatlagichga ulang va kamida 20% gacha quvvatlang.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "unsent_checks_limit",
+    "name": "Jo'natilmagan cheklar yig'ilib qolgan (Очередь чеков)",
+    "screen_keywords": [
+      "jo'natilmagan cheklar",
+      "неотправленные чеки",
+      "chek yig'ilib qolgan",
+      "очередь чеков",
+      "cheklar serverga ketmadi",
+      "sinxronizatsiya",
+      "jo'natilmagan chek"
+    ],
+    "response_text": "⚠️ <b>Soliq serveriga jo'natilmagan cheklar soni ko'payib ketgan!</b>\n\n📌 <b>Sababi:</b> Kassa apparati internetga ulanmagan holda offline rejimda ishlagan.\n💡 <b>Yechimi:</b> Internetni (Wi-Fi yoki SIM) yoqing va menyudan <b>«Cheklarni yuborish / Sinxronizatsiya»</b> tugmasini bosing.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "card_read_error",
+    "name": "Bank kartasini o'qish xatoligi (Humo / Uzcard)",
+    "screen_keywords": [
+      "karta o'qilmadi",
+      "karta xato",
+      "ошибка чтения карты",
+      "chip xatosi",
+      "karta o'qishda xatolik",
+      "karta qabul qilmadi",
+      "humo o'qimayapti",
+      "uzcard o'qimayapti"
+    ],
+    "response_text": "⚠️ <b>Bank kartasini o'qishda xatolik yuz berdi!</b>\n\n📌 <b>Sababi:</b> Karta chipi kirlangan, noto'g'ri kiritilgan yoki kontaktsiz (NFC) signal ushlamadi.\n💡 <b>Yechimi:</b> Kartani toza mato bilan artib qayta soling yoki apparat orqasidagi NFC zonasiga tekkizing.\n\n👇 <i>Humo terminal sozlamalari videosi:</i>",
+    "video_id": 101,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "password_blocked",
+    "name": "Kassir yoki Admin paroli bloklangan / xato",
+    "screen_keywords": [
+      "parol xato",
+      "parol noto'g'ri",
+      "неверный пароль",
+      "parol bloklandi",
+      "admin paroli",
+      "kassir paroli",
+      "kod kiritish xato"
+    ],
+    "response_text": "⚠️ <b>Kassa paroli noto'g'ri kiritildi yoki bloklandi!</b>\n\n📌 <b>Standart parollar:</b> Odatda <code>0000</code>, <code>1111</code>, <code>1234</code> yoki <code>9999</code> bo'ladi.\n💡 <b>Yechimi:</b> Standart parollarni sinab ko'ring. Agar ochilmasa, servis markazimizga murojaat qiling.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "app_crash_freeze",
+    "name": "Ilova qotib qolgan (Приложение остановлено)",
+    "screen_keywords": [
+      "приложение остановлено",
+      "ilova to'xtatildi",
+      "dastur qotdi",
+      "kassa ochilmayapti",
+      "в приложении произошла ошибка",
+      "kassa qotib qoldi",
+      "ekran qotdi"
+    ],
+    "response_text": "⚠️ <b>Kassa ilovasi qotib qolgan yoki to'xtatilgan!</b>\n\n📌 <b>Sababi:</b> Android tizimi kesh xotirasi to'lgan.\n💡 <b>Yechimi:</b>\n1. Apparatni quvvat tugmasi orqali o'chirib qayta yoqing (Restart).\n2. Sozlamalar -> Ilovalar -> Kassa ilovasi -> <b>«Keshni tozalash» (Очистить кэш)</b> qiling.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "gps_location_error",
+    "name": "GPS / Geolokatsiya xatosi",
+    "screen_keywords": [
+      "gps xatosi",
+      "geolokatsiya",
+      "joylashuv aniqlanmadi",
+      "не удалось определить местоположение",
+      "gps o'chiq",
+      "gps отключен",
+      "geolokatsiya yo'q"
+    ],
+    "response_text": "⚠️ <b>GPS (Geolokatsiya) joylashuv aniqlanmadi!</b>\n\n📌 <b>Sababi:</b> Kassa apparati joylashuv datchigi o'chirilgan yoki bino ichida signal ushlamayapti.\n💡 <b>Yechimi:</b> Ekranning yuqori qismidan panelni pastga tushirib <b>«Geolokatsiya (GPS / Местоположение)»</b> funksiyasini yoqing.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "scanner_barcode_error",
+    "name": "Shtrix-kod skaneri o'qimayapti",
+    "screen_keywords": [
+      "skaner o'qimayapti",
+      "skaner ishlamayapti",
+      "skaner ulanmadi",
+      "сканер не работает",
+      "shtrix kod o'qimadi",
+      "skaner xato",
+      "ruchkoy skaner"
+    ],
+    "response_text": "⚠️ <b>2D shtrix-kod skaneri mahsulotni o'qimayapti!</b>\n\n📌 <b>Sababi:</b> Skaner kabeli bo'shagan yoki USB ulanish rejimi o'zgargan.\n💡 <b>Yechimi:</b> Skaner kabelini chiqarib qayta ulang va sozlash shtrix-kodini skanerlang.\n\n👇 <i>Skanerni ulash bo'yicha video-qo'llanma yuborildi:</i>",
+    "video_id": 27,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "markirovka_error",
+    "name": "Asllik belgisi / Markirovka xatoligi",
+    "screen_keywords": [
+      "markirovka xatosi",
+      "asllik belgisi",
+      "markirovka o'qilmadi",
+      "datamatrix xato",
+      "tovar markirovkalanmagan",
+      "markirovka topilmadi"
+    ],
+    "response_text": "⚠️ <b>Mahsulot markirovkasida (Asllik belgisi) xatolik yuz berdi!</b>\n\n📌 <b>Sababi:</b> Alkogol, tamaki yoki dori vositasining DataMatrix kodi bazada tasdiqlanmadi.\n💡 <b>Yechimi:</b> Skanerni DataMatrix kodiga to'g'ri yo'naltiring yoki agar tovar markirovkasiz bo'lsa, markirovkani o'chirish lozim.\n\n👇 <i>Markirovka qo'llanmasi videosi:</i>",
+    "video_id": 116,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "code_102_hardware",
+    "name": "Kod 102 — Kassa ichki apparat xatosi",
+    "screen_keywords": [
+      "kod 102",
+      "код 102",
+      "error 102",
+      "xato 102",
+      "ошибка 102"
+    ],
+    "response_text": "⚠️ <b>Kod 102 — Kassa apparat mikrokontrolleri xatosi!</b>\n\n📌 <b>Sababi:</b> Kassa plata drayveri bilan aloqa uzilgan.\n💡 <b>Yechimi:</b> Quvvat tugmasini 10 soniya bosib ushlab apparatni to'liq o'chirib yoqing. Nosozlik davom etsa, servis markazimizga keltiring.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": true
+  },
+  {
+    "id": "code_201_tax_server",
+    "name": "Kod 201 — Soliq serveri bilan aloqa xatosi",
+    "screen_keywords": [
+      "kod 201",
+      "код 201",
+      "error 201",
+      "xato 201",
+      "ошибка 201"
+    ],
+    "response_text": "⚠️ <b>Kod 201 — Davlat Soliq Qo'mitasi serveri javob bermayapti!</b>\n\n📌 <b>Sababi:</b> DSQ markaziy serverlarida profilaktika ishlari ketmoqda yoki internet aloqasi sekin.\n💡 <b>Yechimi:</b> 10-15 daqiqa kutib qaytadan urinib ko'ring.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "code_300_storage",
+    "name": "Kod 300 — Kassa ichki xotirasi to'lgan",
+    "screen_keywords": [
+      "kod 300",
+      "код 300",
+      "error 300",
+      "xato 300",
+      "xotira to'lgan",
+      "память переполнена",
+      "недостаточно места"
+    ],
+    "response_text": "⚠️ <b>Kod 300 — Kassa apparatining ichki xotirasi to'lgan!</b>\n\n📌 <b>Sababi:</b> Eskirgan cheklar va tizim log fayllari xotirani to'ldirgan.\n💡 <b>Yechimi:</b> Sozlamalar bo'limidan keshni tozalash talab etiladi.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": true
+  },
+  {
+    "id": "fatal_hardware_damage",
+    "name": "Apparat tampered / Xavfsizlik qulfi (Tamper)",
+    "screen_keywords": [
+      "tampered",
+      "tamper detected",
+      "tamper",
+      "apparat buzilgan",
+      "xavfsizlik blokladi",
+      "взлом устройства",
+      "аппарат заблокирован датчиком"
+    ],
+    "response_text": "🚨 <b>TAMPER DETECTED — Apparat xavfsizlik datchigi qulflangan!</b>\n\n📌 <b>Sababi:</b> Kassa apparati yerga tushib ketgan, zarba yegan yoki korpusi ochilgan.\n💡 <b>Yechimi:</b> Ushbu holatda apparat faqat servis markazimiz laboratoriyasida ochiladi va qayta tiklanadi.\n\n📞 <b>Servis markazimiz bilan bog'laning.</b>",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": true
   }
 ]
