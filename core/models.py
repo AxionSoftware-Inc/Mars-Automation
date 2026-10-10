@@ -1,6 +1,50 @@
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Dict, Any, List
+
+def extract_clean_inn(text: str) -> Optional[str]:
+    """
+    Matndan 9 xonali INN (STIR) yoki 14 xonali JSHSHIR raqamini har qanday formatda
+    (toza, bo'shliqlar bilan, nuqta, tire, prefikslar bilan) aniq va xatosiz ajratib olish.
+    """
+    if not text:
+        return None
+    t = text.strip()
+    prefix_pattern = r"(?:inn|stir|стир|инн|jshshir|жшшир|пинфл|pinfl)[:\s#№]*([0-9\s\.\-]{8,22})"
+    prefix_match = re.search(prefix_pattern, t, re.IGNORECASE)
+    if prefix_match:
+        digits = re.sub(r"\D", "", prefix_match.group(1))
+        if len(digits) in [9, 14]:
+            return digits
+        elif len(digits) > 9 and len(digits) < 14:
+            return digits[:9]
+
+    m14 = re.findall(r"\b(\d{14})\b", t)
+    if m14:
+        return m14[0]
+
+    m9 = re.findall(r"\b(\d{9})\b", t)
+    if m9:
+        return m9[0]
+
+    spaced_9 = re.search(r"\b(\d{3}[\s\.\-]\d{3}[\s\.\-]\d{3})\b", t)
+    if spaced_9:
+        digits = re.sub(r"\D", "", spaced_9.group(1))
+        if len(digits) == 9:
+            return digits
+
+    spaced_14 = re.search(r"\b(\d{1,3}[\s\.\-]\d{2,6}[\s\.\-]\d{2,6}[\s\.\-]?\d{1,6})\b", t)
+    if spaced_14:
+        digits = re.sub(r"\D", "", spaced_14.group(1))
+        if len(digits) == 14:
+            return digits
+
+    pure_digits = re.sub(r"\D", "", t)
+    if len(pure_digits) in [9, 14] and len(t) <= 20:
+        return pure_digits
+
+    return None
 
 class ActionType(Enum):
     IGNORE = "IGNORE"                          # Begona rasm yoki ob'ekt — javob bermay jim turish
@@ -65,3 +109,6 @@ class DecisionResult:
     admin_alert_text: Optional[str] = None
     receipt_facts: Optional[ReceiptFacts] = None
     debt_status_info: Dict[str, Any] = field(default_factory=dict)
+    file_id: Optional[str] = None
+    is_photo: bool = True
+

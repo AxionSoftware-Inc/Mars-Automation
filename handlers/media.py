@@ -95,7 +95,9 @@ async def handle_document(message: types.Message, bot: Bot):
                 facts=facts,
                 chat_id=chat_id,
                 user_id=user_id,
-                user_comment=caption
+                user_comment=caption,
+                file_id=doc.file_id,
+                is_photo=False
             )
 
             if decision.action == ActionType.IGNORE:
@@ -180,7 +182,9 @@ async def _process_image_content(
             facts=receipt_facts,
             chat_id=chat_id,
             user_id=user_id,
-            user_comment=caption
+            user_comment=caption,
+            file_id=file_id,
+            is_photo=not is_document
         )
         if decision.reply_text:
             try:
@@ -247,8 +251,21 @@ async def _process_image_content(
                 logger.error(f"Videoni yuborishda xatolik: {e}")
         return
 
-    # 3. BEGONA TASVIR (GUARDRAIL)
+    # 3. BEGONA TASVIR YOKI XATOLIK BO'LGANDA XAVFSIZLIK CHIQISHI
     else:
+        if device_facts and device_facts.extraction_error:
+            logger.warning(f"Tasvir sensori xatoligi: {device_facts.extraction_error}")
+            # Agar foydalanuvchi biror izoh bilan yuborgan bo'lsa, xatolik haqida xabar berish
+            if caption or message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                try:
+                    await message.reply(
+                        "⚠️ <b>Tasvirni yuklashda yoki tahlil qilishda nosozlik yuz berdi.</b>\n"
+                        "Iltimos, qayta yuboring yoki korxona <b>INN</b> raqamini yozing.",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            return
         logger.info("Guardrail: Rasm kassa apparati ham, to'lov cheki ham emas. E'tiborsiz qoldiriladi.")
         return
 

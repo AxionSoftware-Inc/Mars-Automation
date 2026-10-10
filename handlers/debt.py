@@ -102,7 +102,9 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
                 user=message.from_user,
                 chat_id=chat_id,
                 receipt_facts=receipt_decision.receipt_facts,
-                debt_status_info=receipt_decision.debt_status_info
+                debt_status_info=receipt_decision.debt_status_info,
+                file_id=receipt_decision.file_id,
+                is_photo=receipt_decision.is_photo
             )
         return
 
@@ -147,10 +149,32 @@ def is_debt_inquiry(message: types.Message) -> bool:
     t = message.text.lower()
     return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
 
-def has_inn_in_text(message: types.Message) -> bool:
+from core.models import extract_clean_inn
+
+def is_inn_query_message(message: types.Message) -> bool:
+    """Matnda INN/JSHSHIR aniqlanganda xabarni tekshirish va guruhlarda to'g'ri filtr qilish"""
     if not message.text:
         return False
-    return bool(re.search(r"\b(\d{14}|\d{9})\b", message.text))
+    query_num = extract_clean_inn(message.text)
+    if not query_num:
+        return False
+
+    # Shaxsiy chatda har doim qabul qilinadi
+    if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        return True
+
+    # Guruhlarda spamdan saqlanish filtri
+    text = message.text.strip()
+    if len(text) <= 30:
+        return True
+
+    lower = text.lower()
+    inn_keywords = [
+        "inn", "stir", "стир", "инн", "jshshir", "жшшир", "qarz", "mars",
+        "apparat", "kassa", "to'lov", "tolov", "chek", "tekshir",
+        "ishlamayapti", "blok", "ochib qoldi", "o'chib qoldi"
+    ]
+    return any(kw in lower for kw in inn_keywords)
 
 @router.message(is_debt_inquiry)
 async def handle_debt_inquiry(message: types.Message):
@@ -160,11 +184,9 @@ async def handle_debt_inquiry(message: types.Message):
 
     last_id = user_memory.get_last_id(chat_id, user_id)
     if not last_id:
-        # Agar hali INN kiritilmagan bo'lsa
-        # Matn ichida INN bormi tekshiramiz
-        found_nums = re.findall(r"\b(\d{14}|\d{9})\b", message.text)
-        if found_nums:
-            last_id = found_nums[0]
+        found_num = extract_clean_inn(message.text)
+        if found_num:
+            last_id = found_num
         else:
             await message.reply(
                 "⚠️ <b>To'lov tarixini tekshirish uchun korxona INN yoki JSHSHIR raqamini yuboring.</b>\n"
@@ -181,6 +203,10 @@ async def handle_debt_inquiry(message: types.Message):
         )
         return
 
+    org_name = results[0].get("name", "") if results else ""
+    total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
+    user_memory.set_last_id(chat_id, user_id, last_id, org_name=org_name, debt=total_debt)
+
     history_resp = excel_manager.format_payment_history(results)
     await message.reply(history_resp, parse_mode="HTML")
 
@@ -190,20 +216,13 @@ async def handle_debt_inquiry(message: types.Message):
 
 
 # 2. TO'G'RIDAN-TO'G'RI INN / JSHSHIR YUBORILGANDA
-@router.message(has_inn_in_text)
+@router.message(is_inn_query_message)
 async def handle_inn_query(message: types.Message, bot: Bot):
     """Matnda 9 xonali INN yoki 14 xonali JSHSHIR aniqlanganda qarz tekshirish"""
     text = (message.text or "").strip()
-    found_nums = re.findall(r"\b(\d{14}|\d{9})\b", text)
-    if not found_nums:
-        return
-
-    query_num = found_nums[0]
-    is_group = message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]
-
-    # Guruhlarda faqat qisqa so'rovlar yoki toza INN bo'lsa javob berish (spamdan saqlanish)
-    if is_group and len(text) > 30 and text != query_num:
-        # Boshqa maqsadli uzun xabardagi ixtiyoriy son bo'lsa e'tiborsiz qoldirish
+    query_num = extract_clean_inn(text)
+    if not query_num:
         return
 
     await process_and_send_debt_result(message, bot, query_num)
+

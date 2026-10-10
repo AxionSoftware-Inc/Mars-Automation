@@ -148,7 +148,8 @@ class CoreEngine:
 
         # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR, YOKI JIDDIY APPARAT XATOSI)
         is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
-        should_escalate = is_fatal_hardware or (facts.has_internet and total_debt <= 0 and has_error and not facts.time_mismatch)
+        debt_verified_clear = bool(target_inn and total_debt <= 0)
+        should_escalate = is_fatal_hardware or (facts.has_internet and debt_verified_clear and has_error and not facts.time_mismatch)
 
         if should_escalate:
             issue_desc = diag_text or facts.screen_text_summary or "Noma'lum apparat nosozligi"
@@ -172,7 +173,7 @@ class CoreEngine:
                 should_notify_admin=True,
                 admin_alert_type="tech_issue",
                 admin_alert_text=issue_desc,
-                log_reason="Hardware fatal error or Internet active & no debt -> Escalated to admin"
+                log_reason="Hardware fatal error or Internet active & verified no debt -> Escalated to admin"
             )
 
         # 6-BOSQICH: ODDIY TASHXIS VA JAVOB SINTEZI
@@ -188,7 +189,10 @@ class CoreEngine:
             if total_debt > 0:
                 final_video_id = 148
         elif diag_text:
-            final_reply = diag_text
+            if not target_inn and has_error and not is_fatal_hardware:
+                final_reply = f"{diag_text}\n\n💡 <b>Qarzdorlik holatini tekshirishimiz uchun korxonangizning INN raqamini yuboring.</b>"
+            else:
+                final_reply = diag_text
         else:
             final_reply = "✅ <b>Apparat ekrani normal holatda.</b>"
 
@@ -210,7 +214,9 @@ class CoreEngine:
         facts: ReceiptFacts,
         chat_id: int,
         user_id: int,
-        user_comment: str = ""
+        user_comment: str = "",
+        file_id: Optional[str] = None,
+        is_photo: bool = True
     ) -> DecisionResult:
         """
         Kvitansiya faktlarini tahlil qilish:
@@ -253,15 +259,16 @@ class CoreEngine:
                 reply_text=warning_text,
                 paid_amount=facts.amount,
                 receipt_facts=facts,
+                file_id=file_id,
+                is_photo=is_photo,
                 log_reason="Receipt recipient is not Mars Elektron Texnika"
             )
 
         # 3. To'lovchi korxona INN/JSHSHIR raqamini aniqlash
+        from core.models import extract_clean_inn
         inn = facts.payer_inn
         if not inn and user_comment:
-            inn_found = re.findall(r"\b(\d{14}|\d{9})\b", user_comment)
-            if inn_found:
-                inn = inn_found[0]
+            inn = extract_clean_inn(user_comment)
 
         if not inn:
             inn = user_memory.get_last_id(chat_id, user_id)
@@ -276,7 +283,9 @@ class CoreEngine:
                 "payment_date": facts.payment_date,
                 "transaction_id": facts.transaction_id,
                 "payment_system": facts.payment_system,
-                "raw_facts": facts.raw_facts
+                "raw_facts": facts.raw_facts,
+                "file_id": file_id,
+                "is_photo": is_photo
             }
             user_memory.set_pending_receipt(chat_id, user_id, receipt_dict)
             ask_inn_reply = (
@@ -292,18 +301,22 @@ class CoreEngine:
                 reply_text=ask_inn_reply,
                 paid_amount=facts.amount,
                 receipt_facts=facts,
+                file_id=file_id,
+                is_photo=is_photo,
                 log_reason="Receipt accepted, waiting for user INN"
             )
 
         # 4. INN aniq bo'lsa -> Excel bazadan tekshirish va qarzni solishtirish
-        return self._evaluate_receipt_with_inn(inn, facts, chat_id, user_id)
+        return self._evaluate_receipt_with_inn(inn, facts, chat_id, user_id, file_id=file_id, is_photo=is_photo)
 
     def _evaluate_receipt_with_inn(
         self,
         inn: str,
         facts: ReceiptFacts,
         chat_id: int,
-        user_id: int
+        user_id: int,
+        file_id: Optional[str] = None,
+        is_photo: bool = True
     ) -> DecisionResult:
         """Kvitansiya summasini Exceldagi qarz bilan solishtirish va adminga hisobot tayyorlash"""
         results = excel_manager.search(inn)
@@ -323,14 +336,17 @@ class CoreEngine:
         if prev_debt > 0:
             if paid_amount >= prev_debt:
                 debt_covered = True
-                remaining_debt = 0.0
+                overpayment = max(0.0, paid_amount - prev_debt)
+                remaining_debt = -overpayment if overpayment > 0 else 0.0
+                overpay_line = f"🟢 <b>Ortiqcha to'lov (avans):</b> <code>{overpayment:,.0f}</code> so'm kelgusi oylar uchun hisobga o'tdi.\n" if overpayment > 0 else ""
                 user_reply = (
                     f"✅ <b>To'lov muvaffaqiyatli qabul qilindi!</b>\n\n"
                     f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
                     f"🔢 <b>INN:</b> <code>{inn}</code>\n"
                     f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                     f"📉 <b>Avvalgi qarz:</b> {prev_debt:,.0f} so'm\n"
-                    f"🎉 <b>Qarzdorlik to'liq bartaraf etildi!</b>\n\n"
+                    f"🎉 <b>Qarzdorlik to'liq bartaraf etildi!</b>\n"
+                    f"{overpay_line}\n"
                     f"📩 <i>To'lov ma'lumotlari kassa apparatingizni tizimda faollashtirish uchun "
                     f"mas'ul operator va adminga yuborildi. Tez orada tizim yangilanadi.</i>"
                 )
@@ -394,6 +410,8 @@ class CoreEngine:
             admin_alert_type="receipt",
             receipt_facts=facts,
             debt_status_info=debt_status_info,
+            file_id=file_id,
+            is_photo=is_photo,
             log_reason="Receipt successfully verified against Excel debt and prepared for admin"
         )
 
@@ -417,7 +435,10 @@ class CoreEngine:
             raw_facts=pending_data
         )
 
-        return self._evaluate_receipt_with_inn(inn, facts, chat_id, user_id)
+        file_id = pending_data.get("file_id")
+        is_photo = pending_data.get("is_photo", True)
+        return self._evaluate_receipt_with_inn(inn, facts, chat_id, user_id, file_id=file_id, is_photo=is_photo)
+
 
     # =========================================================================
     # 3. ADMINGA UMUMIY ESKALATSIYA (OPERATOR / USTA TALAB QILINGANDA)

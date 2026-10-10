@@ -91,8 +91,16 @@ class UserMemoryManager:
         session["last_receipt"] = receipt_info
         # Agar qoldiq qarz ko'rsatilgan bo'lsa, joriy qarzni yangilash
         rem = receipt_info.get("remaining_debt")
-        if rem is not None and session.get("debt_info"):
-            session["debt_info"]["debt"] = rem
+        if rem is not None:
+            if session.get("debt_info"):
+                session["debt_info"]["debt"] = rem
+            else:
+                session["debt_info"] = {
+                    "identifier": session.get("last_id") or "",
+                    "org_name": session.get("org_name") or "",
+                    "debt": rem
+                }
+
 
     def get_last_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         session = self._get_or_create_session(chat_id, user_id)

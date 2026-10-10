@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 from openrouter_client import openrouter_client
 from core.models import DeviceFacts, ReceiptFacts
 
+from core.models import extract_clean_inn
+
 MARS_ACCOUNT = "20208000800208044003"
 MARS_INN = "302568138"
 MARS_KEYWORDS = [
@@ -42,11 +44,8 @@ def analyze_media_image(
     
     Qaytaradi: (media_type, receipt_facts, device_facts)
     """
-    caption_inn = None
-    if user_caption:
-        found_nums = re.findall(r"\b(\d{14}|\d{9})\b", user_caption)
-        if found_nums:
-            caption_inn = found_nums[0]
+    caption_inn = extract_clean_inn(user_caption) if user_caption else None
+
 
     now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
     current_time_str = now_uzb.strftime("%Y-%m-%d %H:%M")
@@ -161,10 +160,7 @@ Foydalanuvchi izohi: "{user_caption}"
             except Exception:
                 amount = 0.0
 
-            payer_inn = rec_raw.get("payer_inn") or dev_raw.get("detected_inn") or caption_inn
-            if payer_inn:
-                inn_clean = re.findall(r"\b(\d{14}|\d{9})\b", str(payer_inn))
-                payer_inn = inn_clean[0] if inn_clean else None
+            payer_inn = extract_clean_inn(str(rec_raw.get("payer_inn") or dev_raw.get("detected_inn") or caption_inn or ""))
 
             recipient_acc = str(rec_raw.get("recipient_account", ""))
             combined_text = f"{recipient_acc} {rec_raw.get('summary', '')} {rec_raw.get('payer_name', '')} {dev_summary}".lower()
@@ -193,16 +189,14 @@ Foydalanuvchi izohi: "{user_caption}"
 
         # 2. SMART POS KASSA APPARATI
         elif media_type == "pos_device":
-            detected_inn = dev_raw.get("detected_inn") or caption_inn
-            if detected_inn:
-                inn_clean = re.findall(r"\b(\d{14}|\d{9})\b", str(detected_inn))
-                detected_inn = inn_clean[0] if inn_clean else None
+            detected_inn = extract_clean_inn(str(dev_raw.get("detected_inn") or caption_inn or ""))
 
             device_facts = DeviceFacts(
                 is_real_pos_device=bool(dev_raw.get("is_real_pos_device", True)),
                 is_status_bar_visible=bool(dev_raw.get("is_status_bar_visible", False)),
                 time_mismatch=bool(dev_raw.get("time_mismatch", False)),
                 has_internet=bool(dev_raw.get("has_internet", True)),
+
                 error_type=str(dev_raw.get("error_type", "none")),
                 detected_inn=detected_inn,
                 screen_text_summary=str(dev_raw.get("screen_text_summary", "")),

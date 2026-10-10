@@ -21,7 +21,9 @@ PAYMENT_METHODS_KEYWORDS = [
 OPERATOR_KEYWORDS = [
     "operator", "adminga", "admin kerak", "mutaxassis", "usta kerak", "usta chaqir",
     "bog'lanish", "boglanish", "telefon raqam", "aloqaga chiq", "operatorga ula",
-    "yordam bering usta", "hal bo'lmadi", "hal bolmadi", "tushunmadim usta"
+    "yordam bering usta", "hal bo'lmadi", "hal bolmadi", "tushunmadim usta",
+    "operator bilan gaplashmoqchiman", "menga usta kerak", "bog'laning", "boglaning",
+    "operator chaqir", "оператор", "админ", "мастер", "помогите"
 ]
 
 CONVERSATIONAL_FOLLOWUPS = [
@@ -31,13 +33,18 @@ CONVERSATIONAL_FOLLOWUPS = [
     "qancha tolashim", "qancha qarz", "qarzim qancha", "yana to'laymanmi", "yana tolaymanmi",
     "adminga bordimi", "adminga jo'natildimi", "chek tushdimi", "kvitansiya tushdimi",
     "to'lov tushdimi", "tolov tushdimi", "endi nima", "endi nima qilay", "nima qilish kerak",
-    "rahmat", "tushundim", "yaxshi", "ok", "xa", "ha", "boladi", "bo'ladi"
+    "apparatim ishlamayapti", "apparat ishlamayapti", "kassa ishlamayapti", "ishlamayapti",
+    "ishlamay qoldi", "ochib qoldi", "o'chib qoldi", "blok bo'ldi", "bloklandi",
+    "qarzim bormi", "qancha qarzim bor", "yana to'lashim kerakmi", "yana tolashim kerakmi",
+    "rahmat", "tushundim", "yaxshi", "ok", "xa", "ha", "boladi", "bo'ladi",
+    "не работает", "когда включите", "чек отправил", "оплатил", "следующая оплата", "сколько платить"
 ]
 
 @router.message(F.text)
 async def handle_user_chat(message: types.Message, bot: Bot):
     """
     Foydalanuvchi bilan ko'p bosqichli (multi-turn) aqlli suhbat:
+    0. Matnda INN aniqlansa va qarz/apparat so'ralsa -> Zaxira INN protsessori
     1. To'lov usuli yoki Click bo'yicha to'g'ridan-to'g'ri so'rovlar -> 148-video va rekvizitlar
     2. Operator / Usta talab qilinganda -> Adminga to'g'ridan-to'g'ri eskalatsiya
     3. Davomiy suhbat (qachon qo'shiladi, keyingi to'lov, qarz holati va h.k.) -> AI va boyitilgan xotira
@@ -47,6 +54,14 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     lower_text = text.lower()
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
+
+    # 0. AGAR MATNDA INN BO'LSA VA APPARAT/QARZ SO'RALSA (Zaxira xavfsizlik)
+    from core.models import extract_clean_inn
+    found_inn = extract_clean_inn(text)
+    if found_inn:
+        from handlers.debt import process_and_send_debt_result
+        await process_and_send_debt_result(message, bot, found_inn)
+        return
 
     # 1. AGAR TO'LOV QILISH TARTIBI / CLICK SO'RALSA
     if any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS):
@@ -58,6 +73,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 reply_to_message_id=message.message_id
             )
             user_memory.add_user_message(chat_id, user_id, text)
+
             user_memory.add_assistant_message(chat_id, user_id, "[Click orqali to'lash videosi yuborildi]")
             user_memory.set_last_topic(chat_id, user_id, "payment_instruction")
             return

@@ -32,8 +32,10 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
         -> "Keyingi oylik abonent to'lovini kelgusi oyning 6-sanasigacha amalga oshirishingiz kerak. Har oyning 6-sanasidan keyin to'lanmagan apparatlar avtomatik to'xtaydi."
       - "qancha to'lashim kerak?", "mening qarzim qancha?", "yana pul to'laymanmi?":
         -> Agar qarz to'liq yopilgan bo'lsa: "Hozirgi qarzdorligingiz to'liq bartaraf etilgan (0 so'm). Kelgusi oy uchun standart to'lovni 6-sanagacha to'laysiz."
+        -> Agar ortiqcha to'lov (avans) mavjud bo'lsa: kontekstdagi ortiqcha to'lov summasini eslatib, kelgusi oyga hisoblanishini ayting.
         -> Agar qarz qolgan bo'lsa: kontekstdagi qolgan qarz miqdorini aniq ayting.
       - "endi nima qilaman?", "nima bo'ladi endi?":
+
         -> "Hech narsa qilish shart emas. To'lovingiz adminga yuborilgan, tez orada apparatingiz ishga tushadi."
 
    B) AGAR MIJOZDA QARZ BO'LSA (kvitansiya yubormagan bo'lsa):
