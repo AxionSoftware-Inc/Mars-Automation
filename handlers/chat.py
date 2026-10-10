@@ -24,13 +24,24 @@ OPERATOR_KEYWORDS = [
     "yordam bering usta", "hal bo'lmadi", "hal bolmadi", "tushunmadim usta"
 ]
 
+CONVERSATIONAL_FOLLOWUPS = [
+    "qachon qo'shiladi", "qachon qoshiladi", "qachon yoqiladi", "qachon ochiladi",
+    "qachon ishlaydi", "qachon aktivlashadi", "qachon yoqasiz", "keyingi to'lov", "keyingi tolov",
+    "keyingi to'lovni", "keyingi tolovni", "qancha to'layman", "qancha tolayman", "qancha to'lashim",
+    "qancha tolashim", "qancha qarz", "qarzim qancha", "yana to'laymanmi", "yana tolaymanmi",
+    "adminga bordimi", "adminga jo'natildimi", "chek tushdimi", "kvitansiya tushdimi",
+    "to'lov tushdimi", "tolov tushdimi", "endi nima", "endi nima qilay", "nima qilish kerak",
+    "rahmat", "tushundim", "yaxshi", "ok", "xa", "ha", "boladi", "bo'ladi"
+]
+
 @router.message(F.text)
 async def handle_user_chat(message: types.Message, bot: Bot):
     """
     Foydalanuvchi bilan ko'p bosqichli (multi-turn) aqlli suhbat:
     1. To'lov usuli yoki Click bo'yicha to'g'ridan-to'g'ri so'rovlar -> 148-video va rekvizitlar
-    2. Video-qo'llanmalar katalogidan qidiruv -> Mos post bo'lsa darhol uzatish
-    3. Ketma-ket suhbat va AI yordamchisi -> To'liq kontekst va xotira asosida
+    2. Operator / Usta talab qilinganda -> Adminga to'g'ridan-to'g'ri eskalatsiya
+    3. Davomiy suhbat (qachon qo'shiladi, keyingi to'lov, qarz holati va h.k.) -> AI va boyitilgan xotira
+    4. Faqat maxsus texnik qo'llanma so'ralgandagina -> Video katalogdan qidirish
     """
     text = message.text.strip()
     lower_text = text.lower()
@@ -80,7 +91,38 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         await admin_manager.notify_admins(bot, text=admin_text)
         return
 
-    # 3. VIDEO KATALOGDAN QIDIRISH (50+ ta video postlar ichidan)
+    # 3. DAVOMIY KONVERSATSION SAVOLLAR YOKI FAOL SUHBAT KONTEKSTI
+    # Agar foydalanuvchi faol kontekstda bo'lsa yoki savoli davomiy xarakterga ega bo'lsa:
+    has_active_context = bool(user_memory.get_last_id(chat_id, user_id) or user_memory.get_last_receipt(chat_id, user_id))
+    is_conversational = any(kw in lower_text for kw in CONVERSATIONAL_FOLLOWUPS)
+    explicit_video_request = any(kw in lower_text for kw in ["video", "rolik", "video tashla", "qo'llanma", "qollanma"])
+
+    # Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat bo'lsa -> To'g'ridan-to'g'ri AI kontekstiga!
+    if is_conversational or (has_active_context and not explicit_video_request):
+        context_summary = user_memory.get_context_summary(chat_id, user_id)
+        reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
+
+        try:
+            await message.reply(reply_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(reply_text)
+
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, reply_text)
+
+        if ai_video_id:
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=ai_video_id,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.error(f"AI tavsiya qilgan videoni yuborishda xatolik (ID: {ai_video_id}): {e}")
+        return
+
+    # 4. TEXNIK VIDEO KATALOGDAN QIDIRISH (faqat maxsus texnik amallar uchun)
     video_id = catalog_manager.find_matching_post(text)
     if video_id:
         try:
@@ -97,8 +139,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
-    # 3. KETMA-KET SAVOLLAR BO'YICHA AI BILAN SUHBAT (XOTIRA VA KONTEKST ASOSIDA)
-    # Foydalanuvchining barcha avvalgi konteksti: tekshirilgan INN, korxona, qarz holati va oxirgi xabarlar
+    # 5. BOSHQALARI BO'YICHA UMUMIY AI JAVOBI
     context_summary = user_memory.get_context_summary(chat_id, user_id)
     reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
 

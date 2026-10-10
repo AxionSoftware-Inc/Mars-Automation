@@ -363,6 +363,15 @@ class CoreEngine:
         # Xotiraga saqlash va pending receiptni tozalash
         user_memory.clear_pending_receipt(chat_id, user_id)
         user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=remaining_debt)
+        user_memory.set_last_receipt(chat_id, user_id, {
+            "amount": paid_amount,
+            "date": facts.payment_date,
+            "transaction_id": facts.transaction_id,
+            "prev_debt": prev_debt,
+            "remaining_debt": remaining_debt,
+            "debt_covered": debt_covered,
+            "admin_notified": True
+        })
         user_memory.set_last_topic(chat_id, user_id, "receipt_verified")
 
         debt_status_info = {

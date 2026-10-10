@@ -71,8 +71,13 @@ class CatalogManager:
         """Tezkor kalit so'zlar bo'yicha qidirish"""
         t = self.normalize(text)
 
-        # Qarz yoki apparat ishlamay qolgan shikoyatlarga video berilmaydi (INN so'ralishi kerak)
-        if any(w in t for w in ["qarzim bormi", "qarz bormi", "qarzdorlik bormi", "ishlamayapti", "ochib qoldi", "blok boldi"]):
+        # Qarz, to'lov kvitansiyasi, faollashish yoki davomiy suhbat savollariga video berilmaydi (AI javob berishi kerak)
+        conversational_guards = [
+            "qarzim bormi", "qarz bormi", "qarzdorlik bormi", "ishlamayapti", "ochib qoldi", "blok boldi",
+            "qachon qoshiladi", "qachon yoqiladi", "qachon ochiladi", "qachon ishlaydi",
+            "keyingi tolov", "qancha tolayman", "kvitansiya", "chek tushdimi", "tolov tushdimi", "adminga bordimi"
+        ]
+        if any(w in t for w in conversational_guards):
             return None
 
         # Eng yuqori moslikdagi postni topish
@@ -98,12 +103,20 @@ class CatalogManager:
         1-bosqich: Tezkor kalit so'zlar orqali;
         2-bosqich: Agar topilmasa, Gemini AI orqali butun indeks ichidan eng mosini topish.
         """
+        t = self.normalize(user_text)
+
+        # Suhbat va kontekstli savollarni videoga aylantirmaslik
+        if any(w in t for w in [
+            "qoshiladi", "yoqiladi", "keyingi", "tolov tush", "kvitansiya", "adminga",
+            "qancha tolayman", "qancha qarz", "rahmat", "tushundim", "oldi", "boldi"
+        ]):
+            return None
+
         # 1-bosqich: Tezkor kalit so'zlar bo'yicha
         kw_match = self.find_post_by_keywords(user_text)
         if kw_match:
             return kw_match
 
-        t = self.normalize(user_text)
         # Agar apparat ishlamay qolganini bildirayotgan bo'lsa -> INN so'rash uchun video bermaymiz
         if any(w in t for w in ["ishlamay", "ishlamadi", "ishlamas", "ochib qol", "ochiq qol", "ochilmay", "blok", "qarzim", "qarz"]):
             # Faqat aynan o'chish sanasi so'ralgan bo'lsa
