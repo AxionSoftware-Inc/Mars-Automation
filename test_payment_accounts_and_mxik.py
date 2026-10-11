@@ -312,7 +312,8 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
         }
 
         # Vaqtincha test admin qo'shish
-        admin_manager.add_admin(999111222)
+        orig_admins = list(admin_manager.admin_ids)
+        admin_manager.admin_ids = [999111222]
         try:
             await admin_manager.notify_receipt_escalation(
                 bot=bot,
@@ -329,7 +330,7 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
             self.assertTrue("440,000" in call_args["caption"] or "440 000" in call_args["caption"])
             self.assertIn("«Yangi Texnologiyalar» DUK", call_args["caption"])
         finally:
-            admin_manager.remove_admin(999111222)
+            admin_manager.admin_ids = orig_admins
 
 
 if __name__ == "__main__":
