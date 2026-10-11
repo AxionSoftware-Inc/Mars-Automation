@@ -260,6 +260,32 @@ class AdminManager:
         debt_covered = debt_status_info.get("debt_covered", False)
         is_annual = debt_status_info.get("is_annual", False)
 
+        # Tuman (Hudud) aniqlash
+        tuman = debt_status_info.get("tuman", "")
+        if not tuman and clean_inn:
+            from excel_manager import excel_manager
+            tuman = excel_manager.get_district_for_inn(clean_inn)
+        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+
+        # To'lov maqsadi
+        purpose_label = getattr(receipt_facts, "purpose_label", "") or debt_status_info.get("purpose_label", "")
+        payment_purpose = getattr(receipt_facts, "payment_purpose", "") or debt_status_info.get("payment_purpose", "")
+        purpose_line = f"🎯 <b>To'lov maqsadi:</b> <b>{purpose_label}</b>\n" if (purpose_label and payment_purpose != "monthly_subscription") else ""
+
+        # Firibgarlik, Dublikat va Eski chek ogohlantirishlari
+        fraud_warnings = []
+        is_dup = getattr(receipt_facts, "is_duplicate", False) or debt_status_info.get("is_duplicate", False)
+        if is_dup:
+            tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
+            fraud_warnings.append(f"🚨 <b>OGOHLANTIRISH: DUBLIKAT TRANZAKSIYA!</b>\nUshbu chek (ID: <code>{tx_id}</code>) avval ham tizimga yuborilgan!")
+
+        is_old = getattr(receipt_facts, "is_old_receipt", False) or debt_status_info.get("is_old_receipt", False)
+        old_warn_text = getattr(receipt_facts, "old_receipt_warning", "") or debt_status_info.get("old_receipt_warning", "")
+        if is_old:
+            fraud_warnings.append(f"⚠️ <b>OGOHLANTIRISH: ESKI SANADAGI CHEK!</b>\n{old_warn_text or 'Kvitansiya sanasi 30 kundan eski!'}")
+
+        fraud_header = ("\n" + "\n\n".join(fraud_warnings) + "\n────────────────────\n") if fraud_warnings else ""
+
         # Telegram mobilda oson nusxa olish uchun pastda alohida INN bloki
         if clean_inn:
             inn_line = f"<code>{clean_inn}</code>"
@@ -279,11 +305,13 @@ class AdminManager:
             status_text = "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
             text = (
                 f"🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
+                f"{fraud_header}"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
                 f"────────────────────\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"{tuman_line}"
                 f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
                 f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
@@ -310,12 +338,15 @@ class AdminManager:
 
             text = (
                 f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
+                f"{fraud_header}"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
                 f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
                 f"────────────────────\n"
                 f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"{tuman_line}"
+                f"{purpose_line}"
                 f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
                 f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
@@ -353,6 +384,10 @@ class AdminManager:
         user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
         user_id = user.id if user else 0
 
+        from excel_manager import excel_manager
+        tuman = excel_manager.get_district_for_inn(inn) if inn else ""
+        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+
         text = (
             f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA TEZKOR ESKALATSIYA!</b>\n\n"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
@@ -360,6 +395,7 @@ class AdminManager:
             f"────────────────────\n"
             f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
             f"🔢 <b>INN / JSHSHIR:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
+            f"{tuman_line}"
             f"📶 <b>Internet aloqasi:</b> ✅ ISHLAYAPTI (Faol)\n"
             f"💳 <b>Qarzdorlik holati:</b> ✅ QARZ YO'Q (To'langan / 0 so'm)\n"
             f"────────────────────\n"

@@ -63,6 +63,26 @@ def extract_clean_inn(text: str) -> Optional[str]:
 
     return None
 
+def extract_clean_phone(text: str) -> Optional[str]:
+    """
+    O'zbekiston telefon raqamini matndan ajratib olish (9 xonali: 901234567).
+    Prefikslar: +998, 998, tel:, telefon:, nomer: va h.k.
+    """
+    if not text:
+        return None
+    t = text.strip()
+    m_full = re.search(r"(?:tel|telefon|nomer|raqam|телефон)?[:\s#№]*(?:\+?998[\s\-]?)?([389]\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2})\b", t, re.IGNORECASE)
+    if m_full:
+        digits = re.sub(r"\D", "", m_full.group(1))
+        if len(digits) == 9:
+            return digits
+
+    m9 = re.search(r"\b([389]\d\d{7})\b", re.sub(r"[\s\.\-]", "", t))
+    if m9:
+        return m9.group(1)
+
+    return None
+
 class ActionType(Enum):
     IGNORE = "IGNORE"                          # Begona rasm yoki ob'ekt — javob bermay jim turish
     ASK_FULL_SCREEN = "ASK_FULL_SCREEN"        # Status bar (soat va tarmoq) ko'rinmagan — to'liq ekranni talab qilish
@@ -105,6 +125,11 @@ class ReceiptFacts:
     payment_date: str = ""                 # To'lov sanasi va vaqti
     transaction_id: str = ""               # Tranzaksiya yoki chek raqami
     payment_system: str = ""               # Click, Payme, Bank, Munis, Uzum va h.k.
+    payment_purpose: str = "monthly_subscription" # "monthly_subscription", "repair", "hardware_purchase", "registration"
+    purpose_label: str = "Oylik abonent to'lovi"
+    is_old_receipt: bool = False
+    old_receipt_warning: Optional[str] = None
+    is_duplicate: bool = False
     raw_text: str = ""                     # Kvitansiya matni
     raw_facts: Dict[str, Any] = field(default_factory=dict)
     extraction_error: Optional[str] = None # Sensor uzilib qolsa xatolik izohi
@@ -131,4 +156,9 @@ class DecisionResult:
     debt_status_info: Dict[str, Any] = field(default_factory=dict)
     file_id: Optional[str] = None
     is_photo: bool = True
+    payment_purpose: str = "monthly_subscription"
+    purpose_label: str = "Oylik abonent to'lovi"
+    is_old_receipt: bool = False
+    is_duplicate: bool = False
+    tuman: Optional[str] = None
 

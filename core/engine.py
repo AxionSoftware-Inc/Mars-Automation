@@ -248,6 +248,20 @@ class CoreEngine:
                 log_reason="Not a payment receipt"
             )
 
+        # 1.1. Firibgarlik va takrorlanishdan himoya & to'lov maqsadi (Fraud & Duplicates)
+        from transaction_tracker import transaction_tracker
+
+        purpose, purpose_label = transaction_tracker.detect_payment_purpose(facts.raw_text or user_comment)
+        facts.payment_purpose = purpose
+        facts.purpose_label = purpose_label
+
+        is_dup = transaction_tracker.is_duplicate(facts.transaction_id)
+        facts.is_duplicate = is_dup
+
+        is_old, old_warn = transaction_tracker.check_old_receipt(facts.payment_date)
+        facts.is_old_receipt = is_old
+        facts.old_receipt_warning = old_warn
+
         # 2. To'lov qabul qiluvchi va to'lov toifasi tekshiruvi (Oylik vs Yillik)
         from payment_accounts import (
             MARS_ACCOUNT, MARS_ORG_NAME,
@@ -284,12 +298,20 @@ class CoreEngine:
                 is_photo=is_photo,
                 should_notify_admin=True,
                 admin_alert_type="annual_receipt",
+                payment_purpose="annual_fiscal_fee",
+                purpose_label="Yillik fiskal modul to'lovi",
+                is_old_receipt=facts.is_old_receipt,
+                is_duplicate=facts.is_duplicate,
+                tuman="",
                 debt_status_info={
                     "is_annual": True,
                     "org_name": facts.payer_name or "Yillik to'lov",
                     "inn": facts.payer_inn or "",
                     "paid_amount": facts.amount,
-                    "recipient": YANGI_TEXNOLOGIYALAR_ORG_NAME
+                    "recipient": YANGI_TEXNOLOGIYALAR_ORG_NAME,
+                    "is_duplicate": facts.is_duplicate,
+                    "is_old_receipt": facts.is_old_receipt,
+                    "payment_purpose": "annual_fiscal_fee"
                 },
                 log_reason="Annual fiscal fee receipt processed"
             )
@@ -337,11 +359,30 @@ class CoreEngine:
                 "payment_date": facts.payment_date,
                 "transaction_id": facts.transaction_id,
                 "payment_system": facts.payment_system,
+                "payment_purpose": facts.payment_purpose,
+                "purpose_label": facts.purpose_label,
+                "is_duplicate": facts.is_duplicate,
+                "is_old_receipt": facts.is_old_receipt,
+                "old_receipt_warning": facts.old_receipt_warning,
+                "raw_text": facts.raw_text,
                 "raw_facts": facts.raw_facts,
                 "file_id": file_id,
                 "is_photo": is_photo
             }
             user_memory.set_pending_receipt(chat_id, user_id, receipt_dict)
+
+            warning_notes = []
+            if facts.is_duplicate:
+                warning_notes.append(
+                    f"⚠️ <b>DIQQAT: Ushbu to'lov cheki (Tranzaksiya ID: <code>{facts.transaction_id or '-'}</code>) "
+                    f"avval ham tizimga yuborilgan! Takroriy yuborilgan kvitansiya adminga tekshiruv uchun uzatildi.</b>"
+                )
+            if facts.is_old_receipt and facts.old_receipt_warning:
+                warning_notes.append(
+                    f"⚠️ <b>DIQQAT: {facts.old_receipt_warning}</b>"
+                )
+            warn_extra = ("\n\n" + "\n\n".join(warning_notes)) if warning_notes else ""
+
             ask_inn_reply = (
                 f"🧾 <b>To'lov kvitansiyasi qabul qilindi!</b>\n\n"
                 f"💰 <b>O'tkazilgan summa:</b> <b>{facts.amount:,.0f} so'm</b>\n"
@@ -349,6 +390,7 @@ class CoreEngine:
                 f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
                 f"❓ <b>Iltimos, ushbu to'lov aynan qaysi korxona hisobiga kiritilishini bilishimiz uchun, "
                 f"korxonangizning INN (9 xonali) yoki JSHSHIR (14 xonali) raqamini yozib yuboring.</b>"
+                f"{warn_extra}"
             )
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
@@ -359,6 +401,11 @@ class CoreEngine:
                 is_photo=is_photo,
                 should_notify_admin=True,
                 admin_alert_type="receipt_missing_inn",
+                payment_purpose=facts.payment_purpose,
+                purpose_label=facts.purpose_label,
+                is_old_receipt=facts.is_old_receipt,
+                is_duplicate=facts.is_duplicate,
+                tuman="",
                 debt_status_info={
                     "org_name": facts.payer_name or "Noma'lum korxona",
                     "inn": None,
@@ -366,7 +413,13 @@ class CoreEngine:
                     "paid_amount": facts.amount,
                     "prev_debt": 0.0,
                     "remaining_debt": 0.0,
-                    "debt_covered": False
+                    "debt_covered": False,
+                    "tuman": "",
+                    "is_duplicate": facts.is_duplicate,
+                    "is_old_receipt": facts.is_old_receipt,
+                    "old_receipt_warning": facts.old_receipt_warning,
+                    "payment_purpose": facts.payment_purpose,
+                    "purpose_label": facts.purpose_label
                 },
                 log_reason="Receipt accepted, waiting for user INN -> Admin notified with missing INN status"
             )
@@ -398,7 +451,72 @@ class CoreEngine:
         remaining_debt = 0.0
         debt_covered = False
 
-        if prev_debt > 0:
+        # Tranzaksiyani ro'yxatga olish (agar dublikat bo'lmasa)
+        from transaction_tracker import transaction_tracker
+        if not facts.is_duplicate and facts.transaction_id:
+            transaction_tracker.record_transaction(
+                transaction_id=facts.transaction_id,
+                inn=inn,
+                amount=facts.amount,
+                user_id=user_id,
+                payment_date=facts.payment_date
+            )
+
+        tuman = excel_manager.get_district_for_inn(inn)
+
+        # Ogohlantirish xabarlari (Dublikat yoki Eski kvitansiya)
+        warning_notes = []
+        if facts.is_duplicate:
+            warning_notes.append(
+                f"⚠️ <b>DIQQAT: Ushbu to'lov cheki (Tranzaksiya ID: <code>{facts.transaction_id or '-'}</code>) "
+                f"avval ham tizimga yuborilgan! Takroriy yuborilgan kvitansiya adminga tekshiruv uchun uzatildi.</b>"
+            )
+        if facts.is_old_receipt and facts.old_receipt_warning:
+            warning_notes.append(
+                f"⚠️ <b>DIQQAT: {facts.old_receipt_warning}</b>"
+            )
+        warning_block = ("\n\n" + "\n\n".join(warning_notes)) if warning_notes else ""
+
+        # To'lov maqsadiga ko'ra xabarni shakllantirish
+        if facts.payment_purpose == "repair":
+            debt_covered = True
+            user_reply = (
+                f"🔧 <b>Kassa apparati ta'miri (remont) uchun to'lov qabul qilindi!</b>\n\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
+                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
+                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
+                f"👨‍🔧 <i>Ushbu to'lov oylik abonent to'lovi emas, balki apparat ta'miri / ehtiyot qismlari xizmati uchun hisoblanadi. "
+                f"Ma'lumotlar servis ustaxonamiz va adminga yetkazildi.</i>"
+                f"{warning_block}"
+            )
+        elif facts.payment_purpose == "hardware_purchase":
+            debt_covered = True
+            user_reply = (
+                f"📦 <b>Yangi kassa apparati xaridi uchun to'lov qabul qilindi!</b>\n\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
+                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
+                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
+                f"📋 <i>Yangi apparat xaridi to'lovi bo'yicha ma'lumotlar sotuv va rasmiylashtirish bo'limiga yetkazildi. "
+                f"Mutaxassislarimiz apparatni tayyorlash uchun siz bilan bog'lanishadi.</i>"
+                f"{warning_block}"
+            )
+        elif facts.payment_purpose == "registration":
+            debt_covered = True
+            user_reply = (
+                f"📋 <b>Kassani qayta ro'yxatdan o'tkazish (pere-registratsiya) to'lovi qabul qilindi!</b>\n\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
+                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
+                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
+                f"📑 <i>Kassa apparatini soliq ro'yxatidan o'tkazish bo'yicha mas'ul xodimga ma'lumotlar yetkazildi.</i>"
+                f"{warning_block}"
+            )
+        elif prev_debt > 0:
             if paid_amount >= prev_debt:
                 debt_covered = True
                 overpayment = max(0.0, paid_amount - prev_debt)
@@ -414,6 +532,7 @@ class CoreEngine:
                     f"{overpay_line}\n"
                     f"📩 <i>To'lov ma'lumotlari kassa apparatingizni tizimda faollashtirish uchun "
                     f"mas'ul operator va adminga yuborildi. Tez orada tizim yangilanadi.</i>"
+                    f"{warning_block}"
                 )
             else:
                 debt_covered = False
@@ -427,6 +546,7 @@ class CoreEngine:
                     f"🔴 <b>Qolgan qarzdorlik:</b> <b>{remaining_debt:,.0f} so'm</b>\n\n"
                     f"📩 <i>Kvitansiya adminga yuborildi. Apparat to'siqsiz ishlashi uchun "
                     f"qolgan summani ham to'lashingiz lozim.</i>"
+                    f"{warning_block}"
                 )
         else:
             debt_covered = True
@@ -439,6 +559,7 @@ class CoreEngine:
                 f"🟢 <b>Qarzdorlik mavjud emas edi (Oldindan to'lov).</b>\n\n"
                 f"📩 <i>Ushbu mablag' kelgusi oylar abonent to'lovi hisobiga kiritiladi. "
                 f"Kvitansiya adminga yetkazildi.</i>"
+                f"{warning_block}"
             )
 
         # Xotiraga saqlash va pending receiptni tozalash
@@ -451,6 +572,9 @@ class CoreEngine:
             "prev_debt": prev_debt,
             "remaining_debt": remaining_debt,
             "debt_covered": debt_covered,
+            "payment_purpose": facts.payment_purpose,
+            "purpose_label": facts.purpose_label,
+            "tuman": tuman,
             "admin_notified": True
         })
         user_memory.set_last_topic(chat_id, user_id, "receipt_verified")
@@ -461,7 +585,13 @@ class CoreEngine:
             "inn_missing": False,
             "prev_debt": prev_debt,
             "remaining_debt": remaining_debt,
-            "debt_covered": debt_covered
+            "debt_covered": debt_covered,
+            "tuman": tuman,
+            "is_duplicate": facts.is_duplicate,
+            "is_old_receipt": facts.is_old_receipt,
+            "old_receipt_warning": facts.old_receipt_warning,
+            "payment_purpose": facts.payment_purpose,
+            "purpose_label": facts.purpose_label
         }
 
         return DecisionResult(
@@ -478,6 +608,11 @@ class CoreEngine:
             debt_status_info=debt_status_info,
             file_id=file_id,
             is_photo=is_photo,
+            payment_purpose=facts.payment_purpose,
+            purpose_label=facts.purpose_label,
+            is_old_receipt=facts.is_old_receipt,
+            is_duplicate=facts.is_duplicate,
+            tuman=tuman,
             log_reason="Receipt successfully verified against Excel debt and prepared for admin"
         )
 
@@ -498,6 +633,12 @@ class CoreEngine:
             payment_date=pending_data.get("payment_date", ""),
             transaction_id=pending_data.get("transaction_id", ""),
             payment_system=pending_data.get("payment_system", ""),
+            payment_purpose=pending_data.get("payment_purpose", "monthly_subscription"),
+            purpose_label=pending_data.get("purpose_label", "Oylik abonent to'lovi"),
+            is_old_receipt=pending_data.get("is_old_receipt", False),
+            old_receipt_warning=pending_data.get("old_receipt_warning"),
+            is_duplicate=pending_data.get("is_duplicate", False),
+            raw_text=pending_data.get("raw_text", ""),
             raw_facts=pending_data
         )
 

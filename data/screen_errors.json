@@ -138,13 +138,10 @@
       "lentani tekshiring",
       "chek qog'ozi",
       "нет бумаги",
-      "крышка открыта",
-      "qopqoq ochiq",
-      "printer xatosi",
       "lenta soling",
       "bumaga yoq"
     ],
-    "response_text": "⚠️ <b>Chek lentasi (qog'oz) tugagan yoki qopqoq ochiq qolgan!</b>\n\n📌 <b>Sababi:</b> Printer ichida qog'oz yo'q, teskari solingan yoki qopqoq to'liq yopilmagan.\n💡 <b>Yechimi:</b> 57 mm lik termolentani to'g'ri tomoni bilan soling va qopqoqni cherttirish ovozi chiqquncha mahkam yoping.",
+    "response_text": "⚠️ <b>Chek lentasi (qog'oz) tugagan!</b>\n\n📌 <b>Sababi:</b> Printer ichida qog'oz yo'q yoki tugab qolgan.\n💡 <b>Yechimi:</b> 57 mm lik termolentani to'g'ri tomoni bilan soling va qopqoqni cherttirish ovozi chiqquncha mahkam yoping.",
     "video_id": null,
     "require_inn": false,
     "escalate_to_admin": false
@@ -433,6 +430,93 @@
     "response_text": "⚠️ <b>Abonent to'lovi muddati tugamoqda (Dastur to'xtashiga oz qoldi)!</b>\n\n📌 <b>Sababi:</b> Kassa dasturining oylik xizmat to'lovi muddati tugash arafasida. Har oyning 6-sanasigacha to'lov qilinmasa, dastur avtomatik to'xtatiladi.\n💡 <b>Yechimi:</b> Apparat to'xtab qolmasligi uchun Click orqali yoki bank rekvizitlariga oylik abonent to'lovini amalga oshiring. Qarz summasini tekshirish uchun korxonangiz <b>INN (STIR)</b> raqamini yuboring.\n\n👇 <i>Quyida Click orqali to'lash videosi yuborildi:</i>",
     "video_id": 148,
     "require_inn": true,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "pax_d210_menu_help",
+    "name": "Pax D210 tugmali kassa apparati yordami",
+    "screen_keywords": [
+      "pax d210",
+      "d210",
+      "tugmali apparat",
+      "klaviaturali apparat",
+      "smena yopish d210",
+      "d210 menyu",
+      "d210 smena"
+    ],
+    "response_text": "📟 <b>Pax D210 tugmali kassa apparati uchun tezkor ko'rsatmalar:</b>\n\n1️⃣ <b>Smena yopish (Z-hisobot olish):</b>\n🔹 <b>Menu</b> tugmasini bosing -> <b>1</b> (Hisobotlar / Отчеты) -> <b>Smena yopish (Z-otchet)</b> ni tanlang va <b>Yashil (Enter)</b> tugmasini bosing.\n\n2️⃣ <b>Servis menyusi:</b>\n🔹 <b>Func + 0</b> tugmalarini birgalikda bosish orqali servis menyusiga o'tishingiz mumkin.\n🔹 Qog'oz o'rnatilganda lenta tekis va to'g'ri joylashganiga e'tibor bering.",
+    "video_id": 2,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "printer_cover_open",
+    "name": "Printer qopqog'i ochiq (Cover Open)",
+    "screen_keywords": [
+      "крышка открыта",
+      "qopqoq ochiq",
+      "cover open",
+      "принтер открыт",
+      "printer ochiq",
+      "qopqog'i ochiq",
+      "open cover"
+    ],
+    "response_text": "⚠️ <b>Printer qopqog'i ochiq qolgan! (Cover Open)</b>\n\n📌 <b>Sababi:</b> Kassa apparati chek qog'ozi (lenta) bo'lmasining qopqog'i to'liq yopilmagan yoki mahkam bosilmagan.\n💡 <b>Yechimi:</b> Qog'oz lentasi to'g'ri o'rnatilganini tekshiring va printer qopqog'ini 'chert' etgan ovoz chiqquncha mahkam yoping.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "printer_overheat",
+    "name": "Printer qizib ketgan (Printer Overheat)",
+    "screen_keywords": [
+      "перегрев принтера",
+      "printer qizib ketdi",
+      "printer overheat",
+      "перегрев головки",
+      "termoboshcha qizib ketdi",
+      "overheat"
+    ],
+    "response_text": "⚠️ <b>Printer termoboshchasi qizib ketgan! (Printer Overheat)</b>\n\n📌 <b>Sababi:</b> Ketma-ket juda ko'p chek chop etilgan yoki apparat uzoq vaqt to'g'ridan-to'g'ri quyosh/issiqlik ostida ishlagan.\n💡 <b>Yechimi:</b> Kassa apparatini 5-10 daqiqa dam oldiring, salqin joyga qo'ying. Termoboshcha sovigach, chek chop etish avtomatik davom etadi.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "paper_jam",
+    "name": "Printerda qog'oz tiqilib qolgan (Paper Jam)",
+    "screen_keywords": [
+      "замятие бумаги",
+      "qog'oz tiqilib qoldi",
+      "qog'oz siqilib qoldi",
+      "paper jam",
+      "замятие ленты",
+      "qog'oz tiqildi",
+      "lenta tiqildi"
+    ],
+    "response_text": "⚠️ <b>Printerda chek qog'ozi tiqilib qolgan! (Paper Jam)</b>\n\n📌 <b>Sababi:</b> Chek lentasi qiyshiq joylashgan yoki qog'oz yirtilib tishlarga tiqilgan.\n💡 <b>Yechimi:</b>\n1. Printer qopqog'ini oching.\n2. Tiqilib qolgan qog'oz parchalarini ehtiyotkorlik bilan oling (o'tkir metall buyumlardan foydalanmang!).\n3. Qog'oz lentasini tekislab, qaytadan joylashtiring va qopqoqni mahkam yoping.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
+    "id": "serial_number_sticker",
+    "name": "Apparat seriya raqami / Stiker (S/N)",
+    "screen_keywords": [
+      "seriya raqam",
+      "seriya nomer",
+      "sn sticker",
+      "sn:",
+      "s/n:",
+      "серийный номер",
+      "наклейка аппарата",
+      "apparat orqasi",
+      "orqa qopqog'i",
+      "apparat pasporti"
+    ],
+    "response_text": "📟 <b>Kassa apparatining seriya raqami (S/N) / pasport stikeri tasviri aniqlandi.</b>\n\n💡 <b>Eslatma:</b> Apparatni texnik xizmat ko'rsatishga kiritish, ro'yxatdan o'tkazish yoki bazadan aniqlash uchun korxona <b>INN (STIR)</b> raqami kerak bo'ladi.\nIltimos, korxonangiz INN raqamini ham yozib yuboring.",
+    "video_id": null,
+    "require_inn": false,
     "escalate_to_admin": false
   }
 ]

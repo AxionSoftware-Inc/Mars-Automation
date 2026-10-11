@@ -19,6 +19,7 @@ class ExcelManager:
         self.stir_index: Dict[str, List[Dict[str, Any]]] = {}
         self.jshshir_index: Dict[str, List[Dict[str, Any]]] = {}
         self.terminal_index: Dict[str, List[Dict[str, Any]]] = {}
+        self.phone_index: Dict[str, List[Dict[str, Any]]] = {}
         self.records_count = 0
         self.load_data()
 
@@ -44,6 +45,7 @@ class ExcelManager:
             new_stir = {}
             new_jshshir = {}
             new_terminal = {}
+            new_phone = {}
             count = 0
 
             MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
@@ -152,14 +154,21 @@ class ExcelManager:
                 if terminal:
                     new_terminal.setdefault(terminal, []).append(record)
 
+                phone_clean = self.clean_digits(phone_raw)
+                if phone_clean:
+                    p_key = phone_clean[-9:] if len(phone_clean) >= 9 else phone_clean
+                    if len(p_key) >= 7:
+                        new_phone.setdefault(p_key, []).append(record)
+
                 count += 1
 
             self.stir_index = new_stir
             self.jshshir_index = new_jshshir
             self.terminal_index = new_terminal
+            self.phone_index = new_phone
             self.records_count = count
             wb.close()
-            logger.info(f"Excel muvaffaqiyatli yuklandi: {count} ta yozuv indekslandi.")
+            logger.info(f"Excel muvaffaqiyatli yuklandi: {count} ta yozuv indekslandi (Phone: {len(new_phone)} ta).")
             return True
         except Exception as e:
             logger.error(f"Excel faylni o'qishda xatolik: {e}")
@@ -178,7 +187,7 @@ class ExcelManager:
             return False
 
     def search(self, query: str) -> List[Dict[str, Any]]:
-        """INN (9 xonali), JSHSHIR (14 xonali) yoki Terminal raqami bo'yicha qidirish"""
+        """INN (9 xonali), JSHSHIR (14 xonali), Terminal yoki Telefon raqami bo'yicha qidirish"""
         clean_q = re.sub(r"\D", "", query.strip())
         if not clean_q:
             return []
@@ -195,7 +204,19 @@ class ExcelManager:
         if clean_q in self.terminal_index:
             return self.terminal_index[clean_q]
 
+        # 4. Telefon raqami orqali tekshirish (oxirgi 9 xona)
+        p_key = clean_q[-9:] if len(clean_q) >= 9 else clean_q
+        if p_key in self.phone_index:
+            return self.phone_index[p_key]
+
         return []
+
+    def get_district_for_inn(self, inn: str) -> str:
+        """Berilgan INN yoki raqam bo'yicha korxonaning tumanini aniqlash"""
+        results = self.search(inn)
+        if results:
+            return str(results[0].get("tuman", "")).strip()
+        return ""
 
     def format_payment_history(self, results: List[Dict[str, Any]]) -> str:
         """

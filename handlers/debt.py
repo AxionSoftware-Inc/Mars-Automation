@@ -112,8 +112,15 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     org_name = results[0].get("name", "") if results else ""
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
 
-    # Xotiraga korxona va qarz ma'lumotlarini eslab qolish
-    user_memory.set_last_id(chat_id, user_id, query_num, org_name=org_name, debt=total_debt)
+    # Xotiraga korxona va qarz ma'lumotlarini eslab qolish:
+    # Agar telefon orqali qidirilgan bo'lsa, asosiy INN/STIR ni ham bog'lash, aks holda kiritilgan raqamni saqlash
+    clean_p = extract_clean_phone(query_num)
+    if clean_p and query_num not in excel_manager.stir_index and query_num not in excel_manager.jshshir_index:
+        primary_id = (results[0].get("stir") if results else "") or query_num
+    else:
+        primary_id = query_num
+
+    user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt)
     user_memory.set_last_topic(chat_id, user_id, "debt_checked")
 
     resp = format_debt_response(results)
@@ -128,7 +135,7 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
             logger.error(f"Qarz xabarini yuborishda xatolik: {e2}")
 
     # Suhbat tarixiga yozish
-    user_memory.add_user_message(chat_id, user_id, f"Mening INN/JSHSHIR raqamim: {query_num}")
+    user_memory.add_user_message(chat_id, user_id, f"Mening qidiruv raqamim (INN/Tel): {query_num}")
     user_memory.add_assistant_message(chat_id, user_id, resp)
 
     if total_debt > 0:
@@ -157,13 +164,13 @@ def is_debt_inquiry(message: types.Message) -> bool:
     t = message.text.lower()
     return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
 
-from core.models import extract_clean_inn
+from core.models import extract_clean_inn, extract_clean_phone
 
-def is_inn_query_message(message: types.Message) -> bool:
-    """Matnda INN/JSHSHIR aniqlanganda xabarni tekshirish va guruhlarda to'g'ri filtr qilish"""
+def is_inn_or_phone_query_message(message: types.Message) -> bool:
+    """Matnda INN/JSHSHIR yoki telefon raqami aniqlanganda xabarni tekshirish va guruhlarda to'g'ri filtr qilish"""
     if not message.text:
         return False
-    query_num = extract_clean_inn(message.text)
+    query_num = extract_clean_inn(message.text) or extract_clean_phone(message.text)
     if not query_num:
         return False
 
@@ -180,9 +187,12 @@ def is_inn_query_message(message: types.Message) -> bool:
     inn_keywords = [
         "inn", "stir", "стир", "инн", "jshshir", "жшшир", "qarz", "mars",
         "apparat", "kassa", "to'lov", "tolov", "chek", "tekshir",
-        "ishlamayapti", "blok", "ochib qoldi", "o'chib qoldi"
+        "ishlamayapti", "blok", "ochib qoldi", "o'chib qoldi", "telefon", "tel", "nomer"
     ]
     return any(kw in lower for kw in inn_keywords)
+
+# Backward-compatibility alias
+is_inn_query_message = is_inn_or_phone_query_message
 
 @router.message(is_debt_inquiry)
 async def handle_debt_inquiry(message: types.Message):
@@ -192,13 +202,13 @@ async def handle_debt_inquiry(message: types.Message):
 
     last_id = user_memory.get_last_id(chat_id, user_id)
     if not last_id:
-        found_num = extract_clean_inn(message.text)
+        found_num = extract_clean_inn(message.text) or extract_clean_phone(message.text)
         if found_num:
             last_id = found_num
         else:
             await message.reply(
-                "⚠️ <b>To'lov tarixini tekshirish uchun korxona INN yoki JSHSHIR raqamini yuboring.</b>\n"
-                "Masalan: <code>302568138</code>",
+                "⚠️ <b>To'lov tarixini tekshirish uchun korxona INN (STIR) yoki ro'yxatdan o'tgan telefon raqamingizni yuboring.</b>\n"
+                "Masalan: <code>302568138</code> yoki <code>901234567</code>",
                 parse_mode="HTML"
             )
             return
@@ -206,14 +216,20 @@ async def handle_debt_inquiry(message: types.Message):
     results = excel_manager.search(last_id)
     if not results:
         await message.reply(
-            f"❌ <code>{last_id}</code> bo'yicha ma'lumot topilmadi. INN to'g'ri kiritilganini tekshiring.",
+            f"❌ <code>{last_id}</code> bo'yicha ma'lumot topilmadi. INN yoki telefon raqami to'g'ri kiritilganini tekshiring.",
             parse_mode="HTML"
         )
         return
 
+    clean_p = extract_clean_phone(last_id)
+    if clean_p and last_id not in excel_manager.stir_index and last_id not in excel_manager.jshshir_index:
+        primary_id = (results[0].get("stir") if results else "") or last_id
+    else:
+        primary_id = last_id
+
     org_name = results[0].get("name", "") if results else ""
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
-    user_memory.set_last_id(chat_id, user_id, last_id, org_name=org_name, debt=total_debt)
+    user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt)
 
     history_resp = excel_manager.format_payment_history(results)
     await message.reply(history_resp, parse_mode="HTML")
@@ -223,12 +239,12 @@ async def handle_debt_inquiry(message: types.Message):
     user_memory.set_last_topic(chat_id, user_id, "payment_history")
 
 
-# 2. TO'G'RIDAN-TO'G'RI INN / JSHSHIR YUBORILGANDA
-@router.message(is_inn_query_message)
+# 2. TO'G'RIDAN-TO'G'RI INN / JSHSHIR / TELEFON YUBORILGANDA
+@router.message(is_inn_or_phone_query_message)
 async def handle_inn_query(message: types.Message, bot: Bot):
-    """Matnda 9 xonali INN yoki 14 xonali JSHSHIR aniqlanganda qarz tekshirish"""
+    """Matnda 9 xonali INN, 14 xonali JSHSHIR yoki telefon raqami aniqlanganda qarz tekshirish"""
     text = (message.text or "").strip()
-    query_num = extract_clean_inn(text)
+    query_num = extract_clean_inn(text) or extract_clean_phone(text)
     if not query_num:
         return
 

@@ -1,7 +1,9 @@
 import os
 import io
 import re
+import time
 import logging
+from typing import Dict, Optional
 from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
 
@@ -25,6 +27,27 @@ RECEIPT_KEYWORDS = [
     "to'ladim", "toladim", "to'landi", "tolandi", "pul o'tkazdim", "pul otkazdim"
 ]
 
+_PROCESSED_MEDIA_GROUPS: Dict[str, float] = {}
+
+def _check_and_register_media_group(media_group_id: Optional[str]) -> bool:
+    """
+    Bir vaqtda guruhlab (album) yuborilgan rasmlardan faqat birinchisini to'liq tahlil qilish,
+    qolgan nusxalarida takroriy xabarlar va notification spam bo'lishining oldini olish.
+    Qaytaradi: True agar bu media guruhning birinchi rasmi bo'lsa (yoki media group bo'lmasa).
+    """
+    if not media_group_id:
+        return True
+    now = time.time()
+    # 60 soniyadan eski yozuvlarni tozalash
+    to_delete = [k for k, ts in _PROCESSED_MEDIA_GROUPS.items() if now - ts > 60]
+    for k in to_delete:
+        _PROCESSED_MEDIA_GROUPS.pop(k, None)
+
+    if media_group_id in _PROCESSED_MEDIA_GROUPS:
+        return False
+    _PROCESSED_MEDIA_GROUPS[media_group_id] = now
+    return True
+
 # 1. HUJJATLAR (EXCEL BAZA YOKI PDF KVITANSIYA)
 @router.channel_post(F.document)
 @router.message(F.document)
@@ -45,6 +68,20 @@ async def handle_document(message: types.Message, bot: Bot):
 
     # A) EXCEL BAZA FAYLI
     if file_name.endswith(".xlsx") or file_name.endswith(".xls"):
+        # XAVFSIZLIK: Faqat rasmiy kanal yoki vakolatli adminlar (@Yashnarbek_butaev) bazani yangilashi mumkin!
+        is_channel = (message.chat.id == DESTINATION_CHANNEL_ID or message.chat.type == ChatType.CHANNEL)
+        username = message.from_user.username if message.from_user else None
+        is_authorized_admin = admin_manager.is_admin(user_id, username)
+
+        if not is_channel and not is_authorized_admin:
+            logger.warning(f"Ruxsatsiz Excel yuklash urinishi: User {user_id} (@{username})")
+            await message.reply(
+                "❌ <b>Kechirasiz, sizda ma'lumotlar bazasini (Excel) yangilash huquqi yo'q!</b>\n\n"
+                "Ushbu amal faqat tizim administratori (@Yashnarbek_butaev) yoki rasmiy kanal orqali amalga oshiriladi.",
+                parse_mode="HTML"
+            )
+            return
+
         try:
             if message.chat.id == DESTINATION_CHANNEL_ID:
                 last_msg_id = get_last_file_message_id()
@@ -131,6 +168,9 @@ async def handle_document(message: types.Message, bot: Bot):
 
     # C) RASMLI FAYL FORMATIDAGI HUJJATLAR (.PNG, .JPG, .JPEG, .WEBP)
     if any(file_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+        if message.media_group_id and not _check_and_register_media_group(message.media_group_id):
+            logger.info(f"Media group {message.media_group_id} ning keyingi hujjat rasmi o'tkazib yuborildi.")
+            return
         try:
             file_io = io.BytesIO()
             await bot.download(doc, destination=file_io)
@@ -294,6 +334,10 @@ async def handle_photo(message: types.Message, bot: Bot):
     3. Agar begona narsa bo'lsa -> Jim turish (Guardrail)
     """
     caption = message.caption or ""
+    if message.media_group_id and not _check_and_register_media_group(message.media_group_id):
+        logger.info(f"Media group {message.media_group_id} ning keyingi rasmi o'tkazib yuborildi.")
+        return
+
     try:
         photo = message.photo[-1]
         file_io = io.BytesIO()
