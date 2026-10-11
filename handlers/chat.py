@@ -9,10 +9,16 @@ from payment_accounts import (
     get_monthly_payment_card,
     get_annual_payment_card,
     get_all_payment_accounts_card,
+    get_monthly_post_note,
+    get_annual_post_note,
+    get_both_posts_intro,
     get_mxik_guidance,
+    MARS_POST_ID,
     MARS_VIDEO_ID,
+    YANGI_TEXNOLOGIYALAR_POST_ID,
     YANGI_TEXNOLOGIYALAR_VIDEO_ID
 )
+from translit_manager import adapt_to_user_script, detect_script
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +61,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     """
     Foydalanuvchi bilan ko'p bosqichli (multi-turn) aqlli suhbat:
     0. Matnda INN aniqlansa va qarz/apparat so'ralsa -> Zaxira INN protsessori
-    1. To'lov rekvizitlari va hisob raqamlar (Oylik Mars va Yillik Yangi Texnologiyalar ajratilishi)
+    1. To'lov rekvizitlari va hisob raqamlar (Oylik Mars va Yillik Yangi Texnologiyalar ajratilishi, kanaldan post nusxalash)
     2. MXIK (IKPU / Tasnif / Soliq talablari va tovar qo'shish)
     3. To'lov usuli yoki Click bo'yicha to'g'ridan-to'g'ri so'rovlar -> 148-video va rekvizitlar
     4. Operator / Usta talab qilinganda -> Adminga to'g'ridan-to'g'ri eskalatsiya
@@ -67,6 +73,9 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
+    # Foydalanuvchi alifbosini aniqlash va yangilash (Lotin yoki Kirill)
+    user_script = user_memory.detect_and_update_script(chat_id, user_id, text)
+
     # 0. AGAR MATNDA INN BO'LSA VA APPARAT/QARZ SO'RALSA (Zaxira xavfsizlik)
     from core.models import extract_clean_inn
     found_inn = extract_clean_inn(text)
@@ -75,43 +84,128 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         await process_and_send_debt_result(message, bot, found_inn)
         return
 
-    # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (OYLIK VA YILLIK TO'LOVNING ANIQ AJRATILISHI)
+    # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (KANAL MATN POSTIDAN UZATISH VA QO'SHIMCHA IZOH)
     payment_intent = classify_payment_intent(text)
     if payment_intent:
-        if payment_intent == "annual":
-            reply_card = get_annual_payment_card()
-            video_to_send = YANGI_TEXNOLOGIYALAR_VIDEO_ID
-        elif payment_intent == "monthly":
-            reply_card = get_monthly_payment_card()
-            video_to_send = MARS_VIDEO_ID
-        else:
-            reply_card = get_all_payment_accounts_card()
-            video_to_send = MARS_VIDEO_ID
-
-        try:
-            await message.reply(reply_card, parse_mode="HTML")
-        except Exception:
-            await message.reply(reply_card)
-
-        if video_to_send:
+        if payment_intent == "monthly":
+            # A) Oylik abonent hisob raqami (Post 85 kanaldan nusxalanadi)
             try:
                 await bot.copy_message(
                     chat_id=message.chat.id,
                     from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=video_to_send,
+                    message_id=MARS_POST_ID,
                     reply_to_message_id=message.message_id
                 )
             except Exception as e:
-                logger.warning(f"To'lov videosi yuborishda xatolik: {e}")
+                logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}, zaxira kartani yuboramiz")
+                reply_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
+                await message.reply(reply_card, parse_mode="HTML")
 
-        user_memory.add_user_message(chat_id, user_id, text)
-        user_memory.add_assistant_message(chat_id, user_id, reply_card)
-        user_memory.set_last_topic(chat_id, user_id, f"payment_info_{payment_intent}")
-        return
+            # B) Tagidan qo'shimcha tushuntirish va muddat eslatmasi
+            note = get_monthly_post_note(user_script)
+            try:
+                await message.answer(note, parse_mode="HTML")
+            except Exception:
+                await message.answer(note)
+
+            # C) Click orqali oylik to'lov videosi (Post 148)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=MARS_VIDEO_ID
+                )
+            except Exception as e:
+                logger.warning(f"Oylik to'lov videosini yuborishda xatolik: {e}")
+
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, note)
+            user_memory.set_last_topic(chat_id, user_id, "payment_info_monthly")
+            return
+
+        elif payment_intent == "annual":
+            # A) Yillik fiskal modul hisob raqami (Post 34 kanaldan nusxalanadi)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}, zaxira kartani yuboramiz")
+                reply_card = adapt_to_user_script(get_annual_payment_card(), user_script)
+                await message.reply(reply_card, parse_mode="HTML")
+
+            # B) Tagidan qo'shimcha tushuntirish va Soliq tizimi eslatmasi
+            note = get_annual_post_note(user_script)
+            try:
+                await message.answer(note, parse_mode="HTML")
+            except Exception:
+                await message.answer(note)
+
+            # C) Click orqali yillik to'lov videosi (Post 145)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+                )
+            except Exception as e:
+                logger.warning(f"Yillik to'lov videosini yuborishda xatolik: {e}")
+
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, note)
+            user_memory.set_last_topic(chat_id, user_id, "payment_info_annual")
+            return
+
+        else:  # both / general
+            # A) Ikkala to'lovni adashtirmaslik haqida qat'iy ogohlantirish
+            intro = get_both_posts_intro(user_script)
+            try:
+                await message.reply(intro, parse_mode="HTML")
+            except Exception:
+                await message.reply(intro)
+
+            # B) Kanaldan Oylik shot posti (Post 85)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=MARS_POST_ID
+                )
+            except Exception as e:
+                logger.warning(f"Post 85 nusxalashda xatolik: {e}")
+
+            # C) Kanaldan Yillik shot posti (Post 34)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=YANGI_TEXNOLOGIYALAR_POST_ID
+                )
+            except Exception as e:
+                logger.warning(f"Post 34 nusxalashda xatolik: {e}")
+
+            # D) Click orqali to'lov videosi (Post 148)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=MARS_VIDEO_ID
+                )
+            except Exception as e:
+                logger.warning(f"Video 148 nusxalashda xatolik: {e}")
+
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, intro)
+            user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+            return
 
     # 2. MXIK (IKPU / TASNIF / SOLIQ TALABLARI VA TOVAR QO'SHISH)
     if is_mxik_intent(text):
         mxik_text, mxik_video_id = get_mxik_guidance(text)
+        mxik_text = adapt_to_user_script(mxik_text, user_script)
         try:
             await message.reply(mxik_text, parse_mode="HTML")
         except Exception:
@@ -143,7 +237,6 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 reply_to_message_id=message.message_id
             )
             user_memory.add_user_message(chat_id, user_id, text)
-
             user_memory.add_assistant_message(chat_id, user_id, "[Click orqali to'lash videosi yuborildi]")
             user_memory.set_last_topic(chat_id, user_id, "payment_instruction")
             return
@@ -155,13 +248,14 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         from core import core_engine
         from admin_manager import admin_manager
         decision = core_engine.escalate_general_issue(text, chat_id, user_id)
+        reply_msg = adapt_to_user_script(decision.reply_text, user_script)
         try:
-            await message.reply(decision.reply_text, parse_mode="HTML")
+            await message.reply(reply_msg, parse_mode="HTML")
         except Exception:
-            await message.reply(decision.reply_text)
+            await message.reply(reply_msg)
 
         user_memory.add_user_message(chat_id, user_id, text)
-        user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
+        user_memory.add_assistant_message(chat_id, user_id, reply_msg)
 
         user_display = message.from_user.full_name if message.from_user else "Mijoz"
         username_str = f"@{message.from_user.username}" if (message.from_user and message.from_user.username) else "Yo'q"
@@ -177,8 +271,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         await admin_manager.notify_admins(bot, text=admin_text)
         return
 
-    # 3. DAVOMIY KONVERSATSION SAVOLLAR YOKI FAOL SUHBAT KONTEKSTI
-    # Agar foydalanuvchi faol kontekstda bo'lsa yoki savoli davomiy xarakterga ega bo'lsa:
+    # 5. DAVOMIY KONVERSATSION SAVOLLAR YOKI FAOL SUHBAT KONTEKSTI
     has_active_context = bool(user_memory.get_last_id(chat_id, user_id) or user_memory.get_last_receipt(chat_id, user_id))
     is_conversational = any(kw in lower_text for kw in CONVERSATIONAL_FOLLOWUPS)
     explicit_video_request = any(kw in lower_text for kw in ["video", "rolik", "video tashla", "qo'llanma", "qollanma"])
@@ -186,13 +279,14 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     # Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat bo'lsa -> To'g'ridan-to'g'ri AI kontekstiga!
     if is_conversational or (has_active_context and not explicit_video_request):
         context_summary = user_memory.get_context_summary(chat_id, user_id)
-        reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
+        reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary, target_script=user_script)
 
         if not reply_text or not reply_text.strip():
-            reply_text = (
+            fallback = (
                 "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
                 "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
             )
+            reply_text = adapt_to_user_script(fallback, user_script)
 
         logger.info(f"📤 AI JAVOBI (Kontekst) [chat_id={chat_id}]: {reply_text[:120]}")
         try:
@@ -219,7 +313,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 logger.error(f"AI tavsiya qilgan videoni yuborishda xatolik (ID: {ai_video_id}): {e}")
         return
 
-    # 4. TEXNIK VIDEO KATALOGDAN QIDIRISH (faqat maxsus texnik amallar uchun)
+    # 6. TEXNIK VIDEO KATALOGDAN QIDIRISH (faqat maxsus texnik amallar uchun)
     video_id = catalog_manager.find_matching_post(text)
     if video_id:
         try:
@@ -236,15 +330,16 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         except Exception as e:
             logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
-    # 5. BOSHQALARI BO'YICHA UMUMIY AI JAVOBI
+    # 7. BOSHQALARI BO'YICHA UMUMIY AI JAVOBI
     context_summary = user_memory.get_context_summary(chat_id, user_id)
-    reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary)
+    reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary, target_script=user_script)
 
     if not reply_text or not reply_text.strip():
-        reply_text = (
+        fallback = (
             "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
             "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
         )
+        reply_text = adapt_to_user_script(fallback, user_script)
 
     logger.info(f"📤 AI JAVOBI (Umumiy) [chat_id={chat_id}]: {reply_text[:120]}")
     try:

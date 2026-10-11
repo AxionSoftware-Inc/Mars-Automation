@@ -94,13 +94,28 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
    - Tovarlar bazasi / yuklash -> [VIDEO:138]
    - Analitika va hisobotlar -> [VIDEO:136]
    - O'chish sanasi haqida -> [VIDEO:130]
+6. ALIFBO TALABI (MUTLAQO QAT'IY):
+   - Agar mijoz KIRILL alifbosida yozgan bo'lsa (masalan: «Салом», «қарзим борми», «кўриб беринг», «аппаратим ишламаяпти»), javobingizni 100% O'ZBEK KIRILL alifbosida yozing!
+   - Agar mijoz LOTIN alifbosida yozgan bo'lsa (masalan: «Salom», «qarzim bormi», «ko'rib bering»), javobingizni 100% O'ZBEK LOTIN alifbosida yozing!
+   - Hech qachon mijoz yozgan alifboga teskari alifboda javob qaytarmang!
 """
 
-def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str, Optional[int]]:
+def generate_ai_reply(
+    user_message: str,
+    context_history: str = "",
+    target_script: Optional[str] = None
+) -> Tuple[str, Optional[int]]:
     """
     Kontekst asosida, lo'nda va suhbat zanjirini buzmagan holda AI javobi berish.
+    Foydalanuvchi alifbosiga (lotin yoki kirill) 100% moslashtiriladi.
     Natija: (javob_matni, video_id yoki None)
     """
+    from translit_manager import detect_script, adapt_to_user_script
+
+    if not target_script or target_script == "unknown":
+        detected = detect_script(user_message)
+        target_script = detected if detected in ("cyrillic", "latin") else "latin"
+
     try:
         content_prompt = user_message.strip()
         if context_history:
@@ -130,11 +145,13 @@ def generate_ai_reply(user_message: str, context_history: str = "") -> Tuple[str
                 "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
             )
 
+        # Alifboga moslashtirish kafolati
+        full_text = adapt_to_user_script(full_text, target_script)
         return full_text, video_id
 
     except Exception as e:
         logger.error(f"AI reply xatoligi: {e}")
-        return (
-            "Savolingiz bo'yicha ma'lumot olish uchun INN raqamingizni yuboring yoki apparat ekranini rasmga olib tashlang.",
-            None
+        fallback_text = (
+            "Savolingiz bo'yicha ma'lumot olish uchun INN raqamingizni yuboring yoki apparat ekranini rasmga olib tashlang."
         )
+        return adapt_to_user_script(fallback_text, target_script), None

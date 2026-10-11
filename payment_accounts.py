@@ -37,14 +37,18 @@ YANGI_TEXNOLOGIYALAR_POST_ID = 34           # Rekvizit matni
 MARS_KEYWORDS = [
     "mars", "марс", "mars elektron texnika", "марс электрон техника",
     "20208000800208044003", "302568138", "abonent to'lov", "abonent tulov",
-    "oylik to'lov", "oylik tolov", "oylik tulov", "oylik shot"
+    "oylik to'lov", "oylik tolov", "oylik tulov", "oylik shot",
+    "абонент тўлов", "абонент толов", "абонент тулов",
+    "ойлик тўлов", "ойлик толов", "ойлик тулов", "ойлик шот", "марс шот"
 ]
 
 YANGI_TEXNOLOGIYALAR_KEYWORDS = [
     "yangi tehnologiyalar", "yangi texnologiyalar", "янги технологиялар",
     "20210000100431200010", "201589463", "00668", "fiskal modul to'lov",
     "fiskal modul tulov", "fiskal modulning yillik", "yillik to'lov",
-    "yillik tolov", "yillik tulov", "yillik shot", "yillik hisob"
+    "yillik tolov", "yillik tulov", "yillik shot", "yillik hisob",
+    "фискал модул тўлов", "фискал модул толов", "фискал модулнинг йиллик",
+    "йиллик тўлов", "йиллик толов", "йиллик тулов", "йиллик шот", "йиллик ҳисоб"
 ]
 
 
@@ -111,6 +115,41 @@ def get_all_payment_accounts_card() -> str:
     )
 
 
+def get_monthly_post_note(script: str = "latin") -> str:
+    """Kanaldan uzatilgan 85-post (Oylik abonent) tagidan yuboriladigan qo'shimcha eslatma"""
+    from translit_manager import adapt_to_user_script
+    text = (
+        "💡 <b>Eslatma:</b> Ushbu hisob raqam <b>«MARS ELEKTRON TEXNIKA» MCHJ</b> ga Smart POS apparatlariga oylik servis va dasturiy ta'minot xizmati uchun (100 000 so'm/oy).\n"
+        "⏰ <b>Muddat:</b> Har oyning <b>6-sanasigacha</b> to'lanishi shart.\n\n"
+        "👇 <i>Quyida Click orqali to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
+    )
+    return adapt_to_user_script(text, script)
+
+
+def get_annual_post_note(script: str = "latin") -> str:
+    """Kanaldan uzatilgan 34-post (Yillik fiskal modul) tagidan yuboriladigan qo'shimcha eslatma"""
+    from translit_manager import adapt_to_user_script
+    text = (
+        "💡 <b>Eslatma:</b> Ushbu hisob raqam Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> ga 1 yillik fiskal modul sertifikati uchun (440 000 so'm/yil).\n"
+        "⏳ <b>Faollashishi:</b> To'lov qilingach <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda Soliq tizimida avtomatik ishga tushadi.\n"
+        "⚠️ <b>DIQQAT:</b> Ushbu to'lov «Mars Elektron Texnika» oylik to'lovidan mutlaqo alohidadir!\n\n"
+        "👇 <i>Quyida Click orqali to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
+    )
+    return adapt_to_user_script(text, script)
+
+
+def get_both_posts_intro(script: str = "latin") -> str:
+    """Ikkala post uzatilishidan oldin adashtirmaslik haqida qat'iy ogohlantirish"""
+    from translit_manager import adapt_to_user_script
+    text = (
+        "⚠️ <b>QAT'IY QOIDA:</b> Smart POS kassa apparatlarida <b>2 xil alohida to'lov</b> mavjud bo'lib, ular <b>2 xil alohida tashkilotga</b> to'lanadi. Ularni mutlaqo adashtirmaslik lozim!\n\n"
+        "1️⃣ <b>Oylik abonent to'lovi (100 000 so'm)</b> — «MARS ELEKTRON TEXNIKA» MCHJ ga\n"
+        "2️⃣ <b>Yillik fiskal modul to'lovi (440 000 so'm)</b> — «Yangi Texnologiyalar» DUK ga\n\n"
+        "👇 <i>Quyida rasmiy kanaldan ikkala hisob raqamning matnli postlari va video-qo'llanmalari uzatilmoqda:</i>"
+    )
+    return adapt_to_user_script(text, script)
+
+
 # =============================================================================
 # 3. MXIK (IKPU - MAHSULOT VA XIZMATLAR KODI) BILIMLAR BAZASI
 # =============================================================================
@@ -123,7 +162,10 @@ def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
     q = query.lower()
 
     # 1. Agar qidirish yoki tasnif sayti so'ralgan bo'lsa (Post 28)
-    if any(w in q for w in ["tasnif", "qidirish", "sayt", "topish", "qayerdan"]):
+    if any(w in q for w in [
+        "tasnif", "qidirish", "sayt", "topish", "qayerdan",
+        "тасниф", "қидириш", "кидириш", "сайт", "топиш", "қаердан", "каердан"
+    ]):
         text = (
             "🔍 <b>MXIK kodlarni Tasnif.soliq.uz saytidan qidirish:</b>\n\n"
             "Davlat Soliq Qo'mitasining rasmiy <b>tasnif.soliq.uz</b> portali orqali har qanday tovar yoki xizmatning 17 xonali MXIK (IKPU) kodini tezkor topishingiz mumkin.\n\n"
@@ -136,7 +178,10 @@ def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
         return text, 28
 
     # 2. Agar tekshirish yoki soliq jarimasi so'ralgan bo'lsa (Post 17)
-    if any(w in q for w in ["tekshirish", "jarima", "soliq jarima", "xato kod", "to'g'rilash", "togrilash"]):
+    if any(w in q for w in [
+        "tekshirish", "jarima", "soliq jarima", "xato kod", "to'g'rilash", "togrilash",
+        "текшириш", "жарима", "солиқ жарима", "солик жарима", "хато код", "тўғрилаш", "тогрилаш"
+    ]):
         text = (
             "⚠️ <b>Tovarlardagi MXIK kodni tekshirish va soliq jarimalari:</b>\n\n"
             "Soliq qonunchiligiga (VMQ-943) ko'ra, chekda noto'g'ri yoki faoliyatingizga mos kelmaydigan MXIK kodi ko'rsatilsa, soliq organlari tomonidan <b>jarima</b> qo'llaniladi.\n\n"
@@ -148,7 +193,10 @@ def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
         return text, 17
 
     # 3. Naqdga savdo qilib bo'lmaydigan tovarlar (Post 133)
-    if any(w in q for w in ["zapravka", "alkogol", "tamaki", "naqd", "naqt", "bloklab urish"]):
+    if any(w in q for w in [
+        "zapravka", "alkogol", "tamaki", "naqd", "naqt", "bloklab urish",
+        "заправка", "алкогол", "тамаки", "нақд", "накт"
+    ]):
         text = (
             "🚫 <b>Naqd pulga savdo qilib bo'lmaydigan MXIK tovarlar:</b>\n\n"
             "Soliq talabiga ko'ra, <b>Zapravkalar, Alkogol, Tamaki</b> va davlat tashkilotlari xizmatlari MXIK kodi kiritilganda naqd pulga chek urib bo'lmaydi.\n\n"
@@ -185,18 +233,28 @@ def classify_payment_intent(text: str) -> Optional[str]:
     """
     t = text.lower().strip()
 
-    # Yillik to'lov alomatlari
+    # Yillik to'lov alomatlari (Lotin va Kirill)
     is_annual = any(w in t for w in [
-        "yillik shot", "yillik hisob", "yillik rekvizit", "fiskal modul shot",
-        "fiskal modul hisob", "yillik to'lov", "yillik tolov", "yillik tulov",
-        "yangi texnologiyalar", "yillik qancha", "440000", "440 000"
+        "yillik shot", "yillik hisob", "yillik rekvizit", "fiskal modul", "fiskal modul shot",
+        "fiskal modul hisob", "fiskal modul to'lov", "fiskal modul tolov", "fiskal modul tulov",
+        "yillik to'lov", "yillik tolov", "yillik tulov",
+        "yangi texnologiyalar", "yillik qancha", "440000", "440 000",
+        "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
+        "фискал модул", "фискал модуль", "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
+        "фискал модул тўлов", "фискал модул толов", "фискал модул тулов",
+        "йиллик тўлов", "йиллик толов", "йиллик тулов", "янги технологиялар",
+        "йиллик қанча", "йиллик канча"
     ])
 
-    # Oylik to'lov alomatlari
+    # Oylik to'lov alomatlari (Lotin va Kirill)
     is_monthly = any(w in t for w in [
         "oylik shot", "oylik hisob", "oylik rekvizit", "mars hisob", "mars shot",
         "abonent to'lov", "abonent tolov", "abonent tulov", "marsga to'lov",
-        "oylik to'lov", "oylik tolov", "oylik tulov", "100000", "100 000"
+        "oylik to'lov", "oylik tolov", "oylik tulov", "100000", "100 000",
+        "ойлик шот", "ойлик ҳисоб", "ойлик хисоб", "ойлик реквизит",
+        "марс ҳисоб", "марс хисоб", "марс шот", "абонент тўлов",
+        "абонент толов", "абонент тулов", "марсга тўлов", "марсга толов",
+        "ойлик тўлов", "ойлик толов", "ойлик тулов"
     ])
 
     if is_annual and not is_monthly:
@@ -204,12 +262,17 @@ def classify_payment_intent(text: str) -> Optional[str]:
     if is_monthly and not is_annual:
         return "monthly"
 
-    # Umumiy rekvizit yoki to'lov so'rovlari
+    # Umumiy rekvizit yoki to'lov so'rovlari (Lotin va Kirill)
     general_payment_words = [
         "shot raqam", "shot raqamlar", "hisob raqam", "hisob raqamlar",
         "rekvizit", "rekvizitlar", "/tolov", "to'lov qilish tartibi",
         "qayerga to'layman", "qayerga tolayman", "qayerga to'lash kerak",
-        "bank rekvizitlari", "to'lov hisobi", "shotini ber"
+        "bank rekvizitlari", "to'lov hisobi", "shotini ber",
+        "шот рақам", "шот рақамлар", "ҳисоб рақам", "хисоб ракам",
+        "ҳисоб рақамлар", "хисоб ракамлар", "реквизит", "реквизитlar", "реквизитлар",
+        "тўлов қилиш тартиби", "толов килиш тартиби", "қаерга тўлайман", "каерга толайман",
+        "қаерга тўлаш керак", "каерга толаш керак", "банк реквизитлари",
+        "тўлов ҳисоби", "толов хисоби", "шотини бер"
     ]
     if any(w in t for w in general_payment_words) or (is_annual and is_monthly):
         return "both"

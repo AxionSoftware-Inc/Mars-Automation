@@ -6,6 +6,7 @@ from aiogram import Router, types, Bot, F
 from aiogram.enums import ChatType
 from excel_manager import excel_manager
 from user_memory import user_memory
+from translit_manager import adapt_to_user_script, detect_script
 
 logger = logging.getLogger(__name__)
 
@@ -83,18 +84,26 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
+    user_script = user_memory.get_preferred_script(chat_id, user_id)
+    if message.text:
+        sc = detect_script(message.text)
+        if sc in ("cyrillic", "latin"):
+            user_script = sc
+            user_memory.detect_and_update_script(chat_id, user_id, message.text)
+
     # 0. Agar foydalanuvchi avval kvitansiya yuklagan bo'lsa, uni avtomatik bog'lash
     from core import core_engine
     from admin_manager import admin_manager
     receipt_decision = core_engine.resolve_pending_receipt_if_any(query_num, chat_id, user_id)
     if receipt_decision:
+        reply_m = adapt_to_user_script(receipt_decision.reply_text, user_script)
         try:
-            await message.reply(receipt_decision.reply_text, parse_mode="HTML")
+            await message.reply(reply_m, parse_mode="HTML")
         except Exception:
-            await message.reply(receipt_decision.reply_text)
+            await message.reply(reply_m)
 
         user_memory.add_user_message(chat_id, user_id, f"Mening INN raqamim: {query_num}")
-        user_memory.add_assistant_message(chat_id, user_id, receipt_decision.reply_text)
+        user_memory.add_assistant_message(chat_id, user_id, reply_m)
 
         if receipt_decision.should_notify_admin and receipt_decision.receipt_facts:
             await admin_manager.notify_receipt_escalation(
@@ -124,6 +133,7 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_memory.set_last_topic(chat_id, user_id, "debt_checked")
 
     resp = format_debt_response(results)
+    resp = adapt_to_user_script(resp, user_script)
     logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")
     try:
         await message.reply(resp, parse_mode="HTML")
@@ -199,6 +209,7 @@ async def handle_debt_inquiry(message: types.Message):
     """Foydalanuvchi qarzdan e'tiroz bildirsa yoki to'lov tarixini so'rasa"""
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
+    user_script = user_memory.detect_and_update_script(chat_id, user_id, message.text or "")
 
     last_id = user_memory.get_last_id(chat_id, user_id)
     if not last_id:
@@ -206,19 +217,21 @@ async def handle_debt_inquiry(message: types.Message):
         if found_num:
             last_id = found_num
         else:
-            await message.reply(
+            w_msg = adapt_to_user_script(
                 "⚠️ <b>To'lov tarixini tekshirish uchun korxona INN (STIR) yoki ro'yxatdan o'tgan telefon raqamingizni yuboring.</b>\n"
                 "Masalan: <code>302568138</code> yoki <code>901234567</code>",
-                parse_mode="HTML"
+                user_script
             )
+            await message.reply(w_msg, parse_mode="HTML")
             return
 
     results = excel_manager.search(last_id)
     if not results:
-        await message.reply(
+        nf_msg = adapt_to_user_script(
             f"❌ <code>{last_id}</code> bo'yicha ma'lumot topilmadi. INN yoki telefon raqami to'g'ri kiritilganini tekshiring.",
-            parse_mode="HTML"
+            user_script
         )
+        await message.reply(nf_msg, parse_mode="HTML")
         return
 
     clean_p = extract_clean_phone(last_id)
@@ -232,6 +245,7 @@ async def handle_debt_inquiry(message: types.Message):
     user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt)
 
     history_resp = excel_manager.format_payment_history(results)
+    history_resp = adapt_to_user_script(history_resp, user_script)
     await message.reply(history_resp, parse_mode="HTML")
 
     user_memory.add_user_message(chat_id, user_id, message.text)

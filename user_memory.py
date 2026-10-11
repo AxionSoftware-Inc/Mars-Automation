@@ -43,19 +43,41 @@ class UserMemoryManager:
                 "debt_info": None,
                 "last_receipt": None,
                 "last_topic": None,
-                "pending_receipt": None
+                "pending_receipt": None,
+                "preferred_script": "latin"
             }
         self.sessions[key]["last_active"] = now
         return self.sessions[key]
 
     def add_user_message(self, chat_id: int, user_id: int, text: str):
-        """Foydalanuvchi xabarini xotiraga qo'shish"""
+        """Foydalanuvchi xabarini xotiraga qo'shish va alifbo afzalligini aniqlash"""
         session = self._get_or_create_session(chat_id, user_id)
         session["history"].append({"role": "user", "text": text.strip()})
+
+        # Alifbo turini aniqlash va yangilash
+        from translit_manager import detect_script
+        sc = detect_script(text)
+        if sc in ("cyrillic", "latin"):
+            session["preferred_script"] = sc
 
         # Xotirani limit doirasida saqlash
         if len(session["history"]) > self.max_turns * 2:
             session["history"] = session["history"][-(self.max_turns * 2):]
+
+    def get_preferred_script(self, chat_id: int, user_id: int) -> str:
+        """Foydalanuvchi qaysi alifboda (latin yoki cyrillic) muloqot qilayotganini olish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("preferred_script") or "latin"
+
+    def detect_and_update_script(self, chat_id: int, user_id: int, text: str) -> str:
+        """Yangi matn bo'yicha alifboni aniqlab, xotirani yangilash va qaytarish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        from translit_manager import detect_script
+        sc = detect_script(text)
+        if sc in ("cyrillic", "latin"):
+            session["preferred_script"] = sc
+            return sc
+        return session.get("preferred_script") or "latin"
 
     def add_assistant_message(self, chat_id: int, user_id: int, text: str):
         """Bot javobini xotiraga qo'shish"""

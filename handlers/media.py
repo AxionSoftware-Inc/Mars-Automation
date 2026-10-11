@@ -14,6 +14,7 @@ from admin_manager import admin_manager
 from core import core_engine, ActionType
 from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
+from translit_manager import adapt_to_user_script, detect_script
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,13 @@ async def _process_image_content(
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
+    user_script = user_memory.get_preferred_script(chat_id, user_id)
+    if caption:
+        sc = detect_script(caption)
+        if sc in ("cyrillic", "latin"):
+            user_script = sc
+            user_memory.detect_and_update_script(chat_id, user_id, caption)
+
     media_type, receipt_facts, device_facts = analyze_media_image(
         image_bytes=image_bytes,
         user_caption=caption,
@@ -227,13 +235,14 @@ async def _process_image_content(
             is_photo=not is_document
         )
         if decision.reply_text:
+            reply_text = adapt_to_user_script(decision.reply_text, user_script)
             try:
-                await message.reply(decision.reply_text, parse_mode="HTML")
+                await message.reply(reply_text, parse_mode="HTML")
             except Exception:
-                await message.reply(decision.reply_text)
+                await message.reply(reply_text)
 
             user_memory.add_user_message(chat_id, user_id, f"[To'lov kvitansiyasi] {caption}".strip())
-            user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
+            user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
         if decision.should_notify_admin and decision.receipt_facts:
             await admin_manager.notify_receipt_escalation(
@@ -259,13 +268,14 @@ async def _process_image_content(
             return
 
         if decision.reply_text:
+            reply_text = adapt_to_user_script(decision.reply_text, user_script)
             try:
-                await message.reply(decision.reply_text, parse_mode="HTML")
+                await message.reply(reply_text, parse_mode="HTML")
             except Exception:
-                await message.reply(decision.reply_text)
+                await message.reply(reply_text)
 
             user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
-            user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
+            user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
         if decision.should_notify_admin and decision.admin_alert_type == "tech_issue":
             await admin_manager.notify_technical_issue(
@@ -296,12 +306,13 @@ async def _process_image_content(
         if device_facts and device_facts.extraction_error:
             logger.warning(f"Tasvir sensori xatoligi: {device_facts.extraction_error}")
             if caption or message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                err_msg = adapt_to_user_script(
+                    "⚠️ <b>Tasvirni yuklashda yoki tahlil qilishda nosozlik yuz berdi.</b>\n"
+                    "Iltimos, qayta yuboring yoki korxona <b>INN</b> raqamini yozing.",
+                    user_script
+                )
                 try:
-                    await message.reply(
-                        "⚠️ <b>Tasvirni yuklashda yoki tahlil qilishda nosozlik yuz berdi.</b>\n"
-                        "Iltimos, qayta yuboring yoki korxona <b>INN</b> raqamini yozing.",
-                        parse_mode="HTML"
-                    )
+                    await message.reply(err_msg, parse_mode="HTML")
                 except Exception:
                     pass
             return
@@ -309,13 +320,13 @@ async def _process_image_content(
         # Agar shaxsiy chat bo'lsa yoki rasm bilan izoh yozilgan bo'lsa -> jim turmaslik!
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP] or caption:
             try:
-                await message.reply(
+                unrec_msg = (
                     "📸 <b>Kechirasiz, yuborilgan tasvirdan kassa apparati ekrani yoki to'lov kvitansiyasini aniqlab bo'lmadi.</b>\n\n"
                     "📌 <b>Iltimos:</b>\n"
                     "🔹 Agar bu <b>kassa apparati</b> bo'lsa, ekranidagi xatolikni (soat va tarmoq qatori bilan) yaqinroqdan rasmga olib yuboring.\n"
-                    "🔹 Agar bu <b>to'lov cheki</b> bo'lsa, to'lov kvitansiyasini aniq qilib yuboring yoki korxonangiz <b>INN (STIR)</b> raqamini yozing.",
-                    parse_mode="HTML"
+                    "🔹 Agar bu <b>to'lov cheki</b> bo'lsa, to'lov kvitansiyasini aniq qilib yuboring yoki korxonangiz <b>INN (STIR)</b> raqamini yozing."
                 )
+                await message.reply(adapt_to_user_script(unrec_msg, user_script), parse_mode="HTML")
             except Exception:
                 pass
             return

@@ -11,9 +11,9 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from payment_accounts import (
-    MARS_ACCOUNT, MARS_INN, MARS_ORG_NAME, MARS_MONTHLY_FEE, MARS_VIDEO_ID,
+    MARS_ACCOUNT, MARS_INN, MARS_ORG_NAME, MARS_MONTHLY_FEE, MARS_VIDEO_ID, MARS_POST_ID,
     YANGI_TEXNOLOGIYALAR_ACCOUNT, YANGI_TEXNOLOGIYALAR_INN, YANGI_TEXNOLOGIYALAR_ORG_NAME,
-    YANGI_TEXNOLOGIYALAR_ANNUAL_FEE, YANGI_TEXNOLOGIYALAR_VIDEO_ID,
+    YANGI_TEXNOLOGIYALAR_ANNUAL_FEE, YANGI_TEXNOLOGIYALAR_VIDEO_ID, YANGI_TEXNOLOGIYALAR_POST_ID,
     get_monthly_payment_card, get_annual_payment_card, get_all_payment_accounts_card,
     get_mxik_guidance, classify_payment_intent, is_mxik_intent, classify_receipt_target
 )
@@ -226,18 +226,16 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
 
         await handle_user_chat(msg, bot)
 
+        # Kanaldan Post 34 va Video 145 nusxalanganini tekshirish
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, "34-post kanaldan uzatilishi kerak")
+        self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, "145-video kanaldan uzatilishi kerak")
+
+        # Qo'shimcha tushuntirish yozuvi
         self.assertTrue(len(msg.replies) > 0)
-        reply = msg.replies[0]
-        self.assertIn("20210000100431200010", reply)
-        self.assertIn("«Yangi Texnologiyalar» DUK", reply)
-        self.assertIn("440 000 so'm", reply)
-        # Video 145 nusxalanganini tekshirish
-        bot.copy_message.assert_called_with(
-            chat_id=12345,
-            from_chat_id=-1001641871516,
-            message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID,
-            reply_to_message_id=101
-        )
+        note = msg.replies[0]
+        self.assertIn("Yangi Texnologiyalar", note)
+        self.assertIn("440 000 so'm", note)
 
     async def test_chat_handler_oylik_shot_query(self):
         bot = create_mock_bot()
@@ -247,17 +245,16 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
 
         await handle_user_chat(msg, bot)
 
+        # Kanaldan Post 85 va Video 148 nusxalanganini tekshirish
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(MARS_POST_ID, copied_ids, "85-post kanaldan uzatilishi kerak")
+        self.assertIn(MARS_VIDEO_ID, copied_ids, "148-video kanaldan uzatilishi kerak")
+
+        # Qo'shimcha tushuntirish yozuvi
         self.assertTrue(len(msg.replies) > 0)
-        reply = msg.replies[0]
-        self.assertIn("20208000800208044003", reply)
-        self.assertIn("«MARS ELEKTRON TEXNIKA» MCHJ", reply)
-        self.assertIn("100 000 so'm", reply)
-        bot.copy_message.assert_called_with(
-            chat_id=23456,
-            from_chat_id=-1001641871516,
-            message_id=MARS_VIDEO_ID,
-            reply_to_message_id=102
-        )
+        note = msg.replies[0]
+        self.assertIn("MARS ELEKTRON TEXNIKA", note)
+        self.assertIn("100 000 so'm", note)
 
     async def test_chat_handler_mxik_query(self):
         bot = create_mock_bot()
@@ -288,10 +285,11 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(len(msg.replies) > 0)
         reply = msg.replies[0]
-        self.assertIn("20208000800208044003", reply)
-        self.assertIn("20210000100431200010", reply)
         self.assertIn("adashtirmaslik lozim", reply)
-        bot.copy_message.assert_called_once()
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(MARS_POST_ID, copied_ids)
+        self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids)
+        self.assertIn(MARS_VIDEO_ID, copied_ids)
 
     async def test_admin_annual_notification(self):
         bot = create_mock_bot()
