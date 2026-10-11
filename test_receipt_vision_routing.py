@@ -38,26 +38,51 @@ def test_device_facts_auto_redirect_receipt():
     logger.info("✅ Kvitansiya avtomatik aniqlanib, qarz solishtirildi va soat so'ralmadi!")
 
 
-def test_real_pos_device_without_status_bar_still_asks_for_clock():
-    """Haqiqiy kassa apparati xatoligi kelganda va status bar bo'lmaganda soat so'rashi kerak"""
-    logger.info(">>> 2. Haqiqiy kassa ekrani bo'lganda status bar talab qilinishi testi...")
+def test_p3_pos_device_screen_error_diagnosed_without_status_bar():
+    """P3 model kassa apparatida status bar bo'lmaganda ham ekrandagi xatolik bo'yicha tashxis qo'yilishi testi"""
+    logger.info(">>> 2. P3 apparati: status bar yo'q, lekin ekranda xatolik bor -> Ekrandan yechish testi...")
     
-    pos_device_facts = DeviceFacts(
+    p3_device_facts = DeviceFacts(
         is_real_pos_device=True,
-        is_status_bar_visible=False,
-        screen_text_summary="Smena ochish xatosi",
+        is_status_bar_visible=False, # P3 da soat qatori yo'q
+        screen_text_summary="Smena 24 soatdan oshgan",
         detected_inn="206011507"
     )
 
     decision = core_engine.process_device_facts(
-        facts=pos_device_facts,
+        facts=p3_device_facts,
         chat_id=12345,
         user_id=67890
     )
 
+    # Ekrandagi yozuv bo'yicha hal qilinishi kerak, soat so'ralmasligi shart!
+    assert decision.action != ActionType.ASK_FULL_SCREEN, "XATOLIK: P3 apparatidagi ekranga soat yo'q deb javob berildi!"
+    assert decision.action in [ActionType.DIAGNOSE_AND_REPLY, ActionType.ESCALATE_TO_ADMIN]
+    assert "Smena" in (decision.reply_text or "") or "24 soat" in (decision.reply_text or "")
+    logger.info("✅ P3 apparatida ekrandagi yozuvdan tashxis qo'yildi va soat qatori so'ralmadi.")
+
+
+def test_pos_device_without_error_and_without_status_bar_asks_for_clock():
+    """Ekrandan muammo topilmaganda va status bar bo'lmaganda soat va tarmoq qatori so'ralishi testi"""
+    logger.info(">>> 2b. Ekrandan muammo aniqlanmaganda status bar talab qilinishi testi...")
+    
+    pos_device_facts = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=False,
+        screen_text_summary="",
+        error_type="none",
+        detected_inn=None # Ekrandan INN ham, xatolik ham aniqlanmadi
+    )
+
+    decision = core_engine.process_device_facts(
+        facts=pos_device_facts,
+        chat_id=99999,
+        user_id=88888
+    )
+
     assert decision.action == ActionType.ASK_FULL_SCREEN
     assert decision.reply_text == INCOMPLETE_SCREEN_REPLY
-    logger.info("✅ Kassa apparatining o'zi bo'lganda soat va status bar so'ralishi to'g'ri saqlandi.")
+    logger.info("✅ Ekrandan muammo topilmaganda soat va status bar so'ralishi to'g'ri ishladi.")
 
 
 def test_analyze_media_image_receipt_mock():
@@ -92,6 +117,7 @@ def test_analyze_media_image_receipt_mock():
 
 if __name__ == "__main__":
     test_device_facts_auto_redirect_receipt()
-    test_real_pos_device_without_status_bar_still_asks_for_clock()
+    test_p3_pos_device_screen_error_diagnosed_without_status_bar()
+    test_pos_device_without_error_and_without_status_bar_asks_for_clock()
     test_analyze_media_image_receipt_mock()
     print("\n🎉 BARCHA ROUTING VA KVITANSIYA TESTLARI MUVAFFAQIYATLI O'TDI!")

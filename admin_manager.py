@@ -242,18 +242,39 @@ class AdminManager:
         is_photo: bool = True
     ):
         """Yangi to'lov kvitansiyasi bo'yicha @Yashnarbek_butaev va adminlarga to'liq hisobot yuborish"""
+        from core.models import extract_clean_inn
+
         user_name = user.full_name if user else "Noma'lum"
         user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
         user_id = user.id if user else 0
 
-        org_name = debt_status_info.get("org_name") or receipt_facts.payer_name or "Aniqlanmadi"
-        inn = debt_status_info.get("inn") or receipt_facts.payer_inn or "Aniqlanmadi"
-        paid_amount = receipt_facts.amount
+        org_name = debt_status_info.get("org_name") or getattr(receipt_facts, "payer_name", "") or "Aniqlanmadi"
+        
+        raw_inn = debt_status_info.get("inn") or getattr(receipt_facts, "payer_inn", None)
+        clean_inn = extract_clean_inn(str(raw_inn)) if raw_inn else None
+        is_inn_missing = bool(debt_status_info.get("inn_missing") or not clean_inn)
+
+        paid_amount = getattr(receipt_facts, "amount", 0.0)
         prev_debt = debt_status_info.get("prev_debt", 0.0)
         remaining_debt = debt_status_info.get("remaining_debt", 0.0)
         debt_covered = debt_status_info.get("debt_covered", False)
+        is_annual = debt_status_info.get("is_annual", False)
 
-        if debt_status_info.get("is_annual"):
+        # Telegram mobilda oson nusxa olish uchun pastda alohida INN bloki
+        if clean_inn:
+            inn_line = f"<code>{clean_inn}</code>"
+            bottom_inn_block = (
+                f"📋 <b>INN (nusxa olish uchun):</b>\n"
+                f"<code>{clean_inn}</code>"
+            )
+        else:
+            inn_line = "❌ Topilmadi (Chekda yo'q yoki 000)"
+            bottom_inn_block = (
+                f"⚠️ <b>DIQQAT: Kvitansiyadan INN topilmadi!</b>\n"
+                f"<i>(Chekda INN ko'rsatilmagan yoki '000' bo'sh qoldirilgan. Mijozdan INN so'ralmoqda)</i>"
+            )
+
+        if is_annual:
             status_emoji = "🏛"
             status_text = "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
             text = (
@@ -262,18 +283,22 @@ class AdminManager:
                 f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
                 f"────────────────────\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN / JSHSHIR:</b> <code>{inn or '-'}</code>\n"
+                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
-                f"💳 <b>To'lov tizimi:</b> {receipt_facts.payment_system or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{receipt_facts.transaction_id or '-'}</code>\n"
-                f"📅 <b>To'lov vaqti:</b> {receipt_facts.payment_date or '-'}\n"
+                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
+                f"📅 <b>To'lov vaqti:</b> {getattr(receipt_facts, 'payment_date', '') or '-'}\n"
                 f"────────────────────\n"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
-                f"⏳ <i>Eslatma: Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) to'lovni 2-24 soat ichida faollashtiradi.</i>"
+                f"⏳ <i>Eslatma: Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) to'lovni 2-24 soat ichida faollashtiradi.</i>\n\n"
+                f"{bottom_inn_block}"
             )
         else:
-            if debt_covered:
+            if is_inn_missing:
+                status_emoji = "⚠️"
+                status_text = "<b>KVITANSIYADA INN TOPILMADI (Mijozdan INN so'ralmoqda)</b>"
+            elif debt_covered:
                 status_emoji = "✅"
                 status_text = "<b>QARZ TO'LIQ YOPILDI (Apparatni yoqish mumkin!)</b>"
             elif prev_debt > 0 and paid_amount < prev_debt:
@@ -290,16 +315,17 @@ class AdminManager:
                 f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
                 f"────────────────────\n"
                 f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN / JSHSHIR:</b> <code>{inn}</code>\n"
+                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🏦 <b>Qabul qiluvchi:</b> {receipt_facts.recipient_account or '«Mars Elektron Texnika»'}\n"
-                f"💳 <b>To'lov tizimi:</b> {receipt_facts.payment_system or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{receipt_facts.transaction_id or '-'}</code>\n"
-                f"📅 <b>To'lov vaqti:</b> {receipt_facts.payment_date or '-'}\n"
+                f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
+                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
+                f"📅 <b>To'lov vaqti:</b> {getattr(receipt_facts, 'payment_date', '') or '-'}\n"
                 f"────────────────────\n"
                 f"📊 <b>Qarz tahlili:</b>\n"
                 f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
                 f"▫️ Holat: {status_emoji} {status_text}\n\n"
+                f"{bottom_inn_block}\n\n"
                 f"⚡️ <i>Mas'ul admin (@Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
             )
 

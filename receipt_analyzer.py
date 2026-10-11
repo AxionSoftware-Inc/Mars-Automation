@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import pypdf
 
 from openrouter_client import openrouter_client
-from core.models import ReceiptFacts
+from core.models import ReceiptFacts, extract_clean_inn
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -33,11 +33,7 @@ def extract_receipt_facts(
     Rasm yoki PDF formatdagi to'lov cheki/kvitansiyasidan sof faktlarni ajratib oladi.
     Hech qanday qaror chiqarmaydi, faqat ReceiptFacts modelini to'ldiradi.
     """
-    caption_inn = None
-    if user_caption:
-        inn_matches = re.findall(r"\b(\d{14}|\d{9})\b", user_caption)
-        if inn_matches:
-            caption_inn = inn_matches[0]
+    caption_inn = extract_clean_inn(user_caption) if user_caption else None
 
     is_pdf = filename.lower().endswith(".pdf") or "pdf" in mime_type.lower()
     pdf_text = ""
@@ -146,13 +142,15 @@ Foydalanuvchi izohi: "{user_caption}"
             facts = json.loads(match.group(0)) if match else {}
 
         # Fallback tekshiruvlar: Matndan INN va Mars qabul qiluvchisini aniqlash
-        payer_inn = facts.get("payer_inn") or caption_inn
+        raw_payer_inn = str(facts.get("payer_inn") or "")
+        payer_inn = extract_clean_inn(raw_payer_inn) or caption_inn
         if not payer_inn and pdf_text:
             text_inns = re.findall(r"\b(\d{14}|\d{9})\b", pdf_text)
-            # Mars INN (302568138) bo'lmagan birinchi INN ni to'lovchi deb olamiz
+            # Mars INN (302568138) bo'lmagan birinchi haqiqiy INN ni to'lovchi deb olamiz
             for candidate in text_inns:
-                if candidate != MARS_INN:
-                    payer_inn = candidate
+                clean_cand = extract_clean_inn(candidate)
+                if clean_cand and clean_cand != MARS_INN:
+                    payer_inn = clean_cand
                     break
 
         recipient_account = str(facts.get("recipient_account", "")).strip()

@@ -7,41 +7,58 @@ def extract_clean_inn(text: str) -> Optional[str]:
     """
     Matndan 9 xonali INN (STIR) yoki 14 xonali JSHSHIR raqamini har qanday formatda
     (toza, bo'shliqlar bilan, nuqta, tire, prefikslar bilan) aniq va xatosiz ajratib olish.
+    Agar kiritilgan matnda INN bo'lmasa, yoki '000', '000000000', 'null', 'none' kabi
+    bo'sh / dummy qiymat bo'lsa -> None qaytaradi.
     """
     if not text:
         return None
     t = text.strip()
+    if t.lower() in ["null", "none", "yo'q", "yoq", "topilmadi", "-", "noma'lum", "unknown", "0", "00", "000"]:
+        return None
+
+    def is_valid_inn_digits(d: str) -> bool:
+        if not d:
+            return False
+        # Agar barcha raqamlar 0 bo'lsa (masalan "000", "000000000") -> yaroqsiz
+        if set(d) == {'0'}:
+            return False
+        return len(d) in [9, 14]
+
     prefix_pattern = r"(?:inn|stir|стир|инн|jshshir|жшшир|пинфл|pinfl)[:\s#№]*([0-9\s\.\-]{8,22})"
     prefix_match = re.search(prefix_pattern, t, re.IGNORECASE)
     if prefix_match:
         digits = re.sub(r"\D", "", prefix_match.group(1))
-        if len(digits) in [9, 14]:
+        if is_valid_inn_digits(digits):
             return digits
         elif len(digits) > 9 and len(digits) < 14:
-            return digits[:9]
+            cand = digits[:9]
+            if is_valid_inn_digits(cand):
+                return cand
 
     m14 = re.findall(r"\b(\d{14})\b", t)
-    if m14:
-        return m14[0]
+    for c in m14:
+        if is_valid_inn_digits(c):
+            return c
 
     m9 = re.findall(r"\b(\d{9})\b", t)
-    if m9:
-        return m9[0]
+    for c in m9:
+        if is_valid_inn_digits(c):
+            return c
 
     spaced_9 = re.search(r"\b(\d{3}[\s\.\-]\d{3}[\s\.\-]\d{3})\b", t)
     if spaced_9:
         digits = re.sub(r"\D", "", spaced_9.group(1))
-        if len(digits) == 9:
+        if is_valid_inn_digits(digits):
             return digits
 
     spaced_14 = re.search(r"\b(\d{1,3}[\s\.\-]\d{2,6}[\s\.\-]\d{2,6}[\s\.\-]?\d{1,6})\b", t)
     if spaced_14:
         digits = re.sub(r"\D", "", spaced_14.group(1))
-        if len(digits) == 14:
+        if is_valid_inn_digits(digits):
             return digits
 
     pure_digits = re.sub(r"\D", "", t)
-    if len(pure_digits) in [9, 14] and len(t) <= 20:
+    if is_valid_inn_digits(pure_digits) and len(t) <= 20:
         return pure_digits
 
     return None

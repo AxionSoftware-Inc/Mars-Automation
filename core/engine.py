@@ -96,17 +96,7 @@ class CoreEngine:
                 user_comment=user_comment
             )
 
-        # 2-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
-        if not facts.is_status_bar_visible:
-            logger.info("Pre-condition: Status bar ko'rinmayapti. To'liq ekran talab qilinadi.")
-            return DecisionResult(
-                action=ActionType.ASK_FULL_SCREEN,
-                reply_text=INCOMPLETE_SCREEN_REPLY,
-                detected_inn=facts.detected_inn,
-                log_reason="Status bar invisible"
-            )
-
-        # 3-BOSQICH: EKRAN TASHXISI (ERROR MANAGER QOIDALARI)
+        # 2-BOSQICH: EKRAN TASHXISI (P3 va barcha modellarda avval ekrandagi yozuv va xatolikni tekshirish)
         diag_text: Optional[str] = None
         diag_video_id: Optional[int] = None
         has_error: bool = False
@@ -116,7 +106,7 @@ class CoreEngine:
             has_error = True
             diag_text = matched_rule.get("response_text", "")
             diag_video_id = matched_rule.get("video_id")
-        elif facts.screen_text_summary and facts.screen_text_summary.lower() not in ["none", "normal", ""]:
+        elif facts.screen_text_summary and facts.screen_text_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]:
             has_error = True
             diag_text = (
                 f"ℹ️ <b>Ekrandagi holat:</b> {facts.screen_text_summary}\n"
@@ -126,7 +116,7 @@ class CoreEngine:
         if facts.time_mismatch or facts.error_type != "none":
             has_error = True
 
-        # 4-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN VA QARZ)
+        # 3-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN VA QARZ)
         debt_text: Optional[str] = None
         total_debt: float = 0.0
         org_name: str = ""
@@ -145,6 +135,19 @@ class CoreEngine:
                 # Xotiraga korxona va qarzni yozish
                 user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
                 user_memory.set_last_topic(chat_id, user_id, "screen_diagnostics_with_inn")
+
+        # 4-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
+        # P3 kabi modellarda tepada soat qatori bo'lmaydi.
+        # Avval ekrandagi yozuvni o'qib yechishga harakat qilinadi.
+        # Faqatgina ekranda va qarzda hech qanday muammo aniqlanmasa va status bar ko'rinmasa -> to'liq ekran so'raladi!
+        if not has_error and total_debt <= 0 and not facts.is_status_bar_visible:
+            logger.info("Pre-condition: Ekrandan muammo aniqlanmadi va status bar ko'rinmayapti. To'liq ekran talab qilinadi.")
+            return DecisionResult(
+                action=ActionType.ASK_FULL_SCREEN,
+                reply_text=INCOMPLETE_SCREEN_REPLY,
+                detected_inn=facts.detected_inn,
+                log_reason="No error diagnosed from screen and status bar invisible"
+            )
 
         # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR, YOKI JIDDIY APPARAT XATOSI)
         is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
@@ -313,14 +316,18 @@ class CoreEngine:
 
         # 3. To'lovchi korxona INN/JSHSHIR raqamini aniqlash
         from core.models import extract_clean_inn
-        inn = facts.payer_inn
+        inn = extract_clean_inn(facts.payer_inn) if facts.payer_inn else None
         if not inn and user_comment:
             inn = extract_clean_inn(user_comment)
 
         if not inn:
-            inn = user_memory.get_last_id(chat_id, user_id)
+            raw_last_id = user_memory.get_last_id(chat_id, user_id)
+            if raw_last_id:
+                inn = extract_clean_inn(raw_last_id)
 
-        # Agar INN umuman aniqlanmasa -> Kvitansiyani xotirada saqlab, foydalanuvchidan INN so'rash
+        # Agar INN umuman aniqlanmasa (chekda yo'q yoki '000' bo'sh qoldirilgan) ->
+        # Kvitansiyani xotirada saqlab, foydalanuvchidan INN so'rash VA
+        # adminga darhol "Kvitansiyada INN topilmadi" deb xabarnoma uzatish!
         if not inn:
             receipt_dict = {
                 "recipient_account": facts.recipient_account,
@@ -350,7 +357,18 @@ class CoreEngine:
                 receipt_facts=facts,
                 file_id=file_id,
                 is_photo=is_photo,
-                log_reason="Receipt accepted, waiting for user INN"
+                should_notify_admin=True,
+                admin_alert_type="receipt_missing_inn",
+                debt_status_info={
+                    "org_name": facts.payer_name or "Noma'lum korxona",
+                    "inn": None,
+                    "inn_missing": True,
+                    "paid_amount": facts.amount,
+                    "prev_debt": 0.0,
+                    "remaining_debt": 0.0,
+                    "debt_covered": False
+                },
+                log_reason="Receipt accepted, waiting for user INN -> Admin notified with missing INN status"
             )
 
         # 4. INN aniq bo'lsa -> Excel bazadan tekshirish va qarzni solishtirish
@@ -440,6 +458,7 @@ class CoreEngine:
         debt_status_info = {
             "org_name": org_name,
             "inn": inn,
+            "inn_missing": False,
             "prev_debt": prev_debt,
             "remaining_debt": remaining_debt,
             "debt_covered": debt_covered
