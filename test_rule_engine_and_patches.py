@@ -19,6 +19,15 @@ from core.models import ActionType, DecisionResult
 from core.engine import core_engine
 from core.rule_engine import rule_engine, BaseRule, FunctionalRule, RuleContext
 
+# Testlar haqiqiy data/custom_patches.json ga TEGMASLIGI uchun vaqtinchalik fayl ishlatiladi
+# (aks holda test yarim yo'lda yiqilsa, test patchlari serverga deploy bo'lib ketishi mumkin edi).
+import tempfile
+_TMP_PATCHES = os.path.join(tempfile.mkdtemp(prefix="mars_patches_"), "custom_patches.json")
+with open(_TMP_PATCHES, "w", encoding="utf-8") as _f:
+    _f.write("[]")
+rule_engine.patches_path = _TMP_PATCHES
+rule_engine.reload_patches()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("test_rule_engine")
 
