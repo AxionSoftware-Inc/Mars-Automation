@@ -39,7 +39,11 @@ OPERATOR_KEYWORDS = [
     "bog'lanish", "boglanish", "telefon raqam", "aloqaga chiq", "operatorga ula",
     "yordam bering usta", "hal bo'lmadi", "hal bolmadi", "tushunmadim usta",
     "operator bilan gaplashmoqchiman", "menga usta kerak", "bog'laning", "boglaning",
-    "operator chaqir", "оператор", "админ", "мастер", "помогите"
+    "operator chaqir", "оператор", "админ", "мастер", "помогите",
+    "ishlamadi", "ishlamayapti baribir", "baribir ishlamadi", "ochmadi",
+    "o'xshamadi", "oxshamadi", "yoqilmadi", "reboot qildim ishlamadi",
+    "ochirib yoqdim ishlamadi", "usta yuboring", "usta jonating", "usta jo'nating",
+    "admin bilan gaplashaman", "admin bilan gaplashmoqchiman", "ustaxonaga", "qilolmadim"
 ]
 
 CONVERSATIONAL_FOLLOWUPS = [
@@ -78,6 +82,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     from core.models import extract_clean_inn, extract_fiscal_module
     found_fm = extract_fiscal_module(text)
     if found_fm:
+        user_memory.set_last_fm(chat_id, user_id, found_fm)
         from ofd_bridge import ofd_bridge
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
         if ofd_reply:
@@ -92,6 +97,22 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 await message.reply(full_ofd_text)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
+            return
+        else:
+            fm_fallback = (
+                f"🏛 <b>Fiskal modul:</b> <code>{found_fm}</code> qabul qilindi.\n\n"
+                f"📌 <b>Apparatni ishga tushirish uchun tekshiring:</b>\n"
+                f"1️⃣ Agar Yillik Soliq (OFD - 440,000 so'm) to'lovi to'langan bo'lsa, apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanligini tekshiring;\n"
+                f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
+                f"🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, mutaxassisga bog'laymiz.</i>"
+            )
+            fm_fallback = adapt_to_user_script(fm_fallback, user_script)
+            try:
+                await message.reply(fm_fallback, parse_mode="HTML")
+            except Exception:
+                await message.reply(fm_fallback)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, fm_fallback)
             return
 
     # 0.1 AGAR MATNDA INN BO'LSA VA APPARAT/QARZ SO'RALSA -> OYLIK QARZ TEKSHIRUVI
@@ -178,15 +199,25 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 user_memory.add_assistant_message(chat_id, user_id, debt_resp)
                 return
             else:
-                # 2, 3 va 4-BOSQICHLAR: QARZ YO'Q -> TEXNIK / REBOOT / USTA
-                tuman_str = f" ({tuman})" if tuman else ""
-                clear_msg = (
-                    "✅ <b>Korxonangizda abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
-                    "Nosozlik sababini aniqlash uchun:\n"
-                    "🔹 Apparat ekranidagi yozuvni <b>rasmga olib</b> yuboring;\n"
-                    "🔹 Yoki apparatni o'chirib qayta yoqing (Reboot).\n\n"
-                    f"👨‍💻 <i>Yordam kerak bo'lsa, «Usta kerak» deb yozing{tuman_str}.</i>"
-                )
+                # 2-BOSQICH: MARS QARZI YO'Q -> FISKAL MODULNI TEKSHIRISH
+                org_name = results[0].get("name", "") if results else ""
+                remembered_fm = user_memory.get_last_fm(chat_id, user_id)
+                if not remembered_fm:
+                    clear_msg = (
+                        f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
+                        f"✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
+                        f"🏛 Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+                    )
+                else:
+                    # 3-BOSQICH: OYLIK VA YILLIK QARZI BO'LMASA -> INTERNET, SOAT VA REBOOT
+                    clear_msg = (
+                        f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
+                        f"✅ Oylik va yillik to'lovlardan qarzdorlik yo'q.\n\n"
+                        f"📌 <b>Apparatni ishga tushirish uchun tekshiring:</b>\n"
+                        f"1️⃣ Apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanligini tekshiring;\n"
+                        f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
+                        f"🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, hududingiz bo'yicha mutaxassisga bog'laymiz.</i>"
+                    )
                 clear_msg = adapt_to_user_script(clear_msg, user_script)
                 try:
                     await message.reply(clear_msg, parse_mode="HTML")
@@ -196,12 +227,8 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 user_memory.add_assistant_message(chat_id, user_id, clear_msg)
                 return
         else:
-            # INN hali kiritilmagan: qisqa va lo'nda yo'naltirish
-            guide_msg = (
-                "🔍 <b>Kassangiz holatini tekshirish uchun:</b>\n\n"
-                "1️⃣ Korxonangiz <b>INN (9 xonali)</b> raqamini yuboring (oylik abonent to'lovini tekshiramiz);\n"
-                "2️⃣ Yoki apparat ekranidagi xatolikni <b>rasmga olib</b> yuboring (sababini aniqlaymiz)."
-            )
+            # INN hali kiritilmagan: qisqa va lo'nda INN so'rash
+            guide_msg = "🔍 <b>Kassa apparatingiz holatini tekshirishimiz uchun korxonangiz СТИР (INN) raqamini yuboring.</b>"
             guide_msg = adapt_to_user_script(guide_msg, user_script)
             try:
                 await message.reply(guide_msg, parse_mode="HTML")
@@ -384,6 +411,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_msg)
 
+        saved_photo = user_memory.get_last_photo(chat_id, user_id)
         await admin_manager.notify_user_query_escalation(
             bot=bot,
             user=message.from_user,
@@ -391,7 +419,8 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             query_text=text,
             reason="Mijoz operator / usta talab qilmoqda",
             inn=decision.detected_inn if decision.detected_inn != "-" else None,
-            org_name=decision.org_name if decision.org_name != "-" else None
+            org_name=decision.org_name if decision.org_name != "-" else None,
+            photo_file_id=saved_photo
         )
         return
 
@@ -406,10 +435,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         reply_text, ai_video_id, needs_admin = generate_ai_reply_ex(text, context_history=context_summary, target_script=user_script)
 
         if not reply_text or not reply_text.strip():
-            fallback = (
-                "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
-                "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
-            )
+            fallback = "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz СТИР (INN) raqamini yuboring."
             reply_text = adapt_to_user_script(fallback, user_script)
 
         logger.info(f"📤 AI JAVOBI (Kontekst) [chat_id={chat_id}]: {reply_text[:120]}")
@@ -428,13 +454,15 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         if needs_admin:
             from admin_manager import admin_manager
             last_id = user_memory.get_last_id(chat_id, user_id)
+            saved_photo = user_memory.get_last_photo(chat_id, user_id)
             await admin_manager.notify_user_query_escalation(
                 bot=bot,
                 user=message.from_user,
                 chat_id=chat_id,
                 query_text=text,
                 reason="Mijoz noma'lum savol berdi (AI bilmadi va adminga yo'naltirdi)",
-                inn=last_id
+                inn=last_id,
+                photo_file_id=saved_photo
             )
 
         if ai_video_id:
@@ -471,10 +499,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     reply_text, ai_video_id, needs_admin = generate_ai_reply_ex(text, context_history=context_summary, target_script=user_script)
 
     if not reply_text or not reply_text.strip():
-        fallback = (
-            "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz INN raqamini yuboring "
-            "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
-        )
+        fallback = "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz СТИР (INN) raqamini yuboring."
         reply_text = adapt_to_user_script(fallback, user_script)
 
     logger.info(f"📤 AI JAVOBI (Umumiy) [chat_id={chat_id}]: {reply_text[:120]}")
@@ -494,13 +519,15 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     if needs_admin:
         from admin_manager import admin_manager
         last_id = user_memory.get_last_id(chat_id, user_id)
+        saved_photo = user_memory.get_last_photo(chat_id, user_id)
         await admin_manager.notify_user_query_escalation(
             bot=bot,
             user=message.from_user,
             chat_id=chat_id,
             query_text=text,
             reason="Mijoz noma'lum savol berdi (AI bilmadi va adminga yo'naltirdi)",
-            inn=last_id
+            inn=last_id,
+            photo_file_id=saved_photo
         )
 
     # Agar AI tegishli video tavsiya qilgan bo'lsa

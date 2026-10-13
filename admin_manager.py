@@ -413,12 +413,13 @@ class AdminManager:
         query_text: str,
         reason: str = "Foydalanuvchi adminga/texnikka murojaat qildi",
         inn: Optional[str] = None,
-        org_name: Optional[str] = None
+        org_name: Optional[str] = None,
+        photo_file_id: Optional[str] = None
     ):
         """
         Foydalanuvchi adminga murojaat qilganda, tushunarsiz narsa so'raganda yoki
         yordam talab qilganda ikkala texnikka (@quvonchbek_admin va @Yashnarbek_butaev)
-        zudlik bilan xabarnoma yuborish.
+        zudlik bilan xabarnoma yuborish (agar apparat rasmi bo'lsa rasmi bilan birga!).
         """
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
@@ -446,6 +447,6 @@ class AdminManager:
             f"⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): "
             f"Foydalanuvchi siz bilan bog'lanishni kutmoqda yoki yordam talab qilinmoqda.</i>"
         )
-        await self.notify_admins(bot, text=text)
+        await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)
 
 admin_manager = AdminManager()

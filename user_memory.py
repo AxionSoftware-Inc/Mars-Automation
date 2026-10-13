@@ -231,6 +231,24 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         session["pending_device_screen"] = None
 
+    def set_last_fm(self, chat_id: int, user_id: int, fm_code: str):
+        """Foydalanuvchining oxirgi kiritgan Fiskal modul raqamini saqlash"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["last_fm"] = str(fm_code).strip().upper()
+
+    def get_last_fm(self, chat_id: int, user_id: int) -> Optional[str]:
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("last_fm")
+
+    def set_last_photo(self, chat_id: int, user_id: int, file_id: str):
+        """Oxirgi yuborilgan kassa rasmi file_id sini saqlash"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["last_photo"] = file_id
+
+    def get_last_photo(self, chat_id: int, user_id: int) -> Optional[str]:
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("last_photo")
+
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""
         key = self._get_key(chat_id, user_id)

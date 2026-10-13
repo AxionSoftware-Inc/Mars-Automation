@@ -88,9 +88,17 @@ def format_debt_response(results: list) -> str:
         )
     elif total_debt < 0:
         text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
-        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>"
+        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
+        text += (
+            "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+        )
     else:
-        text += "✅ <b>Abonent to'lovidan qarzdorlik mavjud emas (0 so'm).</b>"
+        text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
+        text += (
+            "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+        )
 
     return text
 
@@ -212,21 +220,6 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         except Exception as e:
             logger.error(f"To'lov videosini yuborishda xatolik: {e}")
 
-    # Agar oylik qarzi bo'lmasa, yillik fiskal modul muddatini tekshirish uchun chekdagi raqamni (LG/YG) yuborishni eslatish
-    from ofd_bridge import ofd_bridge
-    if total_debt <= 0 and ofd_bridge.is_configured():
-        fm_hint = (
-            "💡 <b>Yillik fiskal modul muddatini tekshirish:</b>\n"
-            "Oylik to'lov bo'yicha qarzdorlik mavjud emas! Agar apparatingizda Soliq (OFD) yoki Yillik litsenziya muddatini tekshirmoqchi bo'lsangiz, "
-            "<b>aynan o'sha muammoli apparatdan chiqarilgan chekning</b> pastki qismidagi <b>Fiskal modul raqamini</b> (masalan: <code>LG...</code> yoki <code>YG...</code>) yuboring.\n\n"
-            "⚠️ <i>Eslatma: Har bir apparatda bitta alohida fiskal modul bo'ladi, boshqa apparat chekidan raqam olib yubormang.</i>"
-        )
-        fm_hint = adapt_to_user_script(fm_hint, user_script)
-        try:
-            await message.reply(fm_hint, parse_mode="HTML")
-            user_memory.add_assistant_message(chat_id, user_id, fm_hint)
-        except Exception as e_hint:
-            logger.error(f"Fiskal modul maslahatini yuborishda xatolik: {e_hint}")
 
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI
 DEBT_INQUIRY_KEYWORDS = [

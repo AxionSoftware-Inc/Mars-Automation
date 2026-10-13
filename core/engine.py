@@ -108,13 +108,11 @@ class CoreEngine:
                 user_comment=user_comment
             )
 
-        # 2-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN, QARZ VA APPARAT TURI: P3 vs SmartPOS)
-        # Excelda P3 apparatlar sariq qator (is_p3=True), asosiy SmartPOS apparatlar esa oq qator (is_p3=False).
-        from core.models import extract_clean_inn
-        debt_text: Optional[str] = None
-        total_debt: float = 0.0
-        org_name: str = ""
-        is_p3_device: bool = bool((facts.raw_facts or {}).get("is_p3_device", False))
+        # 2-BOSQICH: BIZNES KETMA-KETLIGI (INN -> FISKAL MODUL -> INTERNET/SOAT -> USTA)
+        # QAT'IY QOIDA: Smart One apparatlari ekranidagi xatolikka qarab AI o'zidan taxminiy xulosa chiqarmasin!
+        # Faqat P3 Humo apparatida ekranda aniq yozuv bo'ladi.
+        from core.models import extract_clean_inn, extract_fiscal_module
+        from handlers.debt import format_debt_response
 
         target_inn = (
             facts.detected_inn
@@ -122,184 +120,156 @@ class CoreEngine:
             or user_memory.get_last_id(chat_id, user_id)
         )
 
-        if target_inn:
-            from handlers.debt import format_debt_response
-            results = excel_manager.search(target_inn)
-            if results:
-                org_name = results[0].get("name", "")
-                total_debt = sum(item.get("debt", 0.0) for item in results)
-                is_p3_device = any(bool(item.get("is_p3", False)) for item in results)
-                debt_text = format_debt_response(results)
+        target_fm = (
+            extract_fiscal_module(user_comment)
+            or user_memory.get_last_fm(chat_id, user_id)
+        )
 
-                # Xotiraga korxona va qarzni yozish
-                user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
-                user_memory.set_last_topic(chat_id, user_id, "screen_diagnostics_with_inn")
+        is_p3_device: bool = bool((facts.raw_facts or {}).get("is_p3_device", False))
 
-        # 3-BOSQICH: EKRAN TASHXISI (SmartPOS va P3 qat'iy ajratilgan holda)
-        # - SmartPOS (asosiy apparat, oq qator): Ekranda muammoga aloqasiz gaplar chiqishi mumkin,
-        #   shuning uchun faqat aniq xatolik qoidalari/kodlari (screen_errors.json), soat va internet tekshiriladi.
-        #   SmartPOS ekranidagi erkin yozuv HECH QACHON shunchaki o'qib berilmaydi!
-        # - P3 apparat (sariq qator): Tepasida soat bo'lmaydi, muammo sababi ekranda aniq yozilgan bo'ladi;
-        #   faqat P3 apparatlarida ekranda yozilgan xabar qisqa ta'riflab beriladi.
-        diag_text: Optional[str] = None
-        diag_video_id: Optional[int] = None
-        has_error: bool = False
-
-        match_payload = dict(facts.raw_facts or {})
-        if facts.screen_text_summary and not match_payload.get("screen_text_summary"):
-            match_payload["screen_text_summary"] = facts.screen_text_summary
-        if facts.error_type and not match_payload.get("error_type"):
-            match_payload["error_type"] = facts.error_type
-        if is_p3_device and not facts.is_status_bar_visible:
-            # P3 apparatda tepada status bar bo'lmagani uchun soat/internet bayroqlari o'chiriladi
-            match_payload["has_internet"] = True
-            match_payload["time_mismatch"] = False
-        else:
-            match_payload["has_internet"] = facts.has_internet
-            match_payload["time_mismatch"] = facts.time_mismatch
-
-        matched_rule = error_manager.match_error(match_payload)
-        clean_summary = (facts.screen_text_summary or "").strip()
-        is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
-
+        # A) P3 HUMO APPARATI (Sariq qator):
+        # P3 apparat ekranida aniq gap chiqadi ("p3 bo'lsa mayli uni ekranida aniq yozuv chiqadi")
         if is_p3_device:
-            # P3 HUMO APPARATI (Sariq qator): Ekranda yozilgan aniq gapni qisqa ta'riflab berish
+            match_payload = dict(facts.raw_facts or {})
+            if facts.screen_text_summary:
+                match_payload["screen_text_summary"] = facts.screen_text_summary
+            matched_rule = error_manager.match_error(match_payload)
+            clean_summary = (facts.screen_text_summary or "").strip()
+            is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
+
+            p3_diag_text = ""
+            p3_video_id = None
             if matched_rule:
-                has_error = True
-                rule_resp = matched_rule.get("response_text", "")
-                diag_video_id = matched_rule.get("video_id")
-                if is_meaningful_summary and clean_summary.lower() not in rule_resp.lower():
-                    diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}\n\n{rule_resp}"
+                rule_text = matched_rule.get("response_text", "")
+                if is_meaningful_summary:
+                    p3_diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}\n\n{rule_text}"
                 else:
-                    diag_text = rule_resp
+                    p3_diag_text = rule_text
+                p3_video_id = matched_rule.get("video_id")
             elif is_meaningful_summary:
-                has_error = True
-                diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}"
-        else:
-            # SMART ONE APPARATI (Oq qator / Asosiy apparat):
-            # Faqat aniq qoida va kodlar bo'yicha tashxis qo'yiladi, ekrandagi aloqasiz yozuvlar o'qib berilmaydi!
-            if matched_rule:
-                has_error = True
-                diag_text = matched_rule.get("response_text", "")
-                diag_video_id = matched_rule.get("video_id")
-            if facts.time_mismatch or facts.error_type != "none":
-                has_error = True
+                p3_diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}"
 
-        if target_inn:
-            user_memory.clear_pending_device_screen(chat_id, user_id)
-        elif is_meaningful_summary:
-            user_memory.set_pending_device_screen(chat_id, user_id, {
-                "screen_text_summary": clean_summary,
-                "is_status_bar_visible": facts.is_status_bar_visible,
-                "time_mismatch": facts.time_mismatch,
-                "has_internet": facts.has_internet,
-                "error_type": facts.error_type
-            })
+            # Agar INN bo'lsa, oylik qarzni ham ko'ramiz
+            if target_inn:
+                results = excel_manager.search(target_inn)
+                if results:
+                    org_name = results[0].get("name", "")
+                    total_debt = sum(item.get("debt", 0.0) for item in results)
+                    user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
+                    if total_debt > 0:
+                        debt_reply = format_debt_response(results)
+                        return DecisionResult(
+                            action=ActionType.DIAGNOSE_AND_REPLY,
+                            reply_text=f"{p3_diag_text}\n\n──────────────\n{debt_reply}" if p3_diag_text else debt_reply,
+                            video_id=148,
+                            detected_inn=target_inn,
+                            debt_amount=total_debt,
+                            org_name=org_name,
+                            log_reason="P3 Humo with monthly debt"
+                        )
 
-        # 4-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
-        # SmartPOS apparatda ekrandan aniq xatolik qoidasi topilmasa va tepada soat qatori ko'rinmasa -> to'liq ekran so'raladi!
-        # P3 apparatda esa tepada soat bo'lmaydi.
-        if not is_p3_device and not has_error and total_debt <= 0 and not facts.is_status_bar_visible:
-            logger.info("Pre-condition: SmartPOS ekranidan aniq xatolik kodi topilmadi va status bar ko'rinmayapti. To'liq ekran talab qilinadi.")
+            return DecisionResult(
+                action=ActionType.DIAGNOSE_AND_REPLY,
+                reply_text=p3_diag_text or "🖥 <b>P3 Humo apparat holati qabul qilindi.</b>",
+                video_id=p3_video_id,
+                detected_inn=target_inn,
+                log_reason="P3 Humo screen handled"
+            )
+
+        # B) SMART ONE (VA BOSHQA BARCHA APPARATLAR):
+        # QAT'IY QOIDA: AI Smart One apparati ekranidagi yozuvga qarab HECH QANDAY taxminiy xulosa chiqarmaydi!
+        # Ekran rasmi xotirada saqlanadi (agar keyin adminga kerak bo'lsa uzatiladi).
+        # Standart ketma-ketlik:
+        # 1-QADAM: INN tekshiruvi (Oylik Mars to'lovi)
+        # 2-QADAM: Fiskal modul tekshiruvi (Yillik Soliq to'lovi)
+        # 3-QADAM: Internet, Soat va Reboot
+        # 4-QADAM: Adminga / ustaga yo'naltirish
+
+        # 1-QADAM: INN SO'RASH VA TEKSHIRISH
+        if not target_inn:
             return DecisionResult(
                 action=ActionType.ASK_FULL_SCREEN,
-                reply_text=INCOMPLETE_SCREEN_REPLY,
-                detected_inn=facts.detected_inn,
-                log_reason="No error rule matched on SmartPOS screen and status bar invisible"
+                reply_text="🔍 <b>Kassa apparatingiz holatini tekshirishimiz uchun korxonangiz СТИР (INN) raqamini yuboring.</b>",
+                detected_inn=None,
+                log_reason="Smart One Step 1: Asking for INN first"
             )
 
-        # 5-BOSQICH (LAYER 4): ADMINGA ESKALATSIYA HOLATI (HUDUDIY USTAGA YO'NALTIRISH)
-        # Internet bor + qarz yo'q + lekin apparatda jiddiy nosozlik bo'lsa
-        is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
-        debt_verified_clear = bool(target_inn and total_debt <= 0)
-        if matched_rule:
-            should_escalate = is_fatal_hardware
-        else:
-            should_escalate = bool(has_error and facts.has_internet and debt_verified_clear and not facts.time_mismatch)
-
-        if should_escalate:
-            issue_desc = diag_text or facts.screen_text_summary or "Apparat nosozligi"
-            tuman = excel_manager.get_district_for_inn(target_inn) if target_inn else ""
-            tuman_line = f"📍 <b>Hudud:</b> {tuman}\n" if tuman else ""
-            status_prefix = "✅ <b>Qarzdorlik yo'q va internet faol.</b>\n" if not is_fatal_hardware else ""
-            escalation_reply = (
-                f"{status_prefix}"
-                f"{tuman_line}"
-                f"{diag_text}\n\n"
-                f"👨‍💻 <b>Ushbu texnik masala ustalarimizga yetkazildi.</b> Tez orada siz bilan bog'lanishadi.\n"
-                f"📞 <b>Aloqa:</b> +998 75 522 75 00 | @quvonchbek_admin"
+        # INN ma'lum bo'lsa -> Excel bazadan tekshirish
+        if excel_manager.is_decommissioned(target_inn):
+            decom_list = excel_manager.get_decommissioned(target_inn)
+            org_name = decom_list[0].get("name", "") if decom_list else ""
+            decom_reply = (
+                f"🏢 <b>Korxona:</b> {org_name}\n"
+                f"🆔 <b>СТИР (INN):</b> <code>{target_inn}</code>\n"
+                f"ℹ️ Ushbu korxona xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan). Qarzdorlik hisoblanmaydi (0 so'm)."
             )
-
             return DecisionResult(
-                action=ActionType.ESCALATE_TO_ADMIN,
-                reply_text=escalation_reply,
-                video_id=diag_video_id,
+                action=ActionType.DEBT_INFO,
+                reply_text=decom_reply,
+                detected_inn=target_inn,
+                org_name=org_name,
+                debt_amount=0.0,
+                log_reason="Smart One: Decommissioned"
+            )
+
+        results = excel_manager.search(target_inn)
+        if not results:
+            return DecisionResult(
+                action=ActionType.DEBT_INFO,
+                reply_text=f"❌ <b>СТИР (INN):</b> <code>{target_inn}</code> bazadan topilmadi. Raqamni to'g'ri kiritganingizni tekshiring.",
+                detected_inn=target_inn,
+                log_reason="Smart One: INN not found"
+            )
+
+        org_name = results[0].get("name", "")
+        total_debt = sum(item.get("debt", 0.0) for item in results)
+        user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
+
+        # 1-A: AGAR OYLIK ABONENT QARZI BO'LSA (total_debt > 0) -> FAQAT QARZ VA REKVIZITLAR!
+        if total_debt > 0:
+            debt_reply = format_debt_response(results)
+            return DecisionResult(
+                action=ActionType.DIAGNOSE_AND_REPLY,
+                reply_text=debt_reply,
+                video_id=148,
                 detected_inn=target_inn,
                 debt_amount=total_debt,
                 org_name=org_name,
-                tuman=tuman,
-                should_notify_admin=True,
-                admin_alert_type="tech_issue",
-                admin_alert_text=issue_desc,
-                log_reason="Hardware fatal error or Internet active & verified no debt -> Escalated to admin"
+                log_reason="Smart One Step 1: Monthly debt exists"
             )
 
-        # 6-BOSQICH (LAYER 1, 2, 3): TASHXIS VA JAVOB SINTEZI
-        final_reply: str = ""
-        final_video_id: Optional[int] = diag_video_id
-
-        if diag_text:
-            final_reply = diag_text
-            if target_inn and org_name:
-                is_annual_rule = bool(matched_rule and matched_rule.get("id") in ["error_406_offline_limit", "annual_fm_expired"])
-                if is_annual_rule:
-                    final_video_id = 145
-                    if total_debt > 0:
-                        company_note = (
-                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-                            f"⚠️ <b>Mars oylik abonent qarzi:</b> {total_debt:,.0f} so'm.\n"
-                            f"ℹ️ <i>(Soliq yillik to'lovi va Mars oylik to'lovi alohida to'lanadi)</i>"
-                        )
-                    else:
-                        company_note = (
-                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-                            f"✅ <b>Mars oylik qarzi:</b> Yo'q (0 so'm). To'lov faqat Soliq («Yangi Texnologiyalar» DUK)ga qilinadi."
-                        )
-                else:
-                    if total_debt > 0:
-                        company_note = (
-                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-                            f"🔴 <b>Mars oylik qarzi:</b> {total_debt:,.0f} so'm."
-                        )
-                        if not final_video_id:
-                            final_video_id = 148
-                    else:
-                        company_note = (
-                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-                            f"✅ <b>Mars oylik qarzi:</b> Yo'q (0 so'm)."
-                        )
-                final_reply = f"{diag_text}{company_note}"
-            elif not target_inn and has_error and not is_fatal_hardware:
-                final_reply = f"{diag_text}\n\n💡 <i>Qarzdorlikni tekshirish uchun korxonangiz INN raqamini yuboring.</i>"
-
-        elif debt_text:
-            final_reply = debt_text
-            if total_debt > 0:
-                final_video_id = 148
-        else:
-            final_reply = (
-                "✅ <b>Apparatda abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
-                "💡 <i>Agar kassa qotib qolgan bo'lsa, ilovadan chiqib qayta kiring yoki apparatni o'chirib yoqing (Reboot).</i>"
+        # 2-QADAM: MARS QARZI YO'Q (total_debt <= 0) -> FISKAL MODULNI TEKSHIRISH (YILLIK SOLIQ TO'LOVI)
+        if not target_fm:
+            fm_ask_reply = (
+                f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+                f"✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
+                f"🏛 Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+            )
+            return DecisionResult(
+                action=ActionType.DEBT_INFO,
+                reply_text=fm_ask_reply,
+                detected_inn=target_inn,
+                debt_amount=total_debt,
+                org_name=org_name,
+                log_reason="Smart One Step 2: Asking for fiscal module"
             )
 
+        # 3-QADAM: OYLIK VA YILLIK QARZI BO'LMASA -> INTERNET, SOAT VA REBOOT
+        reboot_reply = (
+            f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+            f"✅ Oylik va yillik to'lovlardan qarzdorlik yo'q.\n\n"
+            f"📌 <b>Apparatni ishga tushirish uchun tekshiring:</b>\n"
+            f"1️⃣ Apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanligini tekshiring;\n"
+            f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
+            f"🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, hududingiz bo'yicha mutaxassisga bog'laymiz.</i>"
+        )
         return DecisionResult(
             action=ActionType.DIAGNOSE_AND_REPLY,
-            reply_text=final_reply,
-            video_id=final_video_id,
+            reply_text=reboot_reply,
             detected_inn=target_inn,
             debt_amount=total_debt,
             org_name=org_name,
-            log_reason="Successfully diagnosed POS screen facts"
+            log_reason="Smart One Step 3: Verified debts clear, suggested network/time and reboot"
         )
 
     # =========================================================================
