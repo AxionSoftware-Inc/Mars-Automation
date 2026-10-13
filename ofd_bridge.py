@@ -11,16 +11,17 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 OFD_CONFIG_FILE = os.path.join(DATA_DIR, "ofd_config.json")
 
-DEFAULT_OFD_USERNAME = os.getenv("OFD_BOT_USERNAME", "ofd943").lstrip("@").lower()
+DEFAULT_OFD_USERNAME = os.getenv("OFD_BOT_USERNAME", "ofd943_bot").lstrip("@").lower()
+OFD_KNOWN_USERNAMES = {"ofd943_bot", "ofd943"}
 CACHE_TTL_SECONDS = 300  # 5 daqiqa kesh (bir xil INN qayta-qayta so'ralganda)
 
 
 class OFDBridgeManager:
     """
-    Maxfiy guruh orqali @ofd943 (OFD userbot) bilan bog'lanish ko'prigi:
-    1. Mijoz asosiy guruhda yoki bot lichkasida INN yuborganda, botimiz ushbu INNni maxfiy guruhga yozadi.
-    2. Maxfiy guruhda @ofd943 javob qaytaradi (1 ta yoki bir nechta ketma-ket xabar).
-    3. Botimiz maxfiy guruhda @ofd943 ga hech qachon javob qaytarmaydi (cheksiz sikl bo'lmasligi uchun),
+    Maxfiy guruh (yoki Telethon user-session) orqali @ofd943_bot bilan bog'lanish ko'prigi:
+    1. Mijoz asosiy guruhda yoki bot lichkasida INN yuborganda, botimiz ushbu INNni maxfiy guruhga / @ofd943_bot ga yozadi.
+    2. @ofd943_bot javob qaytaradi (1 ta yoki bir nechta ketma-ket xabar).
+    3. Botimiz maxfiy guruhda @ofd943_bot ga hech qachon javob qaytarmaydi (cheksiz sikl bo'lmasligi uchun),
        faqat uning javobini ushlab olib, asosiy guruhdagi / lichkadagi mijozga chiqarib beradi.
     4. Parallel so'rovlar navbat (asyncio.Lock) bilan ketma-ket bajariladi — mijozlar javobi adashib ketmaydi.
     """
@@ -89,10 +90,12 @@ class OFDBridgeManager:
         return self.ofd_group_id is not None
 
     def is_ofd_user(self, user: Optional[types.User]) -> bool:
-        """Xabar yuboruvchi @ofd943 ekanligini tekshirish"""
-        if not user or not user.username:
+        """Xabar yuboruvchi @ofd943_bot (yoki ofd943) ekanligini tekshirish"""
+        if not user:
             return False
-        return user.username.lstrip("@").lower() == self.ofd_username
+        uname = (user.username or "").lstrip("@").lower()
+        fname = (user.full_name or "").strip().lower()
+        return uname in OFD_KNOWN_USERNAMES or uname == self.ofd_username or fname == "ofd943"
 
     def is_ofd_group(self, chat_id: int) -> bool:
         """Berilgan chat maxfiy OFD guruhi ekanligini tekshirish"""
