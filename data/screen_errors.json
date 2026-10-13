@@ -111,7 +111,7 @@
       "fiskalizatsiya qilishda xatolik",
       "fiskalizatsiya qilish xatosi"
     ],
-    "response_text": "⚠️ <b>406-XATOLIK: Oflayn rejimning maksimal davomiylik oralig'i oshib ketdi!</b>\n\n📌 <b>Bu qanday xatolik va nima sababdan kelib chiqadi?</b>\nUshbu xatolik <b>Oylik abonent to'lovi EMAS</b>, balki <b>Yillik Fiskal Modul to'lovi («Yangi Texnologiyalar» DUK / Soliq)</b> muddati tugaganligi yoki kassa uzoq vaqt internetga ulanmaganligi sababli Soliq (OFD) tizimi tomonidan bloklanganida chiqadi!\n\n💡 <b>Yechimi:</b>\n1. <b>Yillik fiskal modul to'lovi:</b> Davlat Soliq Qo'mitasining «Yangi Texnologiyalar» DUK hisobiga yillik to'lovni (Click orqali) to'lang.\n2. <b>Internetni tekshiring:</b> Kassa apparatini barqaror Wi-Fi yoki mobil internetga ulang va apparatni o'chirib qayta yoqing (Restart).\n\n👇 <i>Quyida Yillik to'lovni Click orqali amalga oshirish video-qo'llanmasi yuborildi:</i>",
+    "response_text": "⚠️ <b>406-XATOLIK: Oflayn rejim chegarasi tugagan (Yillik to'lov)!</b>\n\n📌 <b>Sababi:</b> Bu Mars oylik to'lovi emas, balki Davlat Soliq («Yangi Texnologiyalar» DUK)ning 1 yillik litsenziya to'lovidir.\n💡 <b>Yechimi:</b>\n1. «Yangi Texnologiyalar» DUK hisobiga yillik to'lovni (Click orqali) to'lang (440 000 so'm);\n2. Apparatni Wi-Fi yoki internetga ulab, o'chirib qayta yoqing (Restart).\n\n👇 <i>Yillik to'lovni Click orqali to'lash videosi:</i>",
     "video_id": 145,
     "require_inn": false,
     "escalate_to_admin": false
@@ -457,23 +457,6 @@
     "response_text": "⚠️ <b>Abonent to'lovi muddati tugamoqda (Dastur to'xtashiga oz qoldi)!</b>\n\n📌 <b>Sababi:</b> Kassa dasturining oylik xizmat to'lovi muddati tugash arafasida. Har oyning 6-sanasigacha to'lov qilinmasa, dastur avtomatik to'xtatiladi.\n💡 <b>Yechimi:</b> Apparat to'xtab qolmasligi uchun Click orqali yoki bank rekvizitlariga oylik abonent to'lovini amalga oshiring. Qarz summasini tekshirish uchun korxonangiz <b>INN (STIR)</b> raqamini yuboring.\n\n👇 <i>Quyida Click orqali to'lash videosi yuborildi:</i>",
     "video_id": 148,
     "require_inn": true,
-    "escalate_to_admin": false
-  },
-  {
-    "id": "pax_d210_menu_help",
-    "name": "Pax D210 tugmali kassa apparati yordami",
-    "screen_keywords": [
-      "pax d210",
-      "d210",
-      "tugmali apparat",
-      "klaviaturali apparat",
-      "smena yopish d210",
-      "d210 menyu",
-      "d210 smena"
-    ],
-    "response_text": "📟 <b>Pax D210 tugmali kassa apparati uchun tezkor ko'rsatmalar:</b>\n\n1️⃣ <b>Smena yopish (Z-hisobot olish):</b>\n🔹 <b>Menu</b> tugmasini bosing -> <b>1</b> (Hisobotlar / Отчеты) -> <b>Smena yopish (Z-otchet)</b> ni tanlang va <b>Yashil (Enter)</b> tugmasini bosing.\n\n2️⃣ <b>Servis menyusi:</b>\n🔹 <b>Func + 0</b> tugmalarini birgalikda bosish orqali servis menyusiga o'tishingiz mumkin.\n🔹 Qog'oz o'rnatilganda lenta tekis va to'g'ri joylashganiga e'tibor bering.",
-    "video_id": 2,
-    "require_inn": false,
     "escalate_to_admin": false
   },
   {

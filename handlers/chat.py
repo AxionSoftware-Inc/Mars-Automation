@@ -182,11 +182,10 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 tuman_str = f" ({tuman})" if tuman else ""
                 clear_msg = (
                     "✅ <b>Korxonangizda abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
-                    "📌 <b>Apparatni ishga tushirish uchun quyidagi bosqichlarni bajaring:</b>\n\n"
-                    "1️⃣ <b>2-bosqich (Internet va Soat - 30-35%):</b> Apparat ekranining yuqori qismidagi Wi-Fi/SIM belgisi va sana-vaqt to'g'ri ekanligini tekshiring;\n"
-                    "2️⃣ <b>3-bosqich (Dasturdan chiqib kirish / Reboot - 1-3%):</b> Kassa ilovasidan to'liq chiqib qayta kiring yoki quvvat tugmasini 5 soniya bosib apparatni <b>o'chirib qayta yoqing</b>;\n"
-                    "3️⃣ <b>Ekrandagi xatolik:</b> Agar ekranda qandaydir yozuv yoki xato kodi chiqayotgan bo'lsa, <b>ekranini rasmga olib yuboring</b> — sababini darhol aniqlab beramiz.\n\n"
-                    f"👨‍💻 <i>Agarda nosozlik davom etsa, «Usta kerak» deb yozing, sizni hududingiz{tuman_str} bo'yicha mas'ul mutaxassisga bog'laymiz.</i>"
+                    "Nosozlik sababini aniqlash uchun:\n"
+                    "🔹 Apparat ekranidagi yozuvni <b>rasmga olib</b> yuboring;\n"
+                    "🔹 Yoki apparatni o'chirib qayta yoqing (Reboot).\n\n"
+                    f"👨‍💻 <i>Yordam kerak bo'lsa, «Usta kerak» deb yozing{tuman_str}.</i>"
                 )
                 clear_msg = adapt_to_user_script(clear_msg, user_script)
                 try:
@@ -197,13 +196,11 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 user_memory.add_assistant_message(chat_id, user_id, clear_msg)
                 return
         else:
-            # INN hali kiritilmagan: 4 bosqichli formula bo'yicha yo'naltirish
+            # INN hali kiritilmagan: qisqa va lo'nda yo'naltirish
             guide_msg = (
-                "🔍 <b>Qarzdorlik va apparat holatini tekshirish (Standart formula):</b>\n\n"
-                "1️⃣ <b>1-bosqich (Qarzdorlik - 60%+):</b> Korxonangiz <b>INN (9 xonali)</b> raqamini hamda chekning pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring — «Mars» oylik abonent va Davlat Soliq (OFD) yillik to'lovini to'liq tekshirib beramiz;\n"
-                "2️⃣ <b>2-bosqich (Ekran va Tarmoq - 30-35%):</b> Agar qarz bo'lmasa, apparat ekranidagi xatolikni (soat va internet qatori bilan) <b>rasmga olib yuboring</b> (ko'pincha ekranda sababi yozilgan bo'ladi);\n"
-                "3️⃣ <b>3-bosqich (Reboot - 1-3%):</b> Kassa ilovasidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing;\n"
-                "4️⃣ <b>4-bosqich (Mas'ul texniklar):</b> Agar apparat shunda ham tuzalmasa, sizni mas'ul texniklarimizga (@quvonchbek_admin, @Yashnarbek_butaev) bog'laymiz."
+                "🔍 <b>Kassangiz holatini tekshirish uchun:</b>\n\n"
+                "1️⃣ Korxonangiz <b>INN (9 xonali)</b> raqamini yuboring (oylik abonent to'lovini tekshiramiz);\n"
+                "2️⃣ Yoki apparat ekranidagi xatolikni <b>rasmga olib</b> yuboring (sababini aniqlaymiz)."
             )
             guide_msg = adapt_to_user_script(guide_msg, user_script)
             try:

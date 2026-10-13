@@ -212,22 +212,22 @@ class CoreEngine:
         # Internet bor + qarz yo'q + lekin apparatda jiddiy nosozlik bo'lsa
         is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
         debt_verified_clear = bool(target_inn and total_debt <= 0)
-        should_escalate = is_fatal_hardware or (facts.has_internet and debt_verified_clear and has_error and not facts.time_mismatch)
+        if matched_rule:
+            should_escalate = is_fatal_hardware
+        else:
+            should_escalate = bool(has_error and facts.has_internet and debt_verified_clear and not facts.time_mismatch)
 
         if should_escalate:
-            issue_desc = diag_text or facts.screen_text_summary or "Noma'lum apparat nosozligi"
-            contacts_info = admin_manager.get_contacts_display()
+            issue_desc = diag_text or facts.screen_text_summary or "Apparat nosozligi"
             tuman = excel_manager.get_district_for_inn(target_inn) if target_inn else ""
-            tuman_line = f"📍 <b>Hududingiz:</b> {tuman}\n" if tuman else ""
-            status_prefix = "✅ <b>Apparatingizda abonent to'lovidan qarzdorlik yo'q va internet tarmog'i faol.</b>\n\n" if not is_fatal_hardware else ""
+            tuman_line = f"📍 <b>Hudud:</b> {tuman}\n" if tuman else ""
+            status_prefix = "✅ <b>Qarzdorlik yo'q va internet faol.</b>\n" if not is_fatal_hardware else ""
             escalation_reply = (
                 f"{status_prefix}"
                 f"{tuman_line}"
                 f"{diag_text}\n\n"
-                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi.</b> "
-                f"Mas'ul texniklarimiz: @quvonchbek_admin va @Yashnarbek_butaev. "
-                f"Sizning hududingiz ({tuman or 'masʼul'}) bo'yicha mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
-                f"{contacts_info}"
+                f"👨‍💻 <b>Ushbu texnik masala ustalarimizga yetkazildi.</b> Tez orada siz bilan bog'lanishadi.\n"
+                f"📞 <b>Aloqa:</b> +998 75 522 75 00 | @quvonchbek_admin"
             )
 
             return DecisionResult(
@@ -248,47 +248,48 @@ class CoreEngine:
         final_reply: str = ""
         final_video_id: Optional[int] = diag_video_id
 
-        if diag_text and debt_text:
-            is_annual_rule = bool(matched_rule and matched_rule.get("id") in ["error_406_offline_limit", "annual_fm_expired"])
-            if is_annual_rule:
-                final_video_id = 145
-                annual_note = (
-                    "⚠️ <b>MUHIM ESLATMA:</b> Yuqoridagi 406 / Yillik to'lov xatosi — bu Davlat Soliq Qo'mitasining "
-                    "<b>«Yangi Texnologiyalar» DUK</b> hisobiga to'lanadigan to'lovdir!\n"
-                    "Shu bilan birga, «Mars Elektron Texnika»ga <b>oylik abonent to'lovidan</b> ham hisoblangan qarz mavjud (pastda keltirilgan). "
-                    "Iltimos, ushbu ikki xil to'lovni adashtirmang."
-                )
-                final_reply = f"{diag_text}\n\n──────────────\n{annual_note}\n\n{debt_text}"
-            else:
-                final_reply = f"{diag_text}\n\n──────────────\n{debt_text}"
-                if total_debt > 0:
-                    final_video_id = 148
+        if diag_text:
+            final_reply = diag_text
+            if target_inn and org_name:
+                is_annual_rule = bool(matched_rule and matched_rule.get("id") in ["error_406_offline_limit", "annual_fm_expired"])
+                if is_annual_rule:
+                    final_video_id = 145
+                    if total_debt > 0:
+                        company_note = (
+                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+                            f"⚠️ <b>Mars oylik abonent qarzi:</b> {total_debt:,.0f} so'm.\n"
+                            f"ℹ️ <i>(Soliq yillik to'lovi va Mars oylik to'lovi alohida to'lanadi)</i>"
+                        )
+                    else:
+                        company_note = (
+                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+                            f"✅ <b>Mars oylik qarzi:</b> Yo'q (0 so'm). To'lov faqat Soliq («Yangi Texnologiyalar» DUK)ga qilinadi."
+                        )
+                else:
+                    if total_debt > 0:
+                        company_note = (
+                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+                            f"🔴 <b>Mars oylik qarzi:</b> {total_debt:,.0f} so'm."
+                        )
+                        if not final_video_id:
+                            final_video_id = 148
+                    else:
+                        company_note = (
+                            f"\n\n🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
+                            f"✅ <b>Mars oylik qarzi:</b> Yo'q (0 so'm)."
+                        )
+                final_reply = f"{diag_text}{company_note}"
+            elif not target_inn and has_error and not is_fatal_hardware:
+                final_reply = f"{diag_text}\n\n💡 <i>Qarzdorlikni tekshirish uchun korxonangiz INN raqamini yuboring.</i>"
+
         elif debt_text:
+            final_reply = debt_text
             if total_debt > 0:
-                final_reply = debt_text
                 final_video_id = 148
-            else:
-                # 3-BOSQICH (1-3%): Qarz yo'q bo'lsa, kassa ilovasidan chiqib kirish yoki apparatni o'chirib-yoqish tavsiyasi
-                reboot_note = (
-                    "🔄 <b>Kassani ishga tushirish bo'yicha tavsiya (1-3% mayda qotishlar uchun):</b>\n"
-                    "1️⃣ Kassa dasturidan to'liq chiqib (yopib), ilovaga qayta kiring;\n"
-                    "2️⃣ Yoki apparat quvvat tugmasini 5 soniya bosib ushlab, apparatni <b>o'chirib qayta yoqing (Перезагрузка / Reboot)</b>.\n\n"
-                    "🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, hududingiz bo'yicha mutaxassisga ulaymiz.</i>"
-                )
-                final_reply = f"{debt_text}\n\n──────────────\n{reboot_note}"
-        elif diag_text:
-            if not target_inn and has_error and not is_fatal_hardware:
-                final_reply = f"{diag_text}\n\n💡 <b>Qarzdorlik holatini tekshirishimiz uchun korxonangizning INN raqamini yuboring.</b>"
-            else:
-                final_reply = diag_text
         else:
-            # 3-BOSQICH: Qarz yo'q, xato kodi yo'q, soat/internet to'g'ri bo'lganda Reboot tavsiyasi
             final_reply = (
-                "✅ <b>Apparatda abonent to'lovidan qarzdorlik yo'q, internet va soat to'g'ri holatda.</b>\n\n"
-                "🔄 <b>Agar shunda ham chek urmayotgan yoki tizim qotib qolgan bo'lsa (1-3% mayda dasturiy nosozlik):</b>\n"
-                "1️⃣ Kassa dasturidan to'liq chiqib (yopib), ilovaga qayta kiring;\n"
-                "2️⃣ Yoki apparatning quvvat tugmasini 5 soniya bosib ushlab, apparatni <b>o'chirib qayta yoqing (Перезагрузка / Reboot)</b>.\n\n"
-                "🛠 <i>Agarda qayta yoqqandan keyin ham ishlamasa, «Usta kerak» deb yozing, sizni hududingiz bo'yicha mas'ul ustaga bog'laymiz.</i>"
+                "✅ <b>Apparatda abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
+                "💡 <i>Agar kassa qotib qolgan bo'lsa, ilovadan chiqib qayta kiring yoki apparatni o'chirib yoqing (Reboot).</i>"
             )
 
         return DecisionResult(
