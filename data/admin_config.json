@@ -1,11 +1,25 @@
 {
   "admin_ids": [
-    6436610869
+    1966874161,
+    6436610869,
+    777111222
   ],
   "admin_usernames": [
-    "yashnarbek_butaev"
+    "yashnarbek_butaev",
+    "bim_project_manager",
+    "quvonchbek_admin"
   ],
   "contacts": [
+    {
+      "name": "Mas'ul administrator / Texnik",
+      "phone": "@quvonchbek_admin",
+      "role": "Admin / Texnik"
+    },
+    {
+      "name": "Bosh administrator (Eskalatsiya va to'lovlar)",
+      "phone": "@Yashnarbek_butaev",
+      "role": "Bosh admin"
+    },
     {
       "name": "Texnik xizmat ko'rsatish bo'limi",
       "phone": "+998 75 522 75 00",

@@ -199,11 +199,11 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         else:
             # INN hali kiritilmagan: 4 bosqichli formula bo'yicha yo'naltirish
             guide_msg = (
-                "📌 <b>Kassa apparati ishlamay qolganda tekshirish tartibi (Standart formula):</b>\n\n"
-                "1️⃣ <b>1-bosqich (Qarzdorlik - 60%+):</b> Korxonangiz <b>INN (STIR)</b> raqamini yuboring — oylik yoki yillik to'lovdan qarzdorlik bor-yo'qligini darhol tekshirib beramiz;\n"
-                "2️⃣ <b>2-bosqich (Texnik va Tarmoq - 30-35%):</b> Agar qarz bo'lmasa, apparat ekranidagi xatolikni (soat va internet qatori bilan) <b>rasmga olib yuboring</b>;\n"
+                "🔍 <b>Qarzdorlik va apparat holatini tekshirish (Standart formula):</b>\n\n"
+                "1️⃣ <b>1-bosqich (Qarzdorlik - 60%+):</b> Korxonangiz <b>INN (9 xonali)</b> raqamini hamda chekning pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring — «Mars» oylik abonent va Davlat Soliq (OFD) yillik to'lovini to'liq tekshirib beramiz;\n"
+                "2️⃣ <b>2-bosqich (Ekran va Tarmoq - 30-35%):</b> Agar qarz bo'lmasa, apparat ekranidagi xatolikni (soat va internet qatori bilan) <b>rasmga olib yuboring</b> (ko'pincha ekranda sababi yozilgan bo'ladi);\n"
                 "3️⃣ <b>3-bosqich (Reboot - 1-3%):</b> Kassa ilovasidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing;\n"
-                "4️⃣ <b>4-bosqich (Usta):</b> Agar apparat shunda ham tuzalmasa, sizni o'z hududingiz bo'yicha mas'ul ustaga bog'laymiz."
+                "4️⃣ <b>4-bosqich (Mas'ul texniklar):</b> Agar apparat shunda ham tuzalmasa, sizni mas'ul texniklarimizga (@quvonchbek_admin, @Yashnarbek_butaev) bog'laymiz."
             )
             guide_msg = adapt_to_user_script(guide_msg, user_script)
             try:

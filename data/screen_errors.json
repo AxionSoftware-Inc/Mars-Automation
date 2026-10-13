@@ -90,6 +90,33 @@
     "escalate_to_admin": false
   },
   {
+    "id": "error_406_offline_limit",
+    "name": "406 - Oflayn rejimning maksimal davomiylik oralig'i oshib ketdi (Yillik to'lov / Soliq)",
+    "screen_keywords": [
+      "406",
+      "код 406",
+      "kod 406",
+      "xatolik 406",
+      "xatolik: 406",
+      "ошибка 406",
+      "ошибка: 406",
+      "oflayn rejim",
+      "офлайн режим",
+      "maksimal davomiylik",
+      "davomiylik oralig'i",
+      "davomiylik oraligi",
+      "davomiylik oralig'i oshib ketdi",
+      "автономного режима",
+      "максимальная продолжительность автономного режима",
+      "fiskalizatsiya qilishda xatolik",
+      "fiskalizatsiya qilish xatosi"
+    ],
+    "response_text": "⚠️ <b>406-XATOLIK: Oflayn rejimning maksimal davomiylik oralig'i oshib ketdi!</b>\n\n📌 <b>Bu qanday xatolik va nima sababdan kelib chiqadi?</b>\nUshbu xatolik <b>Oylik abonent to'lovi EMAS</b>, balki <b>Yillik Fiskal Modul to'lovi («Yangi Texnologiyalar» DUK / Soliq)</b> muddati tugaganligi yoki kassa uzoq vaqt internetga ulanmaganligi sababli Soliq (OFD) tizimi tomonidan bloklanganida chiqadi!\n\n💡 <b>Yechimi:</b>\n1. <b>Yillik fiskal modul to'lovi:</b> Davlat Soliq Qo'mitasining «Yangi Texnologiyalar» DUK hisobiga yillik to'lovni (Click orqali) to'lang.\n2. <b>Internetni tekshiring:</b> Kassa apparatini barqaror Wi-Fi yoki mobil internetga ulang va apparatni o'chirib qayta yoqing (Restart).\n\n👇 <i>Quyida Yillik to'lovni Click orqali amalga oshirish video-qo'llanmasi yuborildi:</i>",
+    "video_id": 145,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
     "id": "annual_fm_expired",
     "name": "Yillik fiskal modul to'lovi muddati tugagan",
     "screen_keywords": [

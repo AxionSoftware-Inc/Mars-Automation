@@ -89,11 +89,21 @@ def format_debt_response(results: list) -> str:
     elif total_debt < 0:
         text += f"🟢 <b>Oldindan ortiqcha to'lov mavjud: {abs(total_debt):,.0f} so'm</b>\n\n"
         text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
-        text += "📸 <i>Agar apparatingiz ishlamayotgan bo'lsa, iltimos, <b>apparat ekranidagi xatolikni rasmga olib yuboring</b>. Nosozlik sababini (soat, internet yoki xatolik kodi) darhol aniqlab beramiz.</i>"
+        text += (
+            "📌 <b>Apparatni ishga tushirish uchun quyidagilarni tekshiring:</b>\n"
+            "1️⃣ <b>Internet va Soat:</b> Wi-Fi/SIM belgisi va sana-vaqt to'g'ri ekanini tekshiring;\n"
+            "2️⃣ <b>Reboot:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка);\n"
+            "3️⃣ <b>Ekran rasmi:</b> Agar ekranda xatolik yozuvi chiqayotgan bo'lsa, ekranini rasmga olib yuboring (ko'pincha ekranda sababi aniq yozilgan bo'ladi)."
+        )
     else:
         text += "✅ <b>Qarzdorlik mavjud emas (0 so'm).</b>\n\n"
         text += "ℹ️ <b>Abonent to'lovidan qarz yo'q.</b>\n\n"
-        text += "📸 <i>Agar apparatingiz ishlamayotgan bo'lsa, iltimos, <b>apparat ekranidagi xatolikni rasmga olib yuboring</b>. Nosozlik sababini (soat, internet yoki xatolik kodi) darhol aniqlab beramiz.</i>"
+        text += (
+            "📌 <b>Apparatni ishga tushirish uchun quyidagilarni tekshiring:</b>\n"
+            "1️⃣ <b>Internet va Soat:</b> Wi-Fi/SIM belgisi va sana-vaqt to'g'ri ekanini tekshiring;\n"
+            "2️⃣ <b>Reboot:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка);\n"
+            "3️⃣ <b>Ekran rasmi:</b> Agar ekranda xatolik yozuvi chiqayotgan bo'lsa, ekranini rasmga olib yuboring (ko'pincha ekranda sababi aniq yozilgan bo'ladi)."
+        )
 
     return text
 

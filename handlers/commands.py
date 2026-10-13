@@ -146,11 +146,14 @@ async def cmd_tekshir(message: types.Message, bot: Bot):
 
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        w_msg = adapt_to_user_script(
-            "⚠️ Iltimos, INN yoki JSHSHIR raqamini ham yozing.\n"
-            "Masalan: <code>/tekshir 302568138</code>",
-            user_script
+        w_msg = (
+            "🔍 <b>Qarzdorlik va apparat holatini tekshirish:</b>\n\n"
+            "Kassa apparatlari to'xtab qolishining 60%+ sababi abonent yoki soliq to'lovidagi qarzdorlik bo'ladi.\n\n"
+            "Iltimos, korxonangizning <b>INN (9 xonali)</b> raqamini hamda iloji bo'lsa apparat chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring.\n"
+            "Masalan: <code>/tekshir 302568138</code>\n\n"
+            "💡 <i>Biz bir vaqtning o'zida «Mars» oylik abonent to'lovini hamda Davlat Soliq Qo'mitasi (OFD) yillik litsenziya muddatini to'liq tekshirib beramiz!</i>"
         )
+        w_msg = adapt_to_user_script(w_msg, user_script)
         await message.reply(w_msg, parse_mode="HTML")
         return
 

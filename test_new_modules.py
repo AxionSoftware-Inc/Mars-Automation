@@ -186,8 +186,9 @@ async def test_async_admin_notification_mock():
     logger.info(">>> 7. ADMINGA TELEGRAM XABARNOMA YUBORISHNING ASINXRON TESTI...")
     mock_bot = AsyncMock()
     
+    saved_admin_ids = list(admin_manager.admin_ids)
     test_admin_id = 777111222
-    admin_manager.add_admin(test_admin_id)
+    admin_manager.admin_ids = [test_admin_id]
 
     receipt = ReceiptFacts(
         is_receipt=True,
@@ -220,7 +221,7 @@ async def test_async_admin_notification_mock():
     assert "Rustam Karimov" in call_args["caption"]
     assert "QARZ TO'LIQ YOPILDI" in call_args["caption"]
 
-    admin_manager.remove_admin(test_admin_id)
+    admin_manager.admin_ids = saved_admin_ids
     logger.info("✅ Adminga Telegram orqali xabarnoma jo'natish simulyatsiyasi 100% muvaffaqiyatli!")
 
 def main():

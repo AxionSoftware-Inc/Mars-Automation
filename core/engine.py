@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Optional, Dict, Any, List
 
-from core.models import DeviceFacts, ReceiptFacts, DecisionResult, ActionType
+from core.models import DeviceFacts, ReceiptFacts, DecisionResult, ActionType, extract_clean_inn, extract_fiscal_module
 from error_manager import error_manager
 from excel_manager import excel_manager
 from user_memory import user_memory
@@ -224,8 +224,9 @@ class CoreEngine:
                 f"{status_prefix}"
                 f"{tuman_line}"
                 f"{diag_text}\n\n"
-                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar sizning hududingiz ({tuman or 'masʼul'}) bo'yicha mas'ul usta va bosh administratorimizga (@Yashnarbek_butaev) yetkazildi.</b> "
-                f"Mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
+                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi.</b> "
+                f"Mas'ul texniklarimiz: @quvonchbek_admin va @Yashnarbek_butaev. "
+                f"Sizning hududingiz ({tuman or 'masʼul'}) bo'yicha mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
                 f"{contacts_info}"
             )
 
@@ -248,9 +249,20 @@ class CoreEngine:
         final_video_id: Optional[int] = diag_video_id
 
         if diag_text and debt_text:
-            final_reply = f"{diag_text}\n\n──────────────\n{debt_text}"
-            if total_debt > 0:
-                final_video_id = 148
+            is_annual_rule = bool(matched_rule and matched_rule.get("id") in ["error_406_offline_limit", "annual_fm_expired"])
+            if is_annual_rule:
+                final_video_id = 145
+                annual_note = (
+                    "⚠️ <b>MUHIM ESLATMA:</b> Yuqoridagi 406 / Yillik to'lov xatosi — bu Davlat Soliq Qo'mitasining "
+                    "<b>«Yangi Texnologiyalar» DUK</b> hisobiga to'lanadigan to'lovdir!\n"
+                    "Shu bilan birga, «Mars Elektron Texnika»ga <b>oylik abonent to'lovidan</b> ham hisoblangan qarz mavjud (pastda keltirilgan). "
+                    "Iltimos, ushbu ikki xil to'lovni adashtirmang."
+                )
+                final_reply = f"{diag_text}\n\n──────────────\n{annual_note}\n\n{debt_text}"
+            else:
+                final_reply = f"{diag_text}\n\n──────────────\n{debt_text}"
+                if total_debt > 0:
+                    final_video_id = 148
         elif debt_text:
             if total_debt > 0:
                 final_reply = debt_text
@@ -741,7 +753,7 @@ class CoreEngine:
 
         contacts_info = admin_manager.get_contacts_display()
         reply_text = (
-            f"👨‍💻 <b>Murojaatingiz qabul qilindi va mutaxassisimizga (adminga) yetkazildi!</b>\n\n"
+            f"👨‍💻 <b>Murojaatingiz qabul qilindi va bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga (@quvonchbek_admin) yetkazildi!</b>\n\n"
             f"{tuman_line}"
             f"Sizning hududingiz bo'yicha mas'ul usta yoki operatorlarimiz tez orada siz bilan bog'lanishadi.\n\n"
             f"{contacts_info}"
@@ -785,6 +797,303 @@ class CoreEngine:
             debt_amount=total_debt,
             org_name=org_name,
             log_reason="Resolved INN from fallback flow"
+        )
+
+    # =========================================================================
+    # 4. MATNLI MUROJAAT VA TEKSHIRUV INQUIRY (TEXT PROCESSING ENGINE)
+    # =========================================================================
+    async def process_text_inquiry(
+        self,
+        text: str,
+        chat_id: int,
+        user_id: int,
+        user_name: str = "Mijoz",
+        user_username: str = "",
+        bot: Optional[Any] = None
+    ) -> DecisionResult:
+        """
+        Foydalanuvchining har qanday matnli so'rovini qat'iy 4 bosqichli formula bo'yicha tahlil qilish:
+        1-bosqich (Qarzdorlik - 60%+): INN va Fiskal modul orqali oylik va yillik qarz tekshiruvi;
+        2-bosqich: Ekrandagi xatolik yozuvi tahlili (rasm bo'lsa);
+        3-bosqich: Apparatning o'zini tekshirish (Soat, Internet, Reboot);
+        4-bosqich: Eskalatsiya (Adminga va texniklarga yo'naltirish).
+        """
+        user_script = user_memory.detect_and_update_script(chat_id, user_id, text)
+        clean_text = text.strip()
+        lower_text = clean_text.lower()
+
+        found_inn = extract_clean_inn(clean_text)
+        found_fm = extract_fiscal_module(clean_text)
+        remembered_id = user_memory.get_last_id(chat_id, user_id)
+
+        # 0. Agar foydalanuvchi avval kvitansiya yuklagan bo'lsa va endi INN yozsa:
+        if found_inn:
+            pending_res = self.resolve_pending_receipt_if_any(found_inn, chat_id, user_id)
+            if pending_res:
+                return pending_res
+
+        # 1. Operator / Usta / Admin talab qilinganda:
+        OPERATOR_KEYWORDS = [
+            "operator", "adminga", "admin kerak", "admin", "adminga gapim bor", "adminga gap",
+            "adminga yozish", "admin bormi", "admin qani", "admin kim", "adminga bog'la", "adminga bogla",
+            "operator bormi", "operator kerak", "operatorga ula", "operator chaqir", "operator bilan",
+            "texnik", "texnik kerak", "texnik bormi", "texnikka gapim bor", "texnikka yoz",
+            "texnik bilan", "texnik bilan gaplashmoqchiman", "usta kerak", "usta bormi", "usta chaqir",
+            "mutaxassis", "mutaxassis kerak", "inson bilan gaplashmoqchiman", "jonli odam",
+            "bog'lanish", "boglanish", "telefon raqam", "aloqaga chiq", "aloqaga chiqing",
+            "bog'laning", "boglaning", "yordam bering usta", "yordam bering", "telefon qiling",
+            "qongiroq qiling", "qo'ng'iroq qiling", "kimga murojaat", "kimga yozay", "kimga aytay",
+            "hal bo'lmadi", "hal bolmadi", "tushunmadim usta", "operator bilan gaplashmoqchiman",
+            "menga usta kerak", "menga admin kerak", "menga texnik kerak",
+            "оператор", "админ", "техник", "мастер", "позвоните", "свяжитесь", "помогите"
+        ]
+        if any(kw in lower_text for kw in OPERATOR_KEYWORDS):
+            return self.escalate_general_issue(clean_text, chat_id, user_id)
+
+        # 2. 406-xatolik (Oflayn rejim chegarasi) haqida so'ralganda:
+        is_406_query = any(k in lower_text for k in [
+            "406", "kod 406", "xatolik 406", "ashebka 406", "ошибка 406",
+            "oflayn rejim", "офлайн режим", "maksimal davomiylik", "davomiylik oralig'i", "davomiylik oraligi"
+        ])
+        if is_406_query:
+            err_406_reply = (
+                "✅ <b>Ha, aynan to'g'ri! 406-xatolik («Oflayn rejimning maksimal davomiylik oralig'i oshib ketdi») — bu Oylik abonent to'lovi emas, "
+                "balki YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK / Soliq) xatoligidir!</b>\n\n"
+                "📌 <b>Nima sababdan yuzaga keladi?</b>\n"
+                "1. Kassa apparatining Davlat Soliq Qo'mitasidagi <b>yillik fiskal xizmat to'lovi</b> muddati tugagan bo'lishi mumkin;\n"
+                "2. Yoki kassa apparati uzoq vaqt internetga ulanmaganligi sababli Soliq (OFD) tizimi chek qabul qilishni to'xtatgan.\n\n"
+                "💡 <b>Yechimi:</b>\n"
+                "▫️ Click ilovasi orqali <b>«Yangi Texnologiyalar DUK»</b> xizmatiga yillik to'lovni (<code>20210000100431200010</code>) to'lang;\n"
+                "▫️ Kassa apparatini barqaror Wi-Fi yoki mobil internetga ulang va apparatni o'chirib qayta yoqing (Restart).\n\n"
+                "👇 <i>Quyida Yillik to'lovni Click orqali amalga oshirish video-qo'llanmasi yuborildi:</i>"
+            )
+            user_memory.set_last_topic(chat_id, user_id, "error_406_annual")
+            return DecisionResult(
+                action=ActionType.DIAGNOSE_AND_REPLY,
+                reply_text=err_406_reply,
+                video_id=145,
+                log_reason="Error 406 inquiry resolved"
+            )
+
+        # 3. To'lov rekvizitlari va hisob raqamlar so'rovi:
+        from payment_accounts import classify_payment_intent, get_monthly_payment_card, get_monthly_post_note, get_annual_payment_card, get_annual_post_note
+        p_intent = classify_payment_intent(clean_text)
+        if p_intent:
+            if p_intent == "monthly":
+                card_text = f"{get_monthly_payment_card()}\n\n{get_monthly_post_note(user_script)}"
+                return DecisionResult(
+                    action=ActionType.DIAGNOSE_AND_REPLY,
+                    reply_text=card_text,
+                    video_id=148,
+                    log_reason="Monthly payment account inquiry"
+                )
+            else:
+                card_text = f"{get_annual_payment_card()}\n\n{get_annual_post_note(user_script)}"
+                return DecisionResult(
+                    action=ActionType.DIAGNOSE_AND_REPLY,
+                    reply_text=card_text,
+                    video_id=145,
+                    log_reason="Annual payment account inquiry"
+                )
+
+        # 4. Yillik to'lov yoki OFD muddatini tekshirish alohida so'ralganda:
+        ofd_check_keywords = [
+            "yillik qarz", "yillikni tekshir", "ofd tekshir", "ofdni tekshir",
+            "fiskal modul muddat", "fiskal modul qachon", "yillik muddat", "fiskal modul tekshir",
+            "йиллик қарз", "йиллик карз", "йилликни текшир", "офд текшир", "фискал модул муддат"
+        ]
+        if any(kw in lower_text for kw in ofd_check_keywords) and not found_fm:
+            fm_ask = (
+                "🏛 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini tekshirish:</b>\n\n"
+                "⚠️ <b>Muhim qoida:</b> Har bitta kassa apparatida faqat <b>bitta o'ziga xos Fiskal modul</b> bo'ladi! "
+                "Boshqa apparatingizning chekidan emas, <b>aynan o'sha muammoli (ishlamayotgan) apparatdan</b> chiqarilgan chekning pastki qismidagi seriya raqami kerak.\n\n"
+                "📌 <b>Uni qayerdan topish mumkin?</b>\n"
+                "Aynan o'sha apparat chekining eng pastki qismida <b>LG...</b> yoki <b>YG...</b> kabi 2 ta harf bilan boshlangan 12-16 xonali seriya raqami yozilgan bo'ladi.\n\n"
+                "📸 <i>O'sha fiskal modul raqamini (masalan: <code>LG420210...</code>) yozib yuboring yoki chekning pastki qismini rasmga olib tashlang, darhol tekshirib beramiz!</i>"
+            )
+            return DecisionResult(
+                action=ActionType.DEBT_INFO,
+                reply_text=fm_ask,
+                log_reason="Prompted for fiscal module for annual check"
+            )
+
+        # 5. INN yoki FISKAL MODUL kiritilganda (yoki ikkalasi birgalikda):
+        if found_inn or found_fm:
+            debt_res_text = ""
+            total_debt = 0.0
+            target_inn = found_inn or remembered_id
+            target_org = ""
+            tuman = ""
+
+            # A) INN bo'yicha Mars oylik abonent qarzini tekshirish
+            if target_inn:
+                from handlers.debt import format_debt_response
+                results = excel_manager.search(target_inn)
+                if not results and excel_manager.is_decommissioned(target_inn):
+                    decom_list = excel_manager.get_decommissioned(target_inn)
+                    decom_org = decom_list[0].get("name", "") if decom_list else ""
+                    debt_res_text = (
+                        f"ℹ️ <b>{decom_org}</b> korxonasi xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan).\n"
+                        f"Qarzdorlik hisoblanmaydi (0 so'm).\n\n"
+                        f"Agar yangitdan xizmat ko'rsatish yoki apparatni qayta faollashtirish kerak bo'lsa, «Usta kerak» deb yozishingiz mumkin."
+                    )
+                elif results:
+                    target_org = results[0].get("name", "")
+                    total_debt = sum(item.get("debt", 0.0) for item in results)
+                    tuman = excel_manager.get_district_for_inn(target_inn)
+                    model_summary = excel_manager.get_device_model_summary(results)
+                    user_memory.set_last_id(chat_id, user_id, target_inn, org_name=target_org, debt=total_debt, device_models=model_summary)
+                    user_memory.set_last_topic(chat_id, user_id, "debt_checked")
+                    debt_res_text = format_debt_response(results)
+
+                    pending_screen = user_memory.get_pending_device_screen(chat_id, user_id)
+                    if pending_screen:
+                        is_p3 = any(bool(item.get("is_p3", False)) for item in results)
+                        saved_summary = (pending_screen.get("screen_text_summary") or "").strip()
+                        if is_p3 and saved_summary:
+                            debt_res_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {saved_summary}\n\n──────────────\n{debt_res_text}"
+                else:
+                    debt_res_text = format_debt_response([])
+
+            # B) Fiskal modul bo'yicha OFD tekshiruvi
+            ofd_text = ""
+            if found_fm:
+                from ofd_bridge import ofd_bridge
+                ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
+                if ofd_reply:
+                    ofd_text = f"🏛 <b>OFD / Soliq tizimi ma'lumoti (Fiskal modul: <code>{found_fm}</code>):</b>\n{ofd_reply}"
+                else:
+                    ofd_text = (
+                        f"⚠️ <b>Fiskal modul (<code>{found_fm}</code>) bo'yicha ma'lumot olinmadi.</b>\n\n"
+                        f"Iltimos, kassa chekining eng pastki qismidagi seriya raqami (masalan: <code>LG42021...</code>, <code>YG...</code> yoki <code>UZ...</code>) to'g'ri yozilganini tekshiring yoki chekni rasmga olib yuboring."
+                    )
+
+            # C) Birlashtirish va Yakuniy Sintez
+            if debt_res_text and ofd_text:
+                combined_reply = f"{debt_res_text}\n\n{ofd_text}"
+                vid = 148 if total_debt > 0 else None
+                return DecisionResult(
+                    action=ActionType.DEBT_INFO,
+                    reply_text=combined_reply,
+                    video_id=vid,
+                    detected_inn=target_inn,
+                    debt_amount=total_debt,
+                    org_name=target_org,
+                    tuman=tuman,
+                    log_reason="Evaluated both INN and Fiscal Module"
+                )
+            elif debt_res_text:
+                if total_debt > 0:
+                    fm_tip = (
+                        "\n\n💡 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini ham tekshirish uchun:</b>\n"
+                        "Apparat chekining pastki qismidagi <b>Fiskal modul raqamini</b> (masalan: <code>LG...</code>, <code>YG...</code> yoki <code>UZ...</code>) yuboring."
+                    )
+                    return DecisionResult(
+                        action=ActionType.DEBT_INFO,
+                        reply_text=f"{debt_res_text}{fm_tip}",
+                        video_id=148,
+                        detected_inn=target_inn,
+                        debt_amount=total_debt,
+                        org_name=target_org,
+                        tuman=tuman,
+                        log_reason="Debt checked from INN"
+                    )
+                else:
+                    stage3_note = (
+                        "\n\n📌 <b>Apparatni ishga tushirish uchun quyidagilarni tekshiring:</b>\n"
+                        "1️⃣ <b>Internet va Soat:</b> Wi-Fi/SIM belgisi va sana-vaqt to'g'ri ekanini tekshiring;\n"
+                        "2️⃣ <b>Reboot:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка);\n"
+                        "3️⃣ <b>Ekran rasmi:</b> Agar ekranda xatolik yozuvi chiqayotgan bo'lsa, ekranini rasmga olib yuboring (ko'pincha ekranda sababi aniq yozilgan bo'ladi);\n\n"
+                        "💡 <i>Yillik fiskal modul muddatini ham tekshirish uchun chekdagi Fiskal modul raqamini (LG... yoki YG...) yuborishingiz mumkin.</i>"
+                    )
+                    return DecisionResult(
+                        action=ActionType.DEBT_INFO,
+                        reply_text=f"{debt_res_text}{stage3_note}",
+                        detected_inn=target_inn,
+                        debt_amount=0.0,
+                        org_name=target_org,
+                        tuman=tuman,
+                        log_reason="No debt verified, Stage 3 provided"
+                    )
+            elif ofd_text:
+                monthly_hint = "\n\n💡 <i>«Mars Elektron Texnika» oylik abonent to'lovini ham tekshirmoqchi bo'lsangiz, korxonangiz INN (9 xonali) raqamini yuboring.</i>"
+                return DecisionResult(
+                    action=ActionType.DEBT_INFO,
+                    reply_text=f"{ofd_text}{monthly_hint}",
+                    log_reason="Fiscal module checked"
+                )
+
+        # 6. Kassa ishlamay qolganligi yoki tekshiruv so'rovi (INN/FM berilmaganda):
+        DEVICE_ISSUE_PHRASES = [
+            "apparat ishlamayapti", "apparatim ishlamayapti", "kassa ishlamayapti",
+            "kassa ishlamay qoldi", "apparat ishlamay qoldi", "chek urmayapti",
+            "chek chiqmayapti", "kassa qotib qoldi", "apparat qotib qoldi",
+            "ishlamayapti apparat", "ishlamayapti kassa", "ne rabotayet apparat",
+            "не работает касса", "не работает аппарат", "аппарат не работает", "касса не работает"
+        ]
+        CHECK_REQUEST_PHRASES = [
+            "tekshirib ber", "tekshirib beriyla", "tekshirib bering", "tekshirib beringlar",
+            "tekshirib berish", "apparatni tekshir", "apparatimni tekshir", "aparatni tekshir", "aparatimni tekshir",
+            "aparatimga qarab", "apparatimga qarab", "tashkilotni tekshir", "tashkilotimni tekshir", "tashkilotmni tekshir",
+            "yangi tashkilot", "qarzim bormi", "qarzimni tekshir", "qarzdorlikni tekshir", "qarz bormi",
+            "warzim bormi", "aarzim bor", "tekshiring", "tekshirib kor", "tekshirib ko'r",
+            "текшириб бер", "текшириб беринг", "қарзим борми", "карзим борми", "текширинг"
+        ]
+        is_issue_or_check = any(p in lower_text for p in DEVICE_ISSUE_PHRASES) or any(p in lower_text for p in CHECK_REQUEST_PHRASES)
+
+        if is_issue_or_check:
+            if remembered_id:
+                return await self.process_text_inquiry(remembered_id, chat_id, user_id, user_name, user_username, bot)
+            else:
+                guide_msg = (
+                    "🔍 <b>Qarzdorlik va apparat holatini tekshirish:</b>\n\n"
+                    "Kassa apparatlari to'xtab qolishining 60%+ sababi abonent yoki soliq to'lovidagi qarzdorlik bo'ladi.\n\n"
+                    "Iltimos, korxonangizning <b>INN (9 xonali)</b> raqamini hamda iloji bo'lsa apparat chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring.\n\n"
+                    "💡 <i>Biz bir vaqtning o'zida «Mars» oylik abonent to'lovini hamda Davlat Soliq Qo'mitasi (OFD) yillik litsenziya muddatini to'liq tekshirib beramiz!</i>"
+                )
+                return DecisionResult(
+                    action=ActionType.DEBT_INFO,
+                    reply_text=guide_msg,
+                    log_reason="Requested INN and Fiscal Module for issue/check inquiry"
+                )
+
+        # 7. Unresolved problem keywords -> Adminga tinchgina xabarnoma yuborish
+        unresolved_keywords = ["ishlamayapti", "ishlamadi", "o'xshamadi", "oxshamadi", "bo'lmadi", "bolmadi", "tushunmadim", "yana xato", "tushunarsiz"]
+        should_alert_tech = any(ukw in lower_text for ukw in unresolved_keywords)
+
+        # 8. Video katalogdan aniq amallarni qidirish (vozvrat, x-hisobot va h.k.)
+        from catalog_manager import catalog_manager
+        cat_result = catalog_manager.search(clean_text)
+        if cat_result:
+            cat_reply = (
+                f"🎬 <b>{cat_result.get('title', 'Video-qo‘llanma')}</b>\n\n"
+                f"{cat_result.get('description', '')}\n\n"
+                f"👇 <i>Quyida so'ralgan video-qo'llanma yuborildi:</i>"
+            )
+            return DecisionResult(
+                action=ActionType.DIAGNOSE_AND_REPLY,
+                reply_text=cat_reply,
+                video_id=cat_result.get("id"),
+                should_notify_admin=should_alert_tech,
+                admin_alert_text=f"Mijoz so'rovi (katalog): {clean_text}",
+                log_reason="Catalog match"
+            )
+
+        # 9. AI helper / Davomiy muloqot
+        from ai_helper import ai_helper
+        ai_resp, ai_video_id = await ai_helper.ask_with_context(
+            user_text=clean_text,
+            chat_id=chat_id,
+            user_id=user_id,
+            catalog=catalog_manager.get_all_videos()
+        )
+        return DecisionResult(
+            action=ActionType.DIAGNOSE_AND_REPLY,
+            reply_text=ai_resp,
+            video_id=ai_video_id,
+            should_notify_admin=should_alert_tech,
+            admin_alert_text=f"Mijozda hal bo'lmagan muammo: {clean_text}",
+            log_reason="AI conversational response"
         )
 
 core_engine = CoreEngine()

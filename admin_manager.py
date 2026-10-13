@@ -11,9 +11,15 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 ADMIN_CONFIG_PATH = os.path.join(DATA_DIR, "admin_config.json")
 
-DEFAULT_ADMIN_USERNAMES = ["yashnarbek_butaev"]
+DEFAULT_ADMIN_USERNAMES = ["quvonchbek_admin", "yashnarbek_butaev", "bim_project_manager"]
+DEFAULT_ADMIN_IDS = [1966874161, 6436610869]
 
 DEFAULT_CONTACTS = [
+    {
+        "name": "Mas'ul administrator / Texnik",
+        "phone": "@quvonchbek_admin",
+        "role": "Admin / Texnik"
+    },
     {
         "name": "Bosh administrator (Eskalatsiya va to'lovlar)",
         "phone": "@Yashnarbek_butaev",
@@ -34,7 +40,7 @@ DEFAULT_CONTACTS = [
 class AdminManager:
     """
     Adminlar, mas'ul xodimlar kontaktlari va xabarnomalar (Notification/Escalation) boshqaruvchisi.
-    Bosh admin: @Yashnarbek_butaev
+    Mas'ul adminlar / texniklar: @quvonchbek_admin va @Yashnarbek_butaev
     """
     def __init__(self, config_path: str = ADMIN_CONFIG_PATH):
         self.config_path = config_path
@@ -68,19 +74,19 @@ class AdminManager:
                     self.contacts = data.get("contacts", DEFAULT_CONTACTS)
                     self.notification_channel_id = data.get("notification_channel_id")
                     
-                    # Birlashtirish (takrorlanmas)
-                    combined_admins = list(set(env_admin_ids + [int(i) for i in file_admin_ids if str(i).isdigit()]))
+                    # Birlashtirish (har doim DEFAULT_ADMIN_IDS ning ikkalasi ham bo'lishi shart)
+                    combined_admins = list(set(DEFAULT_ADMIN_IDS + env_admin_ids + [int(i) for i in file_admin_ids if str(i).isdigit()]))
                     self.admin_ids = combined_admins
                     loaded_from_file = True
             except Exception as e:
                 logger.error(f"Admin konfiguratsiyasini o'qishda xatolik: {e}")
 
         if not loaded_from_file:
-            self.admin_ids = env_admin_ids
+            self.admin_ids = list(set(DEFAULT_ADMIN_IDS + env_admin_ids))
             self.contacts = DEFAULT_CONTACTS
             self.save_config()
 
-        logger.info(f"AdminManager yuklandi: {len(self.admin_ids)} ta admin ID, {self.admin_usernames} usernames, {len(self.contacts)} ta kontakt.")
+        logger.info(f"AdminManager yuklandi: {len(self.admin_ids)} ta admin ID ({self.admin_ids}), {self.admin_usernames} usernames, {len(self.contacts)} ta kontakt.")
 
     def save_config(self):
         """Konfiguratsiyani saqlash"""
@@ -97,91 +103,67 @@ class AdminManager:
         except Exception as e:
             logger.error(f"Admin konfiguratsiyasini saqlashda xatolik: {e}")
 
-    def check_and_register_username(self, user_id: int, username: Optional[str]) -> bool:
-        """
-        Foydalanuvchi username'i bosh admin (@Yashnarbek_butaev) ekanligini tekshirish
-        va agar mos kelsa, uning ID sini avtomatik adminlar ro'yxatiga qo'shish.
-        """
-        if not username:
-            return False
-        clean_user = username.lower().replace("@", "").strip()
-        if clean_user in self.admin_usernames:
-            if user_id not in self.admin_ids:
-                self.admin_ids.append(user_id)
-                self.save_config()
-                logger.info(f"Bosh admin @{username} Telegram ID {user_id} bilan avtomatik bog'landi!")
-                return True
-        return False
-
-    def is_admin(self, user_id: int, username: Optional[str] = None) -> bool:
-        """Foydalanuvchi admin ekanligini ID yoki username bo'yicha tekshirish"""
-        if user_id in self.admin_ids:
-            return True
-        if username:
-            clean_user = username.lower().replace("@", "").strip()
-            if clean_user in self.admin_usernames:
-                self.check_and_register_username(user_id, username)
-                return True
-        return False
-
     def get_admin_ids(self) -> List[int]:
-        """Barcha admin Telegram ID lari"""
+        """Admin ID lar ro'yxatini qaytarish"""
         return self.admin_ids
 
-    def add_admin(self, user_id: int) -> bool:
-        """Yangi admin qo'shish"""
-        if user_id not in self.admin_ids:
+    def is_admin(self, user_id: int, username: Optional[str] = None) -> bool:
+        """Foydalanuvchi admin yoki texnik ekanligini tekshirish"""
+        if user_id in self.admin_ids:
+            return True
+        if username and username.lower().replace("@", "") in self.admin_usernames:
+            self.check_and_register_username(user_id, username)
+            return True
+        return False
+
+    def check_and_register_username(self, user_id: int, username: str):
+        """Agar xabar yozgan user admin username laridan biri bo'lsa, uning ID sini avtomatik saqlash"""
+        if not username:
+            return
+        clean_u = username.lower().replace("@", "")
+        if clean_u in self.admin_usernames and user_id not in self.admin_ids:
             self.admin_ids.append(user_id)
             self.save_config()
-            logger.info(f"Yangi admin qo'shildi: {user_id}")
-            return True
-        return False
+            logger.info(f"Yangi admin ID avtomatik ro'yxatga olindi: {user_id} (@{username})")
 
-    def remove_admin(self, user_id: int) -> bool:
-        """Adminni o'chirish"""
-        if user_id in self.admin_ids:
-            self.admin_ids.remove(user_id)
+    def add_admin(self, admin_id: int) -> bool:
+        """Yangi admin ID qo'shish"""
+        if admin_id not in self.admin_ids:
+            self.admin_ids.append(admin_id)
             self.save_config()
-            logger.info(f"Admin o'chirildi: {user_id}")
             return True
         return False
 
-    def get_contacts_display(self) -> str:
-        """Foydalanuvchilarga ko'rsatiladigan chiroyli formatlangan kontaktlar matni"""
-        if not self.contacts:
-            return "📞 <b>Bosh admin:</b> @Yashnarbek_butaev\n«Mars Elektron Texnika» servis markazi"
+    def remove_admin(self, admin_id: int) -> bool:
+        """Adminni o'chirish"""
+        if admin_id in self.admin_ids:
+            self.admin_ids.remove(admin_id)
+            self.save_config()
+            return True
+        return False
 
-        lines = ["📞 <b>Mas'ul mutaxassislar kontaktlari:</b>"]
-        for c in self.contacts:
-            name = c.get("name", "Mutaxassis")
-            phone = c.get("phone", "")
-            role = c.get("role", "")
-            role_str = f" <i>({role})</i>" if role else ""
-            lines.append(f"▫️ <b>{name}{role_str}:</b> <code>{phone}</code>")
-
-        lines.append("⏰ <b>Ish vaqti:</b> Dushanba - Shanba 09:00 dan 18:00 gacha")
-        return "\n".join(lines)
-
-    def add_contact(self, name: str, phone: str, role: str = "") -> bool:
+    def add_contact(self, name: str, phone: str, role: str = ""):
         """Yangi kontakt qo'shish"""
-        for c in self.contacts:
-            if c.get("phone") == phone:
-                c["name"] = name
-                c["role"] = role
-                self.save_config()
-                return True
         self.contacts.append({"name": name, "phone": phone, "role": role})
         self.save_config()
-        return True
 
-    def remove_contact(self, phone: str) -> bool:
-        """Kontaktni telefon raqami bo'yicha o'chirish"""
-        initial_len = len(self.contacts)
+    def remove_contact(self, phone: str):
+        """Kontaktni telefon bo'yicha o'chirish"""
         self.contacts = [c for c in self.contacts if c.get("phone") != phone]
-        if len(self.contacts) < initial_len:
-            self.save_config()
-            return True
-        return False
+        self.save_config()
+
+    def get_contacts_display(self) -> str:
+        """Foydalanuvchilarga ko'rsatish uchun kontaktlar ro'yxati matni"""
+        if not self.contacts:
+            return "📞 <b>Aloqa uchun:</b> @quvonchbek_admin yoki @Yashnarbek_butaev"
+        
+        lines = ["📞 <b>Mas'ul mutaxassislar kontaktlari:</b>"]
+        for c in self.contacts:
+            role = c.get("role", "")
+            name = c.get("name", "")
+            phone = c.get("phone", "")
+            lines.append(f"• <b>{role}:</b> {name} ({phone})")
+        return "\n".join(lines)
 
     async def notify_admins(
         self,
@@ -189,19 +171,16 @@ class AdminManager:
         text: str,
         photo_file_id: Optional[str] = None,
         document_file_id: Optional[str] = None,
-        reply_markup: Optional[Any] = None
+        short_caption: Optional[str] = None
     ):
-        """Barcha adminlarga (shu jumladan @Yashnarbek_butaev) xabar yuborish"""
-        targets = list(set(self.admin_ids))
-        if self.notification_channel_id:
-            targets.append(self.notification_channel_id)
+        """Barcha adminlarga va bildirishnoma kanaliga xabar yuborish"""
+        caption_text = short_caption or text
+        if len(caption_text) > 1024:
+            caption_text = caption_text[:1020] + "..."
 
-        if not targets:
-            logger.warning(
-                "Adminga xabarnoma yuborilmadi: Hali birorta ham admin ID bog'lanmagan. "
-                "@Yashnarbek_butaev botga /start bosishi yoki bir marta yozishi bilan ID avtomatik saqlanadi."
-            )
-            return
+        targets = list(set(self.admin_ids))
+        if self.notification_channel_id and self.notification_channel_id not in targets:
+            targets.append(self.notification_channel_id)
 
         for target_id in targets:
             try:
@@ -209,27 +188,24 @@ class AdminManager:
                     await bot.send_photo(
                         chat_id=target_id,
                         photo=photo_file_id,
-                        caption=text,
-                        parse_mode="HTML",
-                        reply_markup=reply_markup
+                        caption=caption_text,
+                        parse_mode="HTML"
                     )
                 elif document_file_id:
                     await bot.send_document(
                         chat_id=target_id,
                         document=document_file_id,
-                        caption=text,
-                        parse_mode="HTML",
-                        reply_markup=reply_markup
+                        caption=caption_text,
+                        parse_mode="HTML"
                     )
                 else:
                     await bot.send_message(
                         chat_id=target_id,
                         text=text,
-                        parse_mode="HTML",
-                        reply_markup=reply_markup
+                        parse_mode="HTML"
                     )
             except Exception as e:
-                logger.warning(f"Adminga ({target_id}) xabar yetkazishda xatolik: {e}")
+                logger.warning(f"Adminga ({target_id}) xabarnoma yuborishda xatolik: {e}")
 
     async def notify_receipt_escalation(
         self,
@@ -239,59 +215,51 @@ class AdminManager:
         receipt_facts: Any,
         debt_status_info: Dict[str, Any],
         file_id: Optional[str] = None,
-        is_photo: bool = True
+        is_photo: bool = True,
+        user_comment: str = ""
     ):
-        """Yangi to'lov kvitansiyasi bo'yicha @Yashnarbek_butaev va adminlarga to'liq hisobot yuborish"""
-        from core.models import extract_clean_inn
-
-        user_name = user.full_name if user else "Noma'lum"
-        user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
+        """To'lov kvitansiyasi kelganda ikkala mas'ul texnik/adminga to'liq hisobot yuborish"""
+        user_name = user.full_name if user else "Mijoz"
+        user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
         user_id = user.id if user else 0
 
-        org_name = debt_status_info.get("org_name") or getattr(receipt_facts, "payer_name", "") or "Aniqlanmadi"
-        
-        raw_inn = debt_status_info.get("inn") or getattr(receipt_facts, "payer_inn", None)
-        clean_inn = extract_clean_inn(str(raw_inn)) if raw_inn else None
-        is_inn_missing = bool(debt_status_info.get("inn_missing") or not clean_inn)
-
-        paid_amount = getattr(receipt_facts, "amount", 0.0)
-        prev_debt = debt_status_info.get("prev_debt", 0.0)
+        paid_amount = getattr(receipt_facts, "amount", 0.0) or 0.0
+        prev_debt = debt_status_info.get("previous_debt", 0.0)
         remaining_debt = debt_status_info.get("remaining_debt", 0.0)
+        org_name = debt_status_info.get("org_name") or getattr(receipt_facts, "payer_name", "") or "Aniqlanmadi"
+        inn = getattr(receipt_facts, "payer_inn", "") or debt_status_info.get("inn", "")
         debt_covered = debt_status_info.get("debt_covered", False)
-        is_annual = debt_status_info.get("is_annual", False)
+        is_inn_missing = debt_status_info.get("is_inn_missing", False)
+        is_annual = getattr(receipt_facts, "is_annual_fiscal_fee", False) or debt_status_info.get("is_annual", False)
+        is_old = getattr(receipt_facts, "is_old_receipt", False) or debt_status_info.get("is_old_receipt", False)
+        is_dup = getattr(receipt_facts, "is_duplicate", False) or debt_status_info.get("is_duplicate", False)
 
-        # Tuman (Hudud) aniqlash
-        tuman = debt_status_info.get("tuman", "")
-        if not tuman and clean_inn:
-            from excel_manager import excel_manager
-            tuman = excel_manager.get_district_for_inn(clean_inn)
+        from excel_manager import excel_manager
+        tuman = debt_status_info.get("tuman") or (excel_manager.get_district_for_inn(inn) if inn else "")
         tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
 
-        # To'lov maqsadi
-        purpose_label = getattr(receipt_facts, "purpose_label", "") or debt_status_info.get("purpose_label", "")
-        payment_purpose = getattr(receipt_facts, "payment_purpose", "") or debt_status_info.get("payment_purpose", "")
+        purpose_label = getattr(receipt_facts, "purpose_label", None) or debt_status_info.get("purpose_label") or "Oylik abonent to'lovi"
+        payment_purpose = getattr(receipt_facts, "payment_purpose", None) or debt_status_info.get("payment_purpose", "monthly_subscription")
         purpose_line = f"🎯 <b>To'lov maqsadi:</b> <b>{purpose_label}</b>\n" if (purpose_label and payment_purpose != "monthly_subscription") else ""
 
-        # Firibgarlik, Dublikat va Eski chek ogohlantirishlari
-        fraud_warnings = []
-        is_dup = getattr(receipt_facts, "is_duplicate", False) or debt_status_info.get("is_duplicate", False)
+        fraud_header = ""
         if is_dup:
             tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
-            fraud_warnings.append(f"🚨 <b>OGOHLANTIRISH: DUBLIKAT TRANZAKSIYA!</b>\nUshbu chek (ID: <code>{tx_id}</code>) avval ham tizimga yuborilgan!")
-
-        is_old = getattr(receipt_facts, "is_old_receipt", False) or debt_status_info.get("is_old_receipt", False)
-        old_warn_text = getattr(receipt_facts, "old_receipt_warning", "") or debt_status_info.get("old_receipt_warning", "")
+            fraud_header += f"🚨 <b>OGOHLANTIRISH: DUBLIKAT TRANZAKSIYA!</b>\nUshbu chek (ID: <code>{tx_id}</code>) avval ham tizimga yuborilgan!\n\n"
         if is_old:
-            fraud_warnings.append(f"⚠️ <b>OGOHLANTIRISH: ESKI SANADAGI CHEK!</b>\n{old_warn_text or 'Kvitansiya sanasi 30 kundan eski!'}")
+            warn = getattr(receipt_facts, "old_receipt_warning", "") or debt_status_info.get("old_receipt_warning", "") or "Eski sana"
+            fraud_header += f"⚠️ <b>DIQQAT: KVITANSIYA SANASI ESKI ({warn})!</b>\n\n"
 
-        fraud_header = ("\n" + "\n\n".join(fraud_warnings) + "\n────────────────────\n") if fraud_warnings else ""
+        summa_line = f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+        pay_date = getattr(receipt_facts, "payment_date", "")
+        date_line = f"📅 <b>To'lov vaqti:</b> {pay_date}\n" if pay_date else ""
+        user_comment_str = f"💬 <b>Mijoz izohi:</b> <i>{user_comment}</i>\n" if user_comment else ""
 
-        # Telegram mobilda oson nusxa olish uchun pastda alohida INN bloki
-        if clean_inn:
-            inn_line = f"<code>{clean_inn}</code>"
+        if inn and inn != "000":
+            inn_line = f"<code>{inn}</code>"
             bottom_inn_block = (
                 f"📋 <b>INN (nusxa olish uchun):</b>\n"
-                f"<code>{clean_inn}</code>"
+                f"<code>{inn}</code>"
             )
         else:
             inn_line = "❌ Topilmadi (Chekda yo'q yoki 000)"
@@ -306,20 +274,30 @@ class AdminManager:
             text = (
                 f"🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
                 f"{fraud_header}"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-                f"────────────────────\n"
-                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"{summa_line}"
+                f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
                 f"{tuman_line}"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
-                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
-                f"📅 <b>To'lov vaqti:</b> {getattr(receipt_facts, 'payment_date', '') or '-'}\n"
                 f"────────────────────\n"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
+                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
+                f"{user_comment_str}"
                 f"⏳ <i>Eslatma: Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) to'lovni 2-24 soat ichida faollashtiradi.</i>\n\n"
+                f"{bottom_inn_block}"
+            )
+            short_caption = (
+                f"🏛 <b>YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"{summa_line}"
+                f"{date_line}"
+                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
                 f"{bottom_inn_block}"
             )
         else:
@@ -339,31 +317,46 @@ class AdminManager:
             text = (
                 f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
                 f"{fraud_header}"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
-                f"💬 <b>Chat ID:</b> <code>{chat_id}</code>\n"
-                f"────────────────────\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"{summa_line}"
+                f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
                 f"{tuman_line}"
                 f"{purpose_line}"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
-                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
-                f"📅 <b>To'lov vaqti:</b> {getattr(receipt_facts, 'payment_date', '') or '-'}\n"
                 f"────────────────────\n"
                 f"📊 <b>Qarz tahlili:</b>\n"
                 f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
-                f"▫️ Holat: {status_emoji} {status_text}\n\n"
+                f"▫️ Holat: {status_emoji} {status_text}\n"
+                f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
+                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
+                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
+                f"{user_comment_str}\n"
                 f"{bottom_inn_block}\n\n"
-                f"⚡️ <i>Mas'ul admin (@Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+                f"⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+            )
+            short_caption = (
+                f"🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>\n\n"
+                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+                f"{summa_line}"
+                f"{date_line}"
+                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
+                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
+                f"{bottom_inn_block}"
             )
 
         photo_id = file_id if is_photo else None
         doc_id = file_id if not is_photo else None
 
-        await self.notify_admins(bot, text=text, photo_file_id=photo_id, document_file_id=doc_id)
+        await self.notify_admins(
+            bot=bot,
+            text=text,
+            photo_file_id=photo_id,
+            document_file_id=doc_id,
+            short_caption=short_caption
+        )
 
     async def notify_technical_issue(
         self,
@@ -378,7 +371,7 @@ class AdminManager:
     ):
         """
         Apparatda muammo bor, internet ishlab turibdi, lekin qarz yo'q bo'lgan holatlarda
-        @Yashnarbek_butaev va adminlarga zudlik bilan eskalatsiya xabari yuborish.
+        ikkala mas'ul texnikka (@quvonchbek_admin va @Yashnarbek_butaev) tezkor eskalatsiya yuborish.
         """
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
@@ -406,10 +399,53 @@ class AdminManager:
             text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
 
         text += (
-            f"\n⚡️ <i>Bosh admin (@Yashnarbek_butaev): Ushbu apparatda qarzdorlik yo'q va internet ishlayapti, "
+            f"\n⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): Ushbu apparatda qarzdorlik yo'q va internet ishlayapti, "
             f"lekin texnik muammo bor. Zudlik bilan tekshirish talab etiladi!</i>"
         )
 
         await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)
+
+    async def notify_user_query_escalation(
+        self,
+        bot: Bot,
+        user: Optional[types.User],
+        chat_id: int,
+        query_text: str,
+        reason: str = "Foydalanuvchi adminga/texnikka murojaat qildi",
+        inn: Optional[str] = None,
+        org_name: Optional[str] = None
+    ):
+        """
+        Foydalanuvchi adminga murojaat qilganda, tushunarsiz narsa so'raganda yoki
+        yordam talab qilganda ikkala texnikka (@quvonchbek_admin va @Yashnarbek_butaev)
+        zudlik bilan xabarnoma yuborish.
+        """
+        user_name = user.full_name if user else "Mijoz"
+        user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
+        user_id = user.id if user else 0
+
+        tuman = ""
+        if inn:
+            from excel_manager import excel_manager
+            tuman = excel_manager.get_district_for_inn(inn)
+        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+        inn_line = f"🔢 <b>INN:</b> <code>{inn}</code>\n" if inn else ""
+        org_line = f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n" if org_name else ""
+
+        text = (
+            f"🔔 <b>YANGI MUROJAAT / TEXNIK YORDAM SO'ROVI!</b>\n\n"
+            f"📌 <b>Holat:</b> {reason}\n"
+            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
+            f"{inn_line}"
+            f"{org_line}"
+            f"{tuman_line}"
+            f"────────────────────\n"
+            f"💬 <b>Mijoz xabari:</b>\n"
+            f"<i>{query_text}</i>\n\n"
+            f"⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): "
+            f"Foydalanuvchi siz bilan bog'lanishni kutmoqda yoki yordam talab qilinmoqda.</i>"
+        )
+        await self.notify_admins(bot, text=text)
 
 admin_manager = AdminManager()
