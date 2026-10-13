@@ -214,9 +214,9 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             user_memory.add_assistant_message(chat_id, user_id, guide_msg)
             return
 
-    # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (KANAL MATN POSTIDAN UZATISH VA QO'SHIMCHA IZOH)
+    # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (agar aniq INN yoki Fiskal modul kiritilmagan bo'lsa)
     payment_intent = classify_payment_intent(text)
-    if payment_intent:
+    if payment_intent and not found_fm and not found_inn:
         if payment_intent == "monthly":
             # A) Oylik abonent hisob raqami (Post 85 kanaldan nusxalanadi)
             try:
@@ -387,18 +387,15 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_msg)
 
-        user_display = message.from_user.full_name if message.from_user else "Mijoz"
-        username_str = f"@{message.from_user.username}" if (message.from_user and message.from_user.username) else "Yo'q"
-        org_display = decision.org_name if decision.org_name else "Noma'lum"
-        inn_display = decision.detected_inn if decision.detected_inn else "-"
-        admin_text = (
-            f"🚨 <b>MIJOZ OPERATOR / MUTAXASSIS TALAB QILMOQDA!</b>\n\n"
-            f"👤 <b>Mijoz:</b> {user_display} ({username_str})\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-            f"🏢 <b>Korxona / INN:</b> {org_display} (<code>{inn_display}</code>)\n"
-            f"💬 <b>Mijoz xabari:</b> <i>{text}</i>"
+        await admin_manager.notify_user_query_escalation(
+            bot=bot,
+            user=message.from_user,
+            chat_id=chat_id,
+            query_text=text,
+            reason="Mijoz operator / usta talab qilmoqda",
+            inn=decision.detected_inn if decision.detected_inn != "-" else None,
+            org_name=decision.org_name if decision.org_name != "-" else None
         )
-        await admin_manager.notify_admins(bot, text=admin_text)
         return
 
     # 5. DAVOMIY KONVERSATSION SAVOLLAR YOKI FAOL SUHBAT KONTEKSTI

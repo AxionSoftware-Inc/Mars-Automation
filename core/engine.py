@@ -875,10 +875,10 @@ class CoreEngine:
                 log_reason="Error 406 inquiry resolved"
             )
 
-        # 3. To'lov rekvizitlari va hisob raqamlar so'rovi:
+        # 3. To'lov rekvizitlari va hisob raqamlar so'rovi (agar aniq INN yoki Fiskal modul kiritilmagan bo'lsa):
         from payment_accounts import classify_payment_intent, get_monthly_payment_card, get_monthly_post_note, get_annual_payment_card, get_annual_post_note
         p_intent = classify_payment_intent(clean_text)
-        if p_intent:
+        if p_intent and not found_fm and not found_inn:
             if p_intent == "monthly":
                 card_text = f"{get_monthly_payment_card()}\n\n{get_monthly_post_note(user_script)}"
                 return DecisionResult(
