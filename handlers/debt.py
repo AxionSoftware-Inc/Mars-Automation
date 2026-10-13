@@ -201,7 +201,9 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     if total_debt <= 0 and ofd_bridge.is_configured():
         fm_hint = (
             "💡 <b>Yillik fiskal modul muddatini tekshirish:</b>\n"
-            "Oylik to'lov bo'yicha qarzdorlik mavjud emas! Agar apparatingizda Soliq (OFD) yoki Yillik litsenziya muddatini tekshirmoqchi bo'lsangiz, chekingizning pastki qismidagi <b>Fiskal modul raqamini</b> (masalan: <code>LG...</code> yoki <code>YG...</code>) yuboring."
+            "Oylik to'lov bo'yicha qarzdorlik mavjud emas! Agar apparatingizda Soliq (OFD) yoki Yillik litsenziya muddatini tekshirmoqchi bo'lsangiz, "
+            "<b>aynan o'sha muammoli apparatdan chiqarilgan chekning</b> pastki qismidagi <b>Fiskal modul raqamini</b> (masalan: <code>LG...</code> yoki <code>YG...</code>) yuboring.\n\n"
+            "⚠️ <i>Eslatma: Har bir apparatda bitta alohida fiskal modul bo'ladi, boshqa apparat chekidan raqam olib yubormang.</i>"
         )
         fm_hint = adapt_to_user_script(fm_hint, user_script)
         try:

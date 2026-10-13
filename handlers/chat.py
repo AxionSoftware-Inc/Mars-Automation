@@ -112,9 +112,10 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     if any(kw in lower_text for kw in ofd_check_keywords):
         fm_ask = (
             "🏛 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini tekshirish:</b>\n\n"
-            "⚠️ <b>Eslatma:</b> Yillik muddatni tekshirish uchun korxona INN raqami emas, balki apparatingizning <b>Fiskal modul raqami (FM)</b> kerak bo'ladi.\n\n"
-            "📌 <b>Uni qayerdan olish mumkin?</b>\n"
-            "Chiqarilgan chekning eng pastki qismida <b>LG...</b> yoki <b>YG...</b> kabi 2 ta harf bilan boshlangan 12-16 xonali seriya raqami yozilgan bo'ladi.\n\n"
+            "⚠️ <b>Muhim qoida:</b> Har bitta kassa apparatida faqat <b>bitta o'ziga xos Fiskal modul</b> bo'ladi! "
+            "Boshqa apparatingizning chekidan emas, <b>aynan o'sha muammoli (ishlamayotgan) apparatdan</b> chiqarilgan chekning pastki qismidagi seriya raqami kerak.\n\n"
+            "📌 <b>Uni qayerdan topish mumkin?</b>\n"
+            "Aynan o'sha apparat chekining eng pastki qismida <b>LG...</b> yoki <b>YG...</b> kabi 2 ta harf bilan boshlangan 12-16 xonali seriya raqami yozilgan bo'ladi.\n\n"
             "📸 <i>O'sha fiskal modul raqamini (masalan: <code>LG420210...</code>) yozib yuboring yoki chekning pastki qismini rasmga olib tashlang, darhol tekshirib beramiz!</i>"
         )
         fm_ask = adapt_to_user_script(fm_ask, user_script)

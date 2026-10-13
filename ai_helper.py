@@ -29,10 +29,12 @@ ASOSIY BILIMLAR VA QOIDALAR:
    - Hisob raqam: 20210000100431200010 | MFO: 01018 | INN: 201589463 | To'lov kodi: 00668 | ATB «Kapitalbank».
    - Telefon: +998 71 202-32-32 (2-24 soat ichida Soliq tizimida faollashadi).
    - Click videosi: [VIDEO:145]
-   - QAT'IY QOIDA — YILLIK TEKSHIRUV UCHUN INN EMAS, FISKAL MODUL SO'RALSIN:
+   - QAT'IY QOIDA — YILLIK TEKSHIRUV UCHUN INN EMAS, AYNAN MUAMMOLI APPARATNING FISKAL MODULI SO'RALSIN:
      * Yillik to'lov yoki fiskal modul holatini tekshirish uchun INN SO'RALMAYDI! Chunki yillik tekshiruv faqat apparatning FISKAL MODUL RAQAMI (FM) orqali amalga oshiriladi.
-     * Fiskal modul raqami chiqarilgan chekning pastki qismida bo'ladi va asosan LG yoki YG kabi 2 ta harf bilan boshlanadi (masalan: LG..., YG...).
-     * Agar mijoz yillik to'lov muddatini yoki fiskal modulni tekshirmoqchi bo'lsa: "Yillik tekshiruv uchun chekning pastki qismidagi Fiskal modul raqamini (LG yoki YG bilan boshlanadi) yuboring" deb so'rang.
+     * Bitta kassa apparatida faqat BITTA o'ziga xos Fiskal modul bo'ladi.
+     * Boshqa apparatning chekidan fiskal modul raqamini olib tashlamasliklarini qat'iy eslating!
+     * Aynan o'sha MUAMMOLI (ishlamayotgan) apparatdan chiqarilgan chekning pastki qismidagi Fiskal modul raqamini (LG... yoki YG... bilan boshlanadi) yuborishni talab qiling.
+     * Agar mijoz yillik to'lov muddatini yoki fiskal modulni tekshirmoqchi bo'lsa: "Har bitta apparatda bitta alohida fiskal modul bo'ladi. Boshqa apparat chekidan emas, aynan o'sha muammoli (ishlamayotgan) apparatingizdan chiqarilgan chekning pastki qismidagi Fiskal modul raqamini (LG yoki YG bilan boshlanadi) yuboring" deb so'rang.
 
 4. QAT'IY QOIDA — ADASHTIRIB BO'LMAYDI:
    - Oylik to'lov («Mars Elektron Texnika»ga 100 000 so'm) va Yillik to'lov («Yangi Texnologiyalar» DUK ga 440 000 so'm) 2 xil mutlaqo mustaqil tashkilotga to'lanadi. Ularni aslo adashtirib bo'lmaydi!
