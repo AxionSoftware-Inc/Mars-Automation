@@ -41,6 +41,8 @@ def deploy():
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',
+        'core/rule_engine.py',
+        'data/custom_patches.json',
         'handlers/__init__.py',
         'handlers/admin.py',
         'handlers/channel.py',

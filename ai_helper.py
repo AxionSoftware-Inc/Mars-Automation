@@ -176,3 +176,23 @@ def generate_ai_reply(
             "Savolingiz bo'yicha ma'lumot olish uchun INN raqamingizni yuboring yoki apparat ekranini rasmga olib tashlang."
         )
         return adapt_to_user_script(fallback_text, target_script), None
+
+
+class AIHelper:
+    """Yadro va boshqa modullar uchun yagona AI muloqot interfeysi"""
+    async def ask_with_context(
+        self,
+        user_text: str,
+        chat_id: int,
+        user_id: int,
+        catalog: Optional[list] = None
+    ) -> Tuple[str, Optional[int]]:
+        from user_memory import user_memory
+        from translit_manager import detect_script
+        script = detect_script(user_text)
+        context = user_memory.get_context_summary(chat_id, user_id)
+        reply, vid = generate_ai_reply(user_message=user_text, context_history=context, target_script=script)
+        return reply, vid
+
+
+ai_helper = AIHelper()

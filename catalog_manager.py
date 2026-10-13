@@ -204,4 +204,25 @@ Javobingiz FAQAT toza JSON bo'lsin:
             logger.error(f"Yangi postni avto-indekslashda xatolik: {e}")
             return False
 
+    def get_post_by_id(self, post_id: int) -> Optional[Dict[str, Any]]:
+        """ID bo'yicha postni topish"""
+        for p in self.posts:
+            if p.get("id") == post_id:
+                return p
+        return None
+
+    def search(self, text: str) -> Optional[Dict[str, Any]]:
+        """Qidiruv natijasida mos post lug'atini qaytarish"""
+        pid = self.find_matching_post(text)
+        if pid:
+            post = self.get_post_by_id(pid)
+            if post:
+                return post
+            return {"id": pid, "title": "Video-qo'llanma", "description": ""}
+        return None
+
+    def get_all_videos(self) -> List[Dict[str, Any]]:
+        """Barcha video postlar ro'yxatini qaytarish"""
+        return self.posts
+
 catalog_manager = CatalogManager()

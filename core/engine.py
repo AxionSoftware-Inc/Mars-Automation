@@ -826,6 +826,26 @@ class CoreEngine:
         found_fm = extract_fiscal_module(clean_text)
         remembered_id = user_memory.get_last_id(chat_id, user_id)
 
+        # -1. MODULLI RULE ENGINE VA MAYDA PATCHLAR TEKSHIRUVI (PLUG & PLAY):
+        from core.rule_engine import rule_engine, RuleContext
+        rule_ctx = RuleContext(
+            text=text,
+            clean_text=clean_text,
+            lower_text=lower_text,
+            chat_id=chat_id,
+            user_id=user_id,
+            user_name=user_name,
+            user_username=user_username,
+            user_script=user_script,
+            found_inn=found_inn,
+            found_fm=found_fm,
+            remembered_id=remembered_id,
+            bot=bot
+        )
+        patch_result = await rule_engine.evaluate(rule_ctx)
+        if patch_result is not None:
+            return patch_result
+
         # 0. Agar foydalanuvchi avval kvitansiya yuklagan bo'lsa va endi INN yozsa:
         if found_inn:
             pending_res = self.resolve_pending_receipt_if_any(found_inn, chat_id, user_id)

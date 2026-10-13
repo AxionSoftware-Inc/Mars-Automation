@@ -202,6 +202,8 @@ async def cmd_yangi_buyruq(message: types.Message):
 | Fayl / Papka | Vazifasi |
 | :--- | :--- |
 | `core/engine.py` | 🧠 Markaziy Yadro (Qarorlar chiqaruvchi orkestrator) |
+| `core/rule_engine.py` | 🔌 Modulli Patch va Qoidalar Dvigateli (Plug & Play Rule Engine) |
+| `data/custom_patches.json`| 📑 Deklarativ mayda patchlar bazasi (kodga tegmasdan yangi shartlar qo'shish) |
 | `core/models.py` | 📦 Ma'lumot modellari (`DeviceFacts`, `ReceiptFacts`, `DecisionResult`, `ActionType`) |
 | `admin_manager.py` | 👨‍💻 Adminlar, mas'ul xodimlar kontaktlari va bildirishnomalar (Escalation) boshqaruvchisi |
 | `receipt_analyzer.py`| 🧾 To'lov kvitansiyalari (rasm / PDF) faktlarini ajratuvchi Sensor |
@@ -218,4 +220,23 @@ async def cmd_yangi_buyruq(message: types.Message):
 | `user_memory.py` | 💾 Ko'p foydalanuvchili 12 soatlik sessiya va pending kvitansiya xotirasi |
 | `openrouter_client.py`| ⚡️ Gemini 3.5 Flash Lite modeli bilan barqaror aloqa |
 | `bot.py` | 🚀 Botni ishga tushiruvchi ixcham dastur |
+
+---
+
+## 8. Modulli Qoidalar va Mayda Patchlar Tizimi (Plug & Play Rule Engine)
+
+### Nega bu arxitektura joriy etildi?
+Ilgari botga mayda shartlar (masalan: *"Wi-Fi parolini qayerdan o'zgartirish kerak?", "quloqchin bormi?", "lenta qayerdan olinadi?"*) to'g'ridan-to'g'ri `handlers/chat.py` yoki `core/engine.py` ichidagi if/elif zanjiriga kiritilardi. Bu esa asosiy biznes mantig'ini (INN qarz tekshiruvi, 406 xatolik, kvitansiyalar, eskalatsiya) buzib qo'yardi yoki regressiyalarga olib kelardi.
+
+### Yangi yechim:
+1. **Yakkalangan maydon (Blast Radius = 0):**
+   Yangi qoidalar `core/rule_engine.py` orqali yoki `data/custom_patches.json` da bitta JSON obyekti sifatida qo'shiladi.
+2. **Prioritet zanjiri (Priority Ordering):**
+   - `90 - 100`: Favqulodda override yoki qat'iy shartlar.
+   - `70 - 89`: Mayda patchlar, savol-javoblar (`data/custom_patches.json`).
+   - `10 - 40`: Fallback va umumiy tavsiyalar.
+3. **Xatolikdan himoya qalqoni (Crash Isolation):**
+   Bitta yangi kiritilgan patchda xatolik bo'lsa ham, `RuleEngine` uni logga yozadi va asosiy 4 bosqichli yadro o'z ishini hech to'xtovsiz davom ettiradi.
+4. **Kodga tegmasdan deklarativ patch qo'shish:**
+   `rule_engine.add_patch(patch_id, keywords, reply_text, priority)` orqali yoki to'g'ridan-to'g'ri `data/custom_patches.json` ga yozish orqali yangi javoblar bir zumda ishga tushadi.
 
