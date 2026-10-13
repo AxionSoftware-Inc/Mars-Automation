@@ -1,7 +1,7 @@
 import logging
 from aiogram import Router, types, Bot, F
 from catalog_manager import catalog_manager
-from ai_helper import generate_ai_reply
+from ai_helper import generate_ai_reply, generate_ai_reply_ex
 from user_memory import user_memory
 from payment_accounts import (
     classify_payment_intent,
@@ -406,7 +406,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     # Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat bo'lsa -> To'g'ridan-to'g'ri AI kontekstiga!
     if is_conversational or (has_active_context and not explicit_video_request):
         context_summary = user_memory.get_context_summary(chat_id, user_id)
-        reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary, target_script=user_script)
+        reply_text, ai_video_id, needs_admin = generate_ai_reply_ex(text, context_history=context_summary, target_script=user_script)
 
         if not reply_text or not reply_text.strip():
             fallback = (
@@ -427,6 +427,18 @@ async def handle_user_chat(message: types.Message, bot: Bot):
 
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_text)
+
+        if needs_admin:
+            from admin_manager import admin_manager
+            last_id = user_memory.get_last_id(chat_id, user_id)
+            await admin_manager.notify_user_query_escalation(
+                bot=bot,
+                user=message.from_user,
+                chat_id=chat_id,
+                query_text=text,
+                reason="Mijoz noma'lum savol berdi (AI bilmadi va adminga yo'naltirdi)",
+                inn=last_id
+            )
 
         if ai_video_id:
             try:
@@ -459,7 +471,7 @@ async def handle_user_chat(message: types.Message, bot: Bot):
 
     # 7. BOSHQALARI BO'YICHA UMUMIY AI JAVOBI
     context_summary = user_memory.get_context_summary(chat_id, user_id)
-    reply_text, ai_video_id = generate_ai_reply(text, context_history=context_summary, target_script=user_script)
+    reply_text, ai_video_id, needs_admin = generate_ai_reply_ex(text, context_history=context_summary, target_script=user_script)
 
     if not reply_text or not reply_text.strip():
         fallback = (
@@ -481,6 +493,18 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     # Suhbat xotirasiga yozish
     user_memory.add_user_message(chat_id, user_id, text)
     user_memory.add_assistant_message(chat_id, user_id, reply_text)
+
+    if needs_admin:
+        from admin_manager import admin_manager
+        last_id = user_memory.get_last_id(chat_id, user_id)
+        await admin_manager.notify_user_query_escalation(
+            bot=bot,
+            user=message.from_user,
+            chat_id=chat_id,
+            query_text=text,
+            reason="Mijoz noma'lum savol berdi (AI bilmadi va adminga yo'naltirdi)",
+            inn=last_id
+        )
 
     # Agar AI tegishli video tavsiya qilgan bo'lsa
     if ai_video_id:

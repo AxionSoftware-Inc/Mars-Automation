@@ -25,8 +25,10 @@ ASOSIY BILIMLAR VA QOIDALAR:
      * Agar mijoz apparat modelini so'rasa:
        -> Agar kontekstda mijozning apparat modeli ko'rsatilgan bo'lsa (P3 Humo yoki Smart One), aynan o'sha modelni ayting.
        -> Agar mijozning INN raqami hali ma'lum bo'lmasa, "Kassa apparatingiz modelini aniqlashimiz uchun korxonangiz INN raqamini yuboring" deb so'rang. Hech qachon o'zingizdan nom to'qimang!
-     * Agar biror mavzu yoki savol bo'yicha aniq ma'lumotga ega bo'lmasangiz:
-       "Kechirasiz, bu haqda menda aniq ma'lumot yo'q. Mutaxassislarimizga murojaat qilishingiz mumkin." deb lo'nda va to'g'ri javob bering.
+     * Agar biror mavzu yoki savol bo'yicha aniq ma'lumotga ega bo'lmasangiz (kontekstda va yuqoridagi bilimlarda yo'q bo'lsa):
+       TAXMIN QILMANG! Javobingizni AYNAN shunday yozing va oxiriga [ADMINGA_SAVOL] tegini qo'shing:
+       "Bu savol bo'yicha menda aniq ma'lumot yo'q. Savolingizni mas'ul mutaxassisimizga yubordim, tez orada sizga javob berishadi. [ADMINGA_SAVOL]"
+       Bu teg mijozga ko'rinmaydi, u savolni adminga avtomatik yuboradi. Faqat haqiqatan bilmagan holda ishlating.
 
 2. OYLIK ABONENT TO'LOVI (Mars servis va dastur xizmati):
    - Har oyning 6-sanasigacha to'lanishi shart (100 000 so'm/oy). To'lanmasa apparat 6-sanasidan keyin avtomatik bloklanadi.
@@ -121,15 +123,20 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
    - Hech qachon mijoz yozgan alifboga teskari alifboda javob qaytarmang!
 """
 
-def generate_ai_reply(
+ADMIN_QUESTION_TAG = "[ADMINGA_SAVOL]"
+# Zaxira: AI teg qo'yishni unutsa ham, "bilmayman" iboralari bo'lsa adminga yuboriladi
+_UNKNOWN_PHRASES = ("menda aniq ma'lumot yo'q", "menda aniq malumot yoq", "менда аниқ маълумот йўқ")
+
+
+def generate_ai_reply_ex(
     user_message: str,
     context_history: str = "",
     target_script: Optional[str] = None
-) -> Tuple[str, Optional[int]]:
+) -> Tuple[str, Optional[int], bool]:
     """
-    Kontekst asosida, lo'nda va suhbat zanjirini buzmagan holda AI javobi berish.
-    Foydalanuvchi alifbosiga (lotin yoki kirill) 100% moslashtiriladi.
-    Natija: (javob_matni, video_id yoki None)
+    generate_ai_reply bilan bir xil, lekin 3-qiymat qaytaradi:
+    (javob_matni, video_id, needs_admin)
+    needs_admin=True -> AI javobni bilmadi, savol adminga yuborilishi kerak.
     """
     from translit_manager import detect_script, adapt_to_user_script
 
@@ -152,6 +159,12 @@ def generate_ai_reply(
 
         full_text = openrouter_client.chat_completion(messages=messages, temperature=0.2) or ""
         full_text = full_text.strip()
+
+        # [ADMINGA_SAVOL] tegini ajratish (mijozga ko'rsatilmaydi)
+        needs_admin = ADMIN_QUESTION_TAG in full_text
+        full_text = full_text.replace(ADMIN_QUESTION_TAG, "").strip()
+        if not needs_admin and any(p in full_text.lower() for p in _UNKNOWN_PHRASES):
+            needs_admin = True
         
         # [VIDEO:xxx] tegini ajratish
         video_id = None
@@ -168,18 +181,45 @@ def generate_ai_reply(
 
         # Alifboga moslashtirish kafolati
         full_text = adapt_to_user_script(full_text, target_script)
-        return full_text, video_id
+        return full_text, video_id, needs_admin
 
     except Exception as e:
         logger.error(f"AI reply xatoligi: {e}")
         fallback_text = (
             "Savolingiz bo'yicha ma'lumot olish uchun INN raqamingizni yuboring yoki apparat ekranini rasmga olib tashlang."
         )
-        return adapt_to_user_script(fallback_text, target_script), None
+        return adapt_to_user_script(fallback_text, target_script), None, False
+
+
+def generate_ai_reply(
+    user_message: str,
+    context_history: str = "",
+    target_script: Optional[str] = None
+) -> Tuple[str, Optional[int]]:
+    """
+    Kontekst asosida, lo'nda va suhbat zanjirini buzmagan holda AI javobi berish.
+    Foydalanuvchi alifbosiga (lotin yoki kirill) 100% moslashtiriladi.
+    Natija: (javob_matni, video_id yoki None)
+    """
+    text, video_id, _ = generate_ai_reply_ex(user_message, context_history, target_script)
+    return text, video_id
 
 
 class AIHelper:
     """Yadro va boshqa modullar uchun yagona AI muloqot interfeysi"""
+    async def ask_with_context_ex(
+        self,
+        user_text: str,
+        chat_id: int,
+        user_id: int,
+        catalog: Optional[list] = None
+    ) -> Tuple[str, Optional[int], bool]:
+        from user_memory import user_memory
+        from translit_manager import detect_script
+        script = detect_script(user_text)
+        context = user_memory.get_context_summary(chat_id, user_id)
+        return generate_ai_reply_ex(user_message=user_text, context_history=context, target_script=script)
+
     async def ask_with_context(
         self,
         user_text: str,
@@ -187,11 +227,7 @@ class AIHelper:
         user_id: int,
         catalog: Optional[list] = None
     ) -> Tuple[str, Optional[int]]:
-        from user_memory import user_memory
-        from translit_manager import detect_script
-        script = detect_script(user_text)
-        context = user_memory.get_context_summary(chat_id, user_id)
-        reply, vid = generate_ai_reply(user_message=user_text, context_history=context, target_script=script)
+        reply, vid, _ = await self.ask_with_context_ex(user_text, chat_id, user_id, catalog)
         return reply, vid
 
 

@@ -84,7 +84,16 @@ async def handle_document(message: types.Message, bot: Bot):
             return
 
         try:
-            if message.chat.id == DESTINATION_CHANNEL_ID:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            temp_file = os.path.join(DATA_DIR, f"temp_{doc.file_name}")
+            await bot.download(doc, destination=temp_file)
+            
+            success = excel_manager.update_file(temp_file)
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
+            # Kanaldagi eski fayl posti FAQAT yangi fayl qabul qilingandan keyin o'chiriladi
+            if success and message.chat.id == DESTINATION_CHANNEL_ID:
                 last_msg_id = get_last_file_message_id()
                 if last_msg_id and last_msg_id != message.message_id:
                     try:
@@ -93,14 +102,6 @@ async def handle_document(message: types.Message, bot: Bot):
                     except Exception as err:
                         logger.warning(f"Avvalgi fayl postini o'chirishda xatolik: {err}")
                 set_last_file_message_id(message.message_id)
-
-            os.makedirs(DATA_DIR, exist_ok=True)
-            temp_file = os.path.join(DATA_DIR, f"temp_{doc.file_name}")
-            await bot.download(doc, destination=temp_file)
-            
-            success = excel_manager.update_file(temp_file)
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
 
             if success:
                 logger.info(f"Yangi Excel bazasi yangilandi! Yozuvlar: {excel_manager.records_count}")
@@ -111,6 +112,19 @@ async def handle_document(message: types.Message, bot: Bot):
                         f"📊 Jami yozuvlar: <b>{excel_manager.records_count} ta</b>",
                         parse_mode="HTML"
                     )
+            else:
+                reason = getattr(excel_manager, "last_update_error", "") or "Noma'lum xatolik"
+                logger.error(f"Excel yangilash RAD ETILDI ({doc.file_name}): {reason}")
+                fail_text = (
+                    f"⚠️ <b>Yangi Excel qabul qilinmadi, eski baza ishlashda davom etmoqda.</b>\n"
+                    f"📁 Fayl: <code>{doc.file_name}</code>\n"
+                    f"❗️ Sabab: {reason}\n"
+                    f"📊 Hozirgi baza: <b>{excel_manager.records_count} ta</b> yozuv"
+                )
+                if message.chat.type != ChatType.CHANNEL:
+                    await message.reply(fail_text, parse_mode="HTML")
+                else:
+                    await admin_manager.notify_admins(bot, text=fail_text)
         except Exception as e:
             logger.error(f"Excel faylni yuklashda xatolik: {e}")
         return

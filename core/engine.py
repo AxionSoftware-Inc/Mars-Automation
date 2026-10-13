@@ -1101,18 +1101,23 @@ class CoreEngine:
 
         # 9. AI helper / Davomiy muloqot
         from ai_helper import ai_helper
-        ai_resp, ai_video_id = await ai_helper.ask_with_context(
+        ai_resp, ai_video_id, ai_needs_admin = await ai_helper.ask_with_context_ex(
             user_text=clean_text,
             chat_id=chat_id,
             user_id=user_id,
             catalog=catalog_manager.get_all_videos()
         )
+        final_notify = should_alert_tech or ai_needs_admin
+        alert_reason = (
+            f"Mijozda hal bo'lmagan muammo: {clean_text}" if should_alert_tech
+            else f"Mijoz noma'lum savol berdi (AI bilmadi va adminga yo'naltirdi): {clean_text}"
+        )
         return DecisionResult(
             action=ActionType.DIAGNOSE_AND_REPLY,
             reply_text=ai_resp,
             video_id=ai_video_id,
-            should_notify_admin=should_alert_tech,
-            admin_alert_text=f"Mijozda hal bo'lmagan muammo: {clean_text}",
+            should_notify_admin=final_notify,
+            admin_alert_text=alert_reason,
             log_reason="AI conversational response"
         )
 

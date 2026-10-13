@@ -234,15 +234,41 @@ class ExcelManager:
             return False
 
     def update_file(self, new_file_path: str) -> bool:
-        """Yangi kelgan Excel faylni almashtirish va qayta yuklash"""
+        """
+        Yangi kelgan Excel faylni XAVFSIZ almashtirish:
+        1) Avval yangi fayl alohida nusxada sinab o'qiladi;
+        2) Yozuvlar soni mantiqiy bo'lsagina latest.xlsx almashtiriladi;
+        3) Aks holda eski baza o'zgarishsiz qoladi (bot bazasiz qolib ketmaydi).
+        Natija sababi self.last_update_error da saqlanadi.
+        """
+        self.last_update_error = ""
         try:
+            if new_file_path.lower().endswith(".xls"):
+                self.last_update_error = "Eski .xls formati o'qilmaydi. Faylni .xlsx qilib saqlab yuboring."
+                return False
+
+            candidate = ExcelManager(excel_path=new_file_path)
+            new_count = getattr(candidate, "records_count", 0)
+            old_count = getattr(self, "records_count", 0)
+
+            if new_count == 0:
+                self.last_update_error = "Yangi faylda birorta ham korxona yozuvi topilmadi (format yoki ustunlar boshqacha)."
+                return False
+            if old_count > 0 and new_count < old_count * 0.5:
+                self.last_update_error = (
+                    f"Yangi faylda yozuvlar keskin kamaygan ({old_count} → {new_count}). "
+                    f"Xato fayl bo'lishi mumkin, baza almashtirilmadi."
+                )
+                return False
+
             os.makedirs(DATA_DIR, exist_ok=True)
-            if new_file_path != self.excel_path:
+            if os.path.abspath(new_file_path) != os.path.abspath(self.excel_path):
                 import shutil
                 shutil.copy2(new_file_path, self.excel_path)
             return self.load_data()
         except Exception as e:
             logger.error(f"Faylni yangilashda xatolik: {e}")
+            self.last_update_error = f"Faylni o'qishda xatolik: {e}"
             return False
 
     def search(self, query: str) -> List[Dict[str, Any]]:
