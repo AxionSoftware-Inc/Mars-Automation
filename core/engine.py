@@ -185,6 +185,17 @@ class CoreEngine:
             if facts.time_mismatch or facts.error_type != "none":
                 has_error = True
 
+        if target_inn:
+            user_memory.clear_pending_device_screen(chat_id, user_id)
+        elif is_meaningful_summary:
+            user_memory.set_pending_device_screen(chat_id, user_id, {
+                "screen_text_summary": clean_summary,
+                "is_status_bar_visible": facts.is_status_bar_visible,
+                "time_mismatch": facts.time_mismatch,
+                "has_internet": facts.has_internet,
+                "error_type": facts.error_type
+            })
+
         # 4-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
         # SmartPOS apparatda ekrandan aniq xatolik qoidasi topilmasa va tepada soat qatori ko'rinmasa -> to'liq ekran so'raladi!
         # P3 apparatda esa tepada soat bo'lmaydi.

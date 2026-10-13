@@ -212,6 +212,19 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         session["pending_receipt"] = None
 
+    def set_pending_device_screen(self, chat_id: int, user_id: int, device_data: Dict[str, Any]):
+        """INN aniqlanmagan ekran rasmini foydalanuvchi INN yozgunicha (Excel rangi P3/SmartPOS tekshirilishi uchun) saqlash"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["pending_device_screen"] = device_data
+
+    def get_pending_device_screen(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("pending_device_screen")
+
+    def clear_pending_device_screen(self, chat_id: int, user_id: int):
+        session = self._get_or_create_session(chat_id, user_id)
+        session["pending_device_screen"] = None
+
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""
         key = self._get_key(chat_id, user_id)

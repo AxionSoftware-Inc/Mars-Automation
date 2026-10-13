@@ -133,6 +133,14 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_memory.set_last_topic(chat_id, user_id, "debt_checked")
 
     resp = format_debt_response(results)
+    pending_screen = user_memory.get_pending_device_screen(chat_id, user_id)
+    if pending_screen:
+        user_memory.clear_pending_device_screen(chat_id, user_id)
+        is_p3 = any(bool(item.get("is_p3", False)) for item in results) if results else False
+        saved_summary = (pending_screen.get("screen_text_summary") or "").strip()
+        if is_p3 and saved_summary:
+            resp = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {saved_summary}\n\n──────────────\n{resp}"
+
     resp = adapt_to_user_script(resp, user_script)
     logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")
     try:
