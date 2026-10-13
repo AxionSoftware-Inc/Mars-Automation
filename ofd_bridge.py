@@ -15,6 +15,10 @@ DEFAULT_OFD_USERNAME = os.getenv("OFD_BOT_USERNAME", "ofd943_bot").lstrip("@").l
 OFD_KNOWN_USERNAMES = {"ofd943_bot", "ofd943"}
 CACHE_TTL_SECONDS = 300  # 5 daqiqa kesh (bir xil INN qayta-qayta so'ralganda)
 
+API_ID = int(os.getenv("TG_API_ID", "2040"))
+API_HASH = os.getenv("TG_API_HASH", "b18441a1ff607e10a989891a5462e627")
+USER_SESSION_FILE = os.path.join(DATA_DIR, "ofd_user.session")
+
 
 class OFDBridgeManager:
     """
@@ -187,31 +191,90 @@ class OFDBridgeManager:
         if not event.is_set():
             event.set()
 
+    def has_user_session(self) -> bool:
+        """Telethon user-akkaunt sessiyasi mavjudligini tekshirish"""
+        return os.path.exists(USER_SESSION_FILE)
+
+    async def _query_telethon(self, inn: str, timeout: float = 9.0) -> Optional[str]:
+        """Telethon user-akkaunt orqali maxfiy guruhga yoki to'g'ridan-to'g'ri @ofd943_bot ga INN yuborib javob olish"""
+        if not self.has_user_session():
+            return None
+        try:
+            from telethon import TelegramClient
+            session_prefix = os.path.join(DATA_DIR, "ofd_user")
+            client = TelegramClient(session_prefix, API_ID, API_HASH)
+            await client.connect()
+            if not await client.is_user_authorized():
+                await client.disconnect()
+                return None
+
+            target = self.ofd_group_id if (self.ofd_group_id and self.is_configured()) else self.ofd_username
+            sent = await client.send_message(target, inn)
+            logger.info(f"📤 OFDBridge (Telethon Userbot): {target} ga INN yuborildi: {inn}")
+
+            t0 = time.time()
+            reply_texts = []
+            collected_ids = set()
+
+            while time.time() - t0 < timeout:
+                await asyncio.sleep(0.6)
+                msgs = await client.get_messages(target, limit=5)
+                for m in msgs:
+                    if m.id > sent.id and m.id not in collected_ids:
+                        sender = await m.get_sender()
+                        s_uname = (getattr(sender, 'username', '') or '').lstrip('@').lower()
+                        s_fname = (getattr(sender, 'first_name', '') or '').strip().lower()
+                        if s_uname in OFD_KNOWN_USERNAMES or s_uname == self.ofd_username or s_fname == "ofd943":
+                            t = (m.text or "").strip()
+                            if t and not self._is_loading_placeholder(t):
+                                collected_ids.add(m.id)
+                                reply_texts.append(t)
+                if reply_texts:
+                    await asyncio.sleep(0.5)
+                    break
+
+            await client.disconnect()
+            if reply_texts:
+                full_reply = "\n\n".join(reply_texts).strip()
+                logger.info(f"📥 OFDBridge (Telethon Userbot): @{self.ofd_username} dan javob olindi (len={len(full_reply)})")
+                return full_reply
+        except Exception as e:
+            logger.error(f"❌ Telethon query xatoligi: {e}")
+        return None
+
     async def query_inn(self, bot: Bot, inn: str, timeout: float = 9.0) -> Optional[str]:
         """
-        Maxfiy guruhga INN yuborib, @ofd943 dan qaytgan javobni olish.
-        Parallel so'rovlar navbat bilan (_query_lock) bajariladi.
+        Maxfiy guruhga yoki @ofd943_bot ga INN yuborib, javobni olish.
+        Agar Telethon user-akkaunt ulangan bo'lsa -> Userbot orqali so'raydi (Bot-to-Bot cheklovini 100% chetlab o'tadi!).
+        Aks holda -> Bot API orqali maxfiy guruhga yuboradi.
         """
         clean_inn = "".join(ch for ch in str(inn) if ch.isdigit())
         if not clean_inn or len(clean_inn) not in (9, 14):
             return None
 
-        if not self.is_configured() or not self.ofd_group_id:
-            return None
-
-        # 1. Keshni tekshirish (oxirgi 5 daqiqa ichida so'ralgan bo'lsa)
+        # 1. Keshni tekshirish
         now = time.time()
         cached = self._cache.get(clean_inn)
         if cached and (now - cached["ts"] < CACHE_TTL_SECONDS):
             return cached["text"]
 
-        # 2. Navbat bilan maxfiy guruhga yozish va javobni kutish
+        # 2. Navbat bilan so'rov yuborish
         async with self._query_lock:
-            # Lock kutish davomida keshga tushgan bo'lsa qayta tekshirish
             now = time.time()
             cached = self._cache.get(clean_inn)
             if cached and (now - cached["ts"] < CACHE_TTL_SECONDS):
                 return cached["text"]
+
+            # A) Agar Telethon user session mavjud bo'lsa -> Userbot orqali so'rash
+            if self.has_user_session():
+                tele_res = await self._query_telethon(clean_inn, timeout=timeout)
+                if tele_res:
+                    self._cache[clean_inn] = {"text": tele_res, "ts": time.time()}
+                    return tele_res
+
+            # B) Agar Telethon bo'lmasa -> Bot API orqali maxfiy guruhga yozish
+            if not self.is_configured() or not self.ofd_group_id:
+                return None
 
             first_event = asyncio.Event()
             collector: Dict[str, Any] = {
@@ -224,13 +287,9 @@ class OFDBridgeManager:
 
             try:
                 await bot.send_message(chat_id=self.ofd_group_id, text=clean_inn)
-                logger.info(f"📤 OFDBridge: Maxfiy guruhga ({self.ofd_group_id}) INN yuborildi: {clean_inn}")
+                logger.info(f"📤 OFDBridge (Bot API): Maxfiy guruhga ({self.ofd_group_id}) INN yuborildi: {clean_inn}")
 
-                # Birinchi javob xabarini kutish
                 await asyncio.wait_for(first_event.wait(), timeout=timeout)
-
-                # Agar @ofd943 bir nechta xabar ketma-ket yuborsa (masalan bir nechta kassa bo'lsa),
-                # 0.6 soniya kutib barcha qismlarni yig'ib olish:
                 await asyncio.sleep(0.6)
                 collector["done"] = True
 
@@ -253,3 +312,4 @@ class OFDBridgeManager:
 
 
 ofd_bridge = OFDBridgeManager()
+
