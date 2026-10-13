@@ -208,7 +208,8 @@ class CoreEngine:
                 log_reason="No error rule matched on SmartPOS screen and status bar invisible"
             )
 
-        # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR, YOKI JIDDIY APPARAT XATOSI)
+        # 5-BOSQICH (LAYER 4): ADMINGA ESKALATSIYA HOLATI (HUDUDIY USTAGA YO'NALTIRISH)
+        # Internet bor + qarz yo'q + lekin apparatda jiddiy nosozlik bo'lsa
         is_fatal_hardware = bool(matched_rule and matched_rule.get("escalate_to_admin"))
         debt_verified_clear = bool(target_inn and total_debt <= 0)
         should_escalate = is_fatal_hardware or (facts.has_internet and debt_verified_clear and has_error and not facts.time_mismatch)
@@ -216,11 +217,14 @@ class CoreEngine:
         if should_escalate:
             issue_desc = diag_text or facts.screen_text_summary or "Noma'lum apparat nosozligi"
             contacts_info = admin_manager.get_contacts_display()
+            tuman = excel_manager.get_district_for_inn(target_inn) if target_inn else ""
+            tuman_line = f"📍 <b>Hududingiz:</b> {tuman}\n" if tuman else ""
             status_prefix = "✅ <b>Apparatingizda abonent to'lovidan qarzdorlik yo'q va internet tarmog'i faol.</b>\n\n" if not is_fatal_hardware else ""
             escalation_reply = (
                 f"{status_prefix}"
+                f"{tuman_line}"
                 f"{diag_text}\n\n"
-                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi.</b> "
+                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar sizning hududingiz ({tuman or 'masʼul'}) bo'yicha mas'ul usta va bosh administratorimizga (@Yashnarbek_butaev) yetkazildi.</b> "
                 f"Mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
                 f"{contacts_info}"
             )
@@ -232,13 +236,14 @@ class CoreEngine:
                 detected_inn=target_inn,
                 debt_amount=total_debt,
                 org_name=org_name,
+                tuman=tuman,
                 should_notify_admin=True,
                 admin_alert_type="tech_issue",
                 admin_alert_text=issue_desc,
                 log_reason="Hardware fatal error or Internet active & verified no debt -> Escalated to admin"
             )
 
-        # 6-BOSQICH: ODDIY TASHXIS VA JAVOB SINTEZI
+        # 6-BOSQICH (LAYER 1, 2, 3): TASHXIS VA JAVOB SINTEZI
         final_reply: str = ""
         final_video_id: Optional[int] = diag_video_id
 
@@ -247,16 +252,32 @@ class CoreEngine:
             if total_debt > 0:
                 final_video_id = 148
         elif debt_text:
-            final_reply = debt_text
             if total_debt > 0:
+                final_reply = debt_text
                 final_video_id = 148
+            else:
+                # 3-BOSQICH (1-3%): Qarz yo'q bo'lsa, kassa ilovasidan chiqib kirish yoki apparatni o'chirib-yoqish tavsiyasi
+                reboot_note = (
+                    "🔄 <b>Kassani ishga tushirish bo'yicha tavsiya (1-3% mayda qotishlar uchun):</b>\n"
+                    "1️⃣ Kassa dasturidan to'liq chiqib (yopib), ilovaga qayta kiring;\n"
+                    "2️⃣ Yoki apparat quvvat tugmasini 5 soniya bosib ushlab, apparatni <b>o'chirib qayta yoqing (Перезагрузка / Reboot)</b>.\n\n"
+                    "🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, hududingiz bo'yicha mutaxassisga ulaymiz.</i>"
+                )
+                final_reply = f"{debt_text}\n\n──────────────\n{reboot_note}"
         elif diag_text:
             if not target_inn and has_error and not is_fatal_hardware:
                 final_reply = f"{diag_text}\n\n💡 <b>Qarzdorlik holatini tekshirishimiz uchun korxonangizning INN raqamini yuboring.</b>"
             else:
                 final_reply = diag_text
         else:
-            final_reply = "✅ <b>Apparat ekrani normal holatda.</b>"
+            # 3-BOSQICH: Qarz yo'q, xato kodi yo'q, soat/internet to'g'ri bo'lganda Reboot tavsiyasi
+            final_reply = (
+                "✅ <b>Apparatda abonent to'lovidan qarzdorlik yo'q, internet va soat to'g'ri holatda.</b>\n\n"
+                "🔄 <b>Agar shunda ham chek urmayotgan yoki tizim qotib qolgan bo'lsa (1-3% mayda dasturiy nosozlik):</b>\n"
+                "1️⃣ Kassa dasturidan to'liq chiqib (yopib), ilovaga qayta kiring;\n"
+                "2️⃣ Yoki apparatning quvvat tugmasini 5 soniya bosib ushlab, apparatni <b>o'chirib qayta yoqing (Перезагрузка / Reboot)</b>.\n\n"
+                "🛠 <i>Agarda qayta yoqqandan keyin ham ishlamasa, «Usta kerak» deb yozing, sizni hududingiz bo'yicha mas'ul ustaga bog'laymiz.</i>"
+            )
 
         return DecisionResult(
             action=ActionType.DIAGNOSE_AND_REPLY,
@@ -590,7 +611,7 @@ class CoreEngine:
                     f"🎉 <b>Qarzdorlik to'liq bartaraf etildi!</b>\n"
                     f"{overpay_line}\n"
                     f"📩 <i>To'lov ma'lumotlari kassa apparatingizni tizimda faollashtirish uchun "
-                    f"mas'ul operator va adminga yuborildi. Tez orada tizim yangilanadi.</i>"
+                    f"mas'ul operator va adminga yuborildi. Tez orada apparatingiz ishga tushirib beriladi.</i>"
                     f"{warning_block}"
                 )
             else:
@@ -710,15 +731,19 @@ class CoreEngine:
     # 3. ADMINGA UMUMIY ESKALATSIYA (OPERATOR / USTA TALAB QILINGANDA)
     # =========================================================================
     def escalate_general_issue(self, user_text: str, chat_id: int, user_id: int) -> DecisionResult:
-        """Mijoz operator, usta yoki shaxsiy yordam so'raganda adminga uzatish"""
+        """Mijoz operator, usta yoki shaxsiy yordam so'raganda o'z hududi bo'yicha adminga uzatish"""
         inn = user_memory.get_last_id(chat_id, user_id) or "-"
         debt_info = user_memory.get_debt_info(chat_id, user_id) or {}
         org_name = debt_info.get("org_name", "-")
 
+        tuman = excel_manager.get_district_for_inn(inn) if (inn and inn != "-") else ""
+        tuman_line = f"📍 <b>Sizning hududingiz:</b> {tuman}\n" if tuman else ""
+
         contacts_info = admin_manager.get_contacts_display()
         reply_text = (
             f"👨‍💻 <b>Murojaatingiz qabul qilindi va mutaxassisimizga (adminga) yetkazildi!</b>\n\n"
-            f"Operatorlarimiz tez orada siz bilan bog'lanishadi.\n\n"
+            f"{tuman_line}"
+            f"Sizning hududingiz bo'yicha mas'ul usta yoki operatorlarimiz tez orada siz bilan bog'lanishadi.\n\n"
             f"{contacts_info}"
         )
 
@@ -727,6 +752,7 @@ class CoreEngine:
             reply_text=reply_text,
             detected_inn=inn if inn != "-" else None,
             org_name=org_name if org_name != "-" else None,
+            tuman=tuman,
             should_notify_admin=True,
             admin_alert_type="escalation",
             admin_alert_text=user_text,

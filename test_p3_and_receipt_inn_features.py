@@ -452,6 +452,80 @@ async def test_ofd_bridge_secret_group_flow():
     logger.info("✅ OFD Maxfiy guruh ko'prigi (@ofd943) 100% bexato ishladi va cheksiz sikldan himoyalangan!")
 
 
+def test_four_layer_hierarchical_diagnostic_system():
+    """
+    4-Bosqichli iyerarxik standart formula testi:
+    Layer 1 (60%+): Oylik/Yillik qarz bo'lsa -> Qarzdorlik birinchi sabab qilib ko'rsatiladi.
+    Layer 2 (30-35%): Qarz yo'q bo'lsa -> Internet/Soat/Ekran xatosi yechimi beriladi.
+    Layer 3 (1-3%): Qarz yo'q, xato yo'q bo'lsa -> Kassa ilovasidan chiqib kirish yoki Reboot tavsiya qilinadi.
+    Layer 4: Jiddiy nosozlik yoki usta so'ralganda -> Korxona tumani (hududi) aniqlanadi va hududiy ustaga ulanadi.
+    """
+    logger.info(">>> 9. 4-Bosqichli iyerarxik tashxis modeli testi...")
+
+    # 1. LAYER 1: QARZLI APPARAT (INN: 206011507 - 1,500,400 so'm qarzi bor)
+    facts_debt = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=True,
+        has_internet=True,
+        time_mismatch=False,
+        detected_inn="206011507"
+    )
+    dec_debt = core_engine.process_device_facts(facts_debt, chat_id=801, user_id=901)
+    assert dec_debt.action == ActionType.DIAGNOSE_AND_REPLY
+    assert "1,500,400" in (dec_debt.reply_text or "")
+    assert "qarzdorlik" in (dec_debt.reply_text or "").lower()
+    assert dec_debt.video_id == 148  # Click orqali oylik qarzni to'lash videosi
+
+    # 2. LAYER 2: QARZ YO'Q (INN: 311790999), LEKIN INTERNET O'CHGAN (30-35% holat)
+    facts_no_net = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=True,
+        has_internet=False,
+        time_mismatch=False,
+        detected_inn="311790999"
+    )
+    dec_no_net = core_engine.process_device_facts(facts_no_net, chat_id=802, user_id=902)
+    assert dec_no_net.action == ActionType.DIAGNOSE_AND_REPLY
+    assert "internet" in (dec_no_net.reply_text or "").lower()
+    assert dec_no_net.video_id in [147, 146, None]
+
+    # 3. LAYER 2: QARZ YO'Q (INN: 311790999), LEKIN SOAT NOTO'G'RI (time_mismatch)
+    facts_bad_time = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=True,
+        has_internet=True,
+        time_mismatch=True,
+        detected_inn="311790999"
+    )
+    dec_bad_time = core_engine.process_device_facts(facts_bad_time, chat_id=803, user_id=903)
+    assert dec_bad_time.action == ActionType.DIAGNOSE_AND_REPLY
+    assert "vaqt" in (dec_bad_time.reply_text or "").lower() or "soat" in (dec_bad_time.reply_text or "").lower()
+    assert dec_bad_time.video_id == 141
+
+    # 4. LAYER 3: QARZ YO'Q, INTERNET BOR, SOAT TO'G'RI, XATO YO'Q (1-3% qotish holati -> REBOOT)
+    facts_clean = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=True,
+        has_internet=True,
+        time_mismatch=False,
+        detected_inn="311790999"
+    )
+    dec_clean = core_engine.process_device_facts(facts_clean, chat_id=804, user_id=904)
+    assert dec_clean.action == ActionType.DIAGNOSE_AND_REPLY
+    assert "qayta yoqing" in (dec_clean.reply_text or "").lower() or "reboot" in (dec_clean.reply_text or "").lower()
+    assert "chiqib" in (dec_clean.reply_text or "").lower()
+
+    # 5. LAYER 4: USTA / OPERATOR TALAB QILINGANDA HUDUD (TUMAN) ANIKLANISHI
+    user_memory.set_last_id(805, 905, "206011507")  # Qashqadaryo Sharq Gavhari (Shahrisabz)
+    dec_escalate = core_engine.escalate_general_issue("apparat tuzalmadi usta chaqir", chat_id=805, user_id=905)
+    assert dec_escalate.action == ActionType.ESCALATE_TO_ADMIN
+    assert dec_escalate.should_notify_admin is True
+    assert dec_escalate.tuman != ""  # Korxona tumani (masalan qarshi)
+    assert "hududingiz" in (dec_escalate.reply_text or "").lower()
+
+    logger.info("✅ 4-Bosqichli iyerarxik standart tashxis tizimi 100% ideal ishladi!")
+
+
 if __name__ == "__main__":
     test_extract_clean_inn_rejects_dummies()
     test_p3_device_without_status_bar_diagnoses_screen_error()
@@ -461,5 +535,7 @@ if __name__ == "__main__":
     test_pending_receipt_resolution_when_user_subsequently_sends_inn()
     test_p3_long_messages_tax_debt_and_freeform()
     asyncio.run(test_ofd_bridge_secret_group_flow())
-    print("\n🎉 BARCHA P3, KVITANSIYA INN VA OFD KO'PRIGI TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
+    test_four_layer_hierarchical_diagnostic_system()
+    print("\n🎉 BARCHA P3, KVITANSIYA INN, OFD VA 4-BOSQICHLI TASHXIS TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
+
 

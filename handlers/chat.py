@@ -109,6 +109,76 @@ async def handle_user_chat(message: types.Message, bot: Bot):
                 user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
                 return
 
+    # 0.2 4-BOSQICHLI STANDART TASHXIS MODELI (Qarzdorlik -> Texnik -> Reboot -> Hududiy Usta)
+    DEVICE_ISSUE_PHRASES = [
+        "apparat ishlamayapti", "apparatim ishlamayapti", "kassa ishlamayapti",
+        "kassa ishlamay qoldi", "apparat ishlamay qoldi", "chek urmayapti",
+        "chek chiqmayapti", "kassa qotib qoldi", "apparat qotib qoldi",
+        "ishlamayapti apparat", "ishlamayapti kassa", "ne rabotayet apparat",
+        "не работает касса", "не работает аппарат", "аппарат не работает", "касса не работает"
+    ]
+    if any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES):
+        remembered_id = user_memory.get_last_id(chat_id, user_id)
+        if remembered_id:
+            # 1-bosqich: Oylik va Yillik qarzdorlikni tekshirish
+            from handlers.debt import format_debt_response
+            from excel_manager import excel_manager
+            results = excel_manager.search(remembered_id)
+            total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
+            tuman = excel_manager.get_district_for_inn(remembered_id)
+
+            if total_debt > 0:
+                # 1-BOSQICH (60%+ holat): QARZDORLIK MAVJUD!
+                debt_resp = format_debt_response(results)
+                debt_resp = adapt_to_user_script(debt_resp, user_script)
+                try:
+                    await message.reply(debt_resp, parse_mode="HTML")
+                except Exception:
+                    await message.reply(debt_resp)
+                try:
+                    await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=148)
+                except Exception:
+                    pass
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, debt_resp)
+                return
+            else:
+                # 2, 3 va 4-BOSQICHLAR: QARZ YO'Q -> TEXNIK / REBOOT / USTA
+                tuman_str = f" ({tuman})" if tuman else ""
+                clear_msg = (
+                    "✅ <b>Korxonangizda abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
+                    "📌 <b>Apparatni ishga tushirish uchun quyidagi bosqichlarni bajaring:</b>\n\n"
+                    "1️⃣ <b>2-bosqich (Internet va Soat - 30-35%):</b> Apparat ekranining yuqori qismidagi Wi-Fi/SIM belgisi va sana-vaqt to'g'ri ekanligini tekshiring;\n"
+                    "2️⃣ <b>3-bosqich (Dasturdan chiqib kirish / Reboot - 1-3%):</b> Kassa ilovasidan to'liq chiqib qayta kiring yoki quvvat tugmasini 5 soniya bosib apparatni <b>o'chirib qayta yoqing</b>;\n"
+                    "3️⃣ <b>Ekrandagi xatolik:</b> Agar ekranda qandaydir yozuv yoki xato kodi chiqayotgan bo'lsa, <b>ekranini rasmga olib yuboring</b> — sababini darhol aniqlab beramiz.\n\n"
+                    f"👨‍💻 <i>Agarda nosozlik davom etsa, «Usta kerak» deb yozing, sizni hududingiz{tuman_str} bo'yicha mas'ul mutaxassisga bog'laymiz.</i>"
+                )
+                clear_msg = adapt_to_user_script(clear_msg, user_script)
+                try:
+                    await message.reply(clear_msg, parse_mode="HTML")
+                except Exception:
+                    await message.reply(clear_msg)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, clear_msg)
+                return
+        else:
+            # INN hali kiritilmagan: 4 bosqichli formula bo'yicha yo'naltirish
+            guide_msg = (
+                "📌 <b>Kassa apparati ishlamay qolganda tekshirish tartibi (Standart formula):</b>\n\n"
+                "1️⃣ <b>1-bosqich (Qarzdorlik - 60%+):</b> Korxonangiz <b>INN (STIR)</b> raqamini yuboring — oylik yoki yillik to'lovdan qarzdorlik bor-yo'qligini darhol tekshirib beramiz;\n"
+                "2️⃣ <b>2-bosqich (Texnik va Tarmoq - 30-35%):</b> Agar qarz bo'lmasa, apparat ekranidagi xatolikni (soat va internet qatori bilan) <b>rasmga olib yuboring</b>;\n"
+                "3️⃣ <b>3-bosqich (Reboot - 1-3%):</b> Kassa ilovasidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing;\n"
+                "4️⃣ <b>4-bosqich (Usta):</b> Agar apparat shunda ham tuzalmasa, sizni o'z hududingiz bo'yicha mas'ul ustaga bog'laymiz."
+            )
+            guide_msg = adapt_to_user_script(guide_msg, user_script)
+            try:
+                await message.reply(guide_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(guide_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, guide_msg)
+            return
+
     # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (KANAL MATN POSTIDAN UZATISH VA QO'SHIMCHA IZOH)
     payment_intent = classify_payment_intent(text)
     if payment_intent:

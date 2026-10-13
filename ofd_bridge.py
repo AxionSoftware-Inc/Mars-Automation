@@ -93,8 +93,8 @@ class OFDBridgeManager:
         """Xabar yuboruvchi @ofd943_bot (yoki ofd943) ekanligini tekshirish"""
         if not user:
             return False
-        uname = (user.username or "").lstrip("@").lower()
-        fname = (user.full_name or "").strip().lower()
+        uname = (getattr(user, "username", "") or "").lstrip("@").lower()
+        fname = (getattr(user, "full_name", "") or "").strip().lower()
         return uname in OFD_KNOWN_USERNAMES or uname == self.ofd_username or fname == "ofd943"
 
     def is_ofd_group(self, chat_id: int) -> bool:
