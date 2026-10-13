@@ -518,5 +518,33 @@
     "video_id": null,
     "require_inn": false,
     "escalate_to_admin": false
+  },
+  {
+    "id": "tax_office_blocked",
+    "name": "Soliq organlari tomonidan o'chirilgan yoki cheklangan",
+    "screen_keywords": [
+      "soliq tomonidan",
+      "soliq o'chirdi",
+      "soliq o'chirgan",
+      "soliq o'chirilgan",
+      "soliq organlari",
+      "soliq qo'mitasi",
+      "soliq blokladi",
+      "soliq bloklagan",
+      "soliqdan o'chgan",
+      "налоговым органом",
+      "налоговый орган",
+      "налоговым комитетом",
+      "заблокирован налогов",
+      "приостановлена налогов",
+      "ijara shartnomasi",
+      "договор аренды",
+      "guvohnoma vaqtincha",
+      "свидетельство неактивно"
+    ],
+    "response_text": "⚠️ <b>Kassa apparati Davlat Soliq Qo'mitasi (soliq organlari) tomonidan vaqtincha to'xtatilgan!</b>\n\n📌 <b>Sababi:</b> Bu «Mars Elektron Texnika» oylik abonent to'lovi emas — kassa soliq tizimi (my.soliq.uz / OFD) tomonidan cheklangan (masalan: ijara shartnomasi, guvohnoma holati, soliq qarzdorligi yoki soliq tekshiruvi sababli).\n💡 <b>Yechimi:</b> Shaxsiy kabinetingiz (<b>my.soliq.uz</b>) orqali bildirishnomani tekshiring yoki hududiy soliq inspeksiyasiga murojaat qiling.",
+    "video_id": null,
+    "require_inn": false,
+    "escalate_to_admin": false
   }
 ]

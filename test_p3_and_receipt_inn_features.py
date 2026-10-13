@@ -274,6 +274,78 @@ def test_pending_receipt_resolution_when_user_subsequently_sends_inn():
     logger.info("✅ Pending kvitansiya mijoz INN yozishi bilan 100% muvaffaqiyatli ulandi!")
 
 
+def test_p3_long_messages_tax_debt_and_freeform():
+    """
+    P3 apparatida tepada soat bo'lmaydi va muammo ekranning o'zida uzun matn bo'lib yoziladi
+    (masalan: qarzdorlik bor, soliq o'chirdi yoki boshqa uzun xabar).
+    Model soat so'ramasligi, 'internet yo'q' deb adashmasligi va ekranda yozilgan aniq gapni
+    qisqa ta'riflab berishi testi.
+    """
+    from unittest.mock import patch
+    from image_analyzer import analyze_media_image
+    from error_manager import error_manager
+
+    error_manager.load_rules()
+    logger.info(">>> 7. P3 apparati uzun ekran yozuvlari (Soliq o'chirdi, Qarzdorlik, Erkin matn) testi...")
+
+    # 1) P3 ekranda: "Soliq o'chirdi / Soliq organlari tomonidan to'xtatilgan"
+    facts_tax = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=False,
+        has_internet=False,  # Status bar yo'qligi uchun Vision false qaytargan taqdirda ham
+        time_mismatch=True,
+        screen_text_summary="Hurmatli soliq to'lovchi, ijara shartnomasi bekor qilinganligi sababli kassa apparati soliq organlari tomonidan vaqtincha o'chirilgan."
+    )
+    dec_tax = core_engine.process_device_facts(facts_tax, chat_id=301, user_id=401)
+    assert dec_tax.action != ActionType.ASK_FULL_SCREEN, "P3 da soat so'ralmasligi shart!"
+    assert "ijara shartnomasi" in (dec_tax.reply_text or "").lower()
+    assert "soliq" in (dec_tax.reply_text or "").lower()
+    assert "oylik servis xizmati to'lovi amalga oshirilmagan" not in (dec_tax.reply_text or "").lower(), (
+        "Soliq o'chirgan holatni Mars oylik abonent qarzdorligi bilan adashtirmasligi shart!"
+    )
+
+    # 2) P3 ekranda: "Qarzdorlik bor" uzun xabar
+    facts_debt = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=False,
+        screen_text_summary="Diqqat! Abonent to'lovi bo'yicha qarzdorlik mavjudligi sababli dastur vaqtincha bloklandi."
+    )
+    dec_debt = core_engine.process_device_facts(facts_debt, chat_id=302, user_id=402)
+    assert dec_debt.action != ActionType.ASK_FULL_SCREEN
+    assert "qarzdorlik mavjudligi sababli" in (dec_debt.reply_text or "").lower()
+    assert dec_debt.video_id == 148
+
+    # 3) P3 ekranda: Qoidalarda yo'q bo'lgan erkin uzun xabar (Vision status bar yo'qligi sabab has_internet=false qaytarganda ham)
+    mock_p3_vision = '''{
+        "media_type": "pos_device",
+        "receipt": null,
+        "device": {
+            "is_real_pos_device": true,
+            "is_status_bar_visible": false,
+            "time_mismatch": true,
+            "has_internet": false,
+            "error_type": "none",
+            "detected_inn": null,
+            "screen_text_summary": "Hurmatli foydalanuvchi, OFD tizimida kassa sertifikati muddati tugaganligi sababli chek urish vaqtincha cheklandi."
+        }
+    }'''
+    with patch("openrouter_client.openrouter_client.chat_completion", return_value=mock_p3_vision):
+        m_type, _, d_facts = analyze_media_image(b"fake_p3_image", user_caption="")
+        assert m_type == "pos_device"
+        assert d_facts is not None
+        assert d_facts.is_status_bar_visible is False
+        assert d_facts.has_internet is True, "Status bar yo'q P3 da has_internet=False bo'lib qolmasligi kerak!"
+        assert d_facts.time_mismatch is False, "Status bar yo'q P3 da time_mismatch=True bo'lib qolmasligi kerak!"
+
+        dec_free = core_engine.process_device_facts(d_facts, chat_id=303, user_id=403)
+        assert dec_free.action == ActionType.DIAGNOSE_AND_REPLY
+        assert "sertifikati muddati tugaganligi" in (dec_free.reply_text or "").lower()
+        assert "internetga ulanmagan" not in (dec_free.reply_text or "").lower()
+        assert "soat yoki sana noto'g'ri" not in (dec_free.reply_text or "").lower()
+
+    logger.info("✅ P3 apparati uzun yozuvlari (Soliq, Qarzdorlik, Erkin xabar) 100% bexato ta'riflandi!")
+
+
 if __name__ == "__main__":
     test_extract_clean_inn_rejects_dummies()
     test_p3_device_without_status_bar_diagnoses_screen_error()
@@ -281,4 +353,5 @@ if __name__ == "__main__":
     test_receipt_with_missing_or_zero_inn_notifies_admin_immediately()
     asyncio.run(test_admin_notification_formatting_for_present_and_missing_inn())
     test_pending_receipt_resolution_when_user_subsequently_sends_inn()
+    test_p3_long_messages_tax_debt_and_freeform()
     print("\n🎉 BARCHA P3 VA KVITANSIYA INN TESTLARI 100% MUVAFFAQIYATLI O'TDI!")

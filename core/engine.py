@@ -65,11 +65,23 @@ class CoreEngine:
         # status bar (soat) so'ramasdan to'g'ridan-to'g'ri kvitansiya protsessoriga yo'naltirish
         summary_lower = (facts.screen_text_summary or "").lower()
         caption_lower = (user_comment or "").lower()
-        receipt_signals = [
-            "to'lov", "tolov", "chek", "kvitansiya", "click", "payme", "oplata",
-            "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma", "munis", "uzum"
+        pos_error_indicators = [
+            "qarzdorlik", "blok", "to'xtatil", "o'chiril", "cheklandi", "cheklangan",
+            "xatolik", "xato", "smena", "z-hisobot", "z-otchet", "qog'oz", "lenta",
+            "soliq to'lovchi", "soliq organ", "soliq qo'mita", "abonent to'lov",
+            "muddati tugagan", "sertifikat", "chek urish", "jo'natilmagan chek",
+            "остановки", "пополните", "заблокирован", "ошибка", "смена", "приостановлен"
         ]
-        if any(sig in summary_lower for sig in receipt_signals) or any(sig in caption_lower for sig in receipt_signals):
+        receipt_signals = [
+            "to'lov amalga", "tolov amalga", "to'lov muvaffaqiyatli", "muvaffaqiyatli",
+            "kvitansiya", "click", "payme", "oplata", "o'tkazildi", "otkazildi",
+            "pul o'tkazma", "munis", "uzum", "anorbank", "to'ladim", "toladim"
+        ]
+        is_pos_error_text = any(ind in summary_lower for ind in pos_error_indicators)
+        if not is_pos_error_text and (
+            any(sig in summary_lower for sig in receipt_signals) or
+            any(sig in caption_lower for sig in receipt_signals)
+        ):
             logger.info("Ekrandagi yozuv to'lov kvitansiyasiga tegishli ekanligi aniqlandi -> Kvitansiya rejimiga yo'naltiriladi.")
             
             detected_amount = 0.0
@@ -101,19 +113,32 @@ class CoreEngine:
         diag_video_id: Optional[int] = None
         has_error: bool = False
 
-        matched_rule = error_manager.match_error(facts.raw_facts)
+        match_payload = dict(facts.raw_facts or {})
+        if facts.screen_text_summary and not match_payload.get("screen_text_summary"):
+            match_payload["screen_text_summary"] = facts.screen_text_summary
+        if facts.error_type and not match_payload.get("error_type"):
+            match_payload["error_type"] = facts.error_type
+        match_payload["is_status_bar_visible"] = facts.is_status_bar_visible
+        match_payload["has_internet"] = facts.has_internet if facts.is_status_bar_visible else True
+        match_payload["time_mismatch"] = facts.time_mismatch if facts.is_status_bar_visible else False
+
+        matched_rule = error_manager.match_error(match_payload)
+        clean_summary = (facts.screen_text_summary or "").strip()
+        is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
+
         if matched_rule:
             has_error = True
-            diag_text = matched_rule.get("response_text", "")
+            rule_resp = matched_rule.get("response_text", "")
             diag_video_id = matched_rule.get("video_id")
-        elif facts.screen_text_summary and facts.screen_text_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]:
+            if is_meaningful_summary and clean_summary.lower() not in rule_resp.lower():
+                diag_text = f"🖥 <b>Ekrandagi holat:</b> {clean_summary}\n\n{rule_resp}"
+            else:
+                diag_text = rule_resp
+        elif is_meaningful_summary:
             has_error = True
-            diag_text = (
-                f"ℹ️ <b>Ekrandagi holat:</b> {facts.screen_text_summary}\n"
-                f"Nosozlik davom etsa, korxona INN raqamini yuboring."
-            )
+            diag_text = f"ℹ️ <b>Ekrandagi holat:</b> {clean_summary}"
 
-        if facts.time_mismatch or facts.error_type != "none":
+        if (facts.is_status_bar_visible and facts.time_mismatch) or facts.error_type != "none":
             has_error = True
 
         # 3-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN VA QARZ)

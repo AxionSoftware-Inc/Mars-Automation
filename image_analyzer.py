@@ -24,9 +24,9 @@ from payment_accounts import (
 )
 
 RECEIPT_SIGNALS = [
-    "to'lov", "tolov", "chek", "kvitansiya", "click", "payme", "oplata",
-    "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma", "summa",
-    "munis", "uzum", "anorbank", "milliy", "hisobiga"
+    "kvitansiya", "click", "payme", "oplata", "to'lov amalga", "tolov amalga",
+    "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma", "to'ladim", "toladim",
+    "munis", "uzum bank", "anorbank", "milliy bank", "платежное поручение"
 ]
 
 
@@ -91,14 +91,15 @@ JAVOB FORMATI FAQAT JSON BO'LISHI SHART (boshqa hech qanday so'z qo'shmang):
   }},
 
   // AGAR media_type == "pos_device" BO'LSA:
+  // Eslatma: P3 modelli kassa apparatlarida tepa qatorda soat (status bar) bo'lmaydi va muammo sababi (masalan: qarzdorlik, soliq tomonidan o'chirilgani yoki boshqa xabar) ekranning o'zida uzun matn bo'lib yoziladi. Bunday holatda ekranda yozilgan aniq gapni o'qib, "screen_text_summary" ichida qisqa va tushunarli ta'riflab bering.
   "device": {{
     "is_real_pos_device": true,
-    "is_status_bar_visible": true/false, // Smart POS apparati ekrani tepasidagi soat yoki tarmoq/internet status bar qatori to'liq tushganmi?
-    "time_mismatch": true/false, // Ekrandagi soat real Toshkent vaqtidan ({current_hour_min}) 10 daqiqadan ko'pga farq qiladimi?
-    "has_internet": true/false, // Status bardagi Wi-Fi yoki mobil tarmoq belgisi bormi?
+    "is_status_bar_visible": true/false, // Ekran tepasida soat va tarmoq/internet status bar qatori ko'rinyaptimi? (P3 apparatlarida false bo'ladi)
+    "time_mismatch": true/false, // Faqat ekranda soat ko'rinsa va u real Toshkent vaqtidan ({current_hour_min}) 10 daqiqadan ko'pga farq qilsa true; agar soat ko'rinmasa (masalan P3 da) -> false!
+    "has_internet": true/false, // Agar status bar ko'rinsa va unda Wi-Fi/mobil internet belgisi mutlaqo yo'q bo'lsa false; agar status bar ko'rinmasa (masalan P3 da) va ekranda internet yo'qligi haqida yozuv bo'lmasa -> true!
     "error_type": "debt" | "fiscal_module" | "update" | "paper" | "none",
     "detected_inn": "123456789" yoki null, // Ekranda ko'ringan STIR/INN
-    "screen_text_summary": "ekrandagi xatolik yoki ko'ringan yozuvlar"
+    "screen_text_summary": "Ekranda yozilgan xatolik yoki ogohlantirishning o'zbek tilidagi aniq va qisqa ta'rifi (agar ekranda uzun matn yozilgan bo'lsa, o'sha gapning aniq mazmunini qisqa ta'riflang; agar ekranda xatolik bo'lmasa 'Asosiy oyna' deb yozing)"
   }}
 }}
 
@@ -204,12 +205,22 @@ Foydalanuvchi izohi: "{user_caption}"
         # 2. SMART POS KASSA APPARATI
         elif media_type == "pos_device":
             detected_inn = extract_clean_inn(str(dev_raw.get("detected_inn") or caption_inn or ""))
+            is_status_bar_visible = bool(dev_raw.get("is_status_bar_visible", False))
+
+            # P3 kabi apparatlarda tepada soat/status bar bo'lmaydi.
+            # Agar status bar ko'rinmasa, status bardagi ikonkalarga qarab soat xato yoki internet yo'q deb xulosa qilinmaydi
+            # (agar ekranda yozuv ko'rinishida internet/vaqt xatosi bo'lsa, u screen_text_summary orqali aniqlanadi).
+            time_mismatch = bool(dev_raw.get("time_mismatch", False)) if is_status_bar_visible else False
+            has_internet = bool(dev_raw.get("has_internet", True)) if is_status_bar_visible else True
+            if isinstance(dev_raw, dict) and not is_status_bar_visible:
+                dev_raw["time_mismatch"] = False
+                dev_raw["has_internet"] = True
 
             device_facts = DeviceFacts(
                 is_real_pos_device=bool(dev_raw.get("is_real_pos_device", True)),
-                is_status_bar_visible=bool(dev_raw.get("is_status_bar_visible", False)),
-                time_mismatch=bool(dev_raw.get("time_mismatch", False)),
-                has_internet=bool(dev_raw.get("has_internet", True)),
+                is_status_bar_visible=is_status_bar_visible,
+                time_mismatch=time_mismatch,
+                has_internet=has_internet,
 
                 error_type=str(dev_raw.get("error_type", "none")),
                 detected_inn=detected_inn,
