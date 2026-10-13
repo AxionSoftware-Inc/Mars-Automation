@@ -49,11 +49,9 @@ CONVERSATIONAL_FOLLOWUPS = [
     "qancha tolashim", "qancha qarz", "qarzim qancha", "yana to'laymanmi", "yana tolaymanmi",
     "adminga bordimi", "adminga jo'natildimi", "chek tushdimi", "kvitansiya tushdimi",
     "to'lov tushdimi", "tolov tushdimi", "endi nima", "endi nima qilay", "nima qilish kerak",
-    "apparatim ishlamayapti", "apparat ishlamayapti", "kassa ishlamayapti", "ishlamayapti",
-    "ishlamay qoldi", "ochib qoldi", "o'chib qoldi", "blok bo'ldi", "bloklandi",
     "qarzim bormi", "qancha qarzim bor", "yana to'lashim kerakmi", "yana tolashim kerakmi",
     "rahmat", "tushundim", "yaxshi", "ok", "xa", "ha", "boladi", "bo'ladi",
-    "не работает", "когда включите", "чек отправил", "оплатил", "следующая оплата", "сколько платить"
+    "когда включите", "чек отправил", "оплатил", "следующая оплата", "сколько платить"
 ]
 
 @router.message(F.text)
@@ -132,8 +130,10 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         "apparat ishlamayapti", "apparatim ishlamayapti", "kassa ishlamayapti",
         "kassa ishlamay qoldi", "apparat ishlamay qoldi", "chek urmayapti",
         "chek chiqmayapti", "kassa qotib qoldi", "apparat qotib qoldi",
-        "ishlamayapti apparat", "ishlamayapti kassa", "ne rabotayet apparat",
-        "не работает касса", "не работает аппарат", "аппарат не работает", "касса не работает"
+        "ishlamayapti apparat", "ishlamayapti kassa", "ishlamayapti",
+        "ishlamay qoldi", "o'chib qoldi", "ochib qoldi", "o'chib qolgan",
+        "blok bo'ldi", "bloklandi", "blok bolgan", "buzildi", "buzilib qoldi",
+        "ne rabotayet", "не работает", "сломался", "заблокирован"
     ]
     if any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES):
         remembered_id = user_memory.get_last_id(chat_id, user_id)
