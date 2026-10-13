@@ -28,10 +28,16 @@ def deploy():
         'error_manager.py',
         'user_memory.py',
         'excel_manager.py',
+        'payment_accounts.py',
+        'translit_manager.py',
+        'ofd_bridge.py',
+        'transaction_tracker.py',
+        'state_manager.py',
         'ARCHITECTURE.md',
         'README.md',
         'data/video_catalog.json',
         'data/screen_errors.json',
+        'data/admin_config.json',
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',
@@ -41,7 +47,8 @@ def deploy():
         'handlers/chat.py',
         'handlers/commands.py',
         'handlers/debt.py',
-        'handlers/media.py'
+        'handlers/media.py',
+        'test_4_stage_pipeline_and_fiscal_check.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
