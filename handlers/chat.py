@@ -84,6 +84,31 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         await process_and_send_debt_result(message, bot, found_inn)
         return
 
+    # 0.1 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR" DEB SO'RASA VA XOTIRADA INN BO'LSA
+    ofd_check_keywords = [
+        "yillik qarz", "yillikni tekshir", "ofd tekshir", "ofdni tekshir",
+        "fiskal modul muddat", "fiskal modul qachon", "yillik muddat",
+        "йиллик қарз", "йиллик карз", "йилликни текшир", "офд текшир", "фискал модул муддат"
+    ]
+    if any(kw in lower_text for kw in ofd_check_keywords):
+        remembered_id = user_memory.get_last_id(chat_id, user_id)
+        from ofd_bridge import ofd_bridge
+        if remembered_id and ofd_bridge.is_configured():
+            ofd_reply = await ofd_bridge.query_inn(bot, remembered_id)
+            if ofd_reply:
+                header = adapt_to_user_script(
+                    "🏛 <b>OFD / Soliq tizimi (Yillik fiskal modul) ma'lumoti:</b>",
+                    user_script
+                )
+                full_ofd_text = f"{header}\n\n{ofd_reply}"
+                try:
+                    await message.reply(full_ofd_text, parse_mode="HTML")
+                except Exception:
+                    await message.reply(full_ofd_text)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
+                return
+
     # 1. TO'LOV REKVIZITLARI VA HISOB RAQAMLAR (KANAL MATN POSTIDAN UZATISH VA QO'SHIMCHA IZOH)
     payment_intent = classify_payment_intent(text)
     if payment_intent:

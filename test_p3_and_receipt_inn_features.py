@@ -352,6 +352,106 @@ def test_p3_long_messages_tax_debt_and_freeform():
     logger.info("✅ Excel sariq qator (P3) va oq qator (SmartPOS) 100% bexato ajratildi, SmartPOS aloqasiz yozuvlarni o'qimaydi!")
 
 
+async def test_ofd_bridge_secret_group_flow():
+    """
+    Maxfiy guruh orqali @ofd943 bilan ishlash (OFDBridgeManager) testi:
+    1) Kichik maxfiy guruhda @ofd943 xabar yozsa -> guruh avtomatik ulanadi.
+    2) @ofd943 ning har qanday xabari va maxfiy guruh ichidagi barcha xabarlar tutib qolinadi (True qaytaradi -> cheksiz sikl bo'lmaydi).
+    3) query_inn() maxfiy guruhga INN yuboradi, @ofd943 javobini ("Kuting..." ni o'tkazib) yig'ib oladi va qaytaradi.
+    """
+    import os
+    import tempfile
+    from types import SimpleNamespace
+    from ofd_bridge import OFDBridgeManager
+
+    logger.info(">>> 8. OFD Maxfiy guruh ko'prigi (@ofd943) testi...")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cfg_file = os.path.join(tmpdir, "ofd_config.json")
+        bridge = OFDBridgeManager(config_path=cfg_file)
+        assert not bridge.is_configured()
+
+        sent_messages = []
+
+        class FakeBot:
+            async def get_chat_member_count(self, chat_id: int) -> int:
+                return 4  # Kichik maxfiy guruh (admin + botimiz + @ofd943)
+
+            async def send_message(self, chat_id: int, text: str, **kwargs):
+                sent_messages.append((chat_id, text))
+                # Agar maxfiy guruhga INN yuborilgan bo'lsa, @ofd943 0.05s dan keyin javob qaytarishini simulyatsiya qilamiz
+                if chat_id == -100999888777 and text.isdigit():
+                    async def simulate_ofd_response():
+                        await asyncio.sleep(0.05)
+                        # 1. Oraliq "Kuting..." xabari (bu o'tkazib yuborilishi kerak)
+                        msg_wait = SimpleNamespace(
+                            chat=SimpleNamespace(id=-100999888777, type="supergroup"),
+                            from_user=SimpleNamespace(id=555000, username="ofd943"),
+                            text="⏳ Tekshirilmoqda, kuting...",
+                            caption=None
+                        )
+                        await bridge.handle_incoming_message(msg_wait, bot=self)
+
+                        # 2. Asosiy uzun javob matni
+                        await asyncio.sleep(0.05)
+                        msg_real = SimpleNamespace(
+                            chat=SimpleNamespace(id=-100999888777, type="supergroup"),
+                            from_user=SimpleNamespace(id=555000, username="ofd943"),
+                            text=(
+                                f"🏢 STIR: {text}\n"
+                                f"📟 Fiskal modul: LG420210630789\n"
+                                f"📅 Faollik muddati: 2026-12-15 gacha\n"
+                                f"✅ Yillik to'lovdan qarzdorlik yo'q"
+                            ),
+                            caption=None
+                        )
+                        intercepted = await bridge.handle_incoming_message(msg_real, bot=self)
+                        assert intercepted is True, "@ofd943 xabari har doim tutib qolinishi (sikl bo'lmasligi) shart!"
+
+                    asyncio.create_task(simulate_ofd_response())
+
+        fake_bot = FakeBot()
+
+        # A) Maxfiy guruhda @ofd943 birinchi marta yozganda avtomatik ulash testi
+        first_ofd_msg = SimpleNamespace(
+            chat=SimpleNamespace(id=-100999888777, type="supergroup"),
+            from_user=SimpleNamespace(id=555000, username="ofd943"),
+            text="Salom, INN yuboring",
+            caption=None
+        )
+        intercepted = await bridge.handle_incoming_message(first_ofd_msg, bot=fake_bot)
+        assert intercepted is True
+        assert bridge.is_configured() is True
+        assert bridge.ofd_group_id == -100999888777
+
+        # B) Maxfiy guruh ichida oddiy odam yozsa ham oddiy handlerlar ishlamasligi (tutib qolinishi)
+        other_member_msg = SimpleNamespace(
+            chat=SimpleNamespace(id=-100999888777, type="supergroup"),
+            from_user=SimpleNamespace(id=12345, username="some_admin"),
+            text="test xabar",
+            caption=None
+        )
+        assert await bridge.handle_incoming_message(other_member_msg, bot=fake_bot) is True
+
+        # C) Katta asosiy guruhda oddiy mijoz yozsa -> tutib qolinmasligi (False)
+        public_client_msg = SimpleNamespace(
+            chat=SimpleNamespace(id=-100111222333, type="supergroup"),
+            from_user=SimpleNamespace(id=777888, username="client_user"),
+            text="305758642",
+            caption=None
+        )
+        assert await bridge.handle_incoming_message(public_client_msg, bot=fake_bot) is False
+
+        # D) INN bo'yicha maxfiy guruh orqali @ofd943 dan javob olish
+        reply = await bridge.query_inn(fake_bot, "305758642", timeout=3.0)
+        assert reply is not None
+        assert "305758642" in reply
+        assert "LG420210630789" in reply
+        assert "Tekshirilmoqda" not in reply  # Placeholder qo'shilmagan bo'lishi shart!
+
+    logger.info("✅ OFD Maxfiy guruh ko'prigi (@ofd943) 100% bexato ishladi va cheksiz sikldan himoyalangan!")
+
+
 if __name__ == "__main__":
     test_extract_clean_inn_rejects_dummies()
     test_p3_device_without_status_bar_diagnoses_screen_error()
@@ -360,4 +460,6 @@ if __name__ == "__main__":
     asyncio.run(test_admin_notification_formatting_for_present_and_missing_inn())
     test_pending_receipt_resolution_when_user_subsequently_sends_inn()
     test_p3_long_messages_tax_debt_and_freeform()
-    print("\n🎉 BARCHA P3 VA KVITANSIYA INN TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
+    asyncio.run(test_ofd_bridge_secret_group_flow())
+    print("\n🎉 BARCHA P3, KVITANSIYA INN VA OFD KO'PRIGI TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
+

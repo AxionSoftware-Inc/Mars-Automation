@@ -299,6 +299,25 @@ async def _process_image_content(
                 )
             except Exception as e:
                 logger.error(f"Videoni yuborishda xatolik: {e}")
+
+        # Agar maxfiy OFD guruhi ulangan bo'lsa va INN aniq bo'lsa -> @ofd943 dan yillik to'lov holatini ham tekshirib berish
+        from ofd_bridge import ofd_bridge
+        if decision.detected_inn and ofd_bridge.is_configured():
+            ofd_reply = await ofd_bridge.query_inn(bot, decision.detected_inn)
+            if ofd_reply:
+                header = adapt_to_user_script(
+                    "🏛 <b>OFD / Soliq tizimi (Yillik fiskal modul) ma'lumoti:</b>",
+                    user_script
+                )
+                full_ofd_text = f"{header}\n\n{ofd_reply}"
+                try:
+                    await message.reply(full_ofd_text, parse_mode="HTML")
+                except Exception:
+                    try:
+                        await message.reply(full_ofd_text)
+                    except Exception:
+                        pass
+                user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
         return
 
     # 3. BEGONA TASVIR YOKI XATOLIK BO'LGANDA XAVFSIZLIK CHIQISHI

@@ -167,6 +167,37 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         except Exception as e:
             logger.error(f"To'lov videosini yuborishda xatolik: {e}")
 
+    # Maxfiy guruh orqali @ofd943 dan yillik to'lov / OFD ma'lumotini olib berish (agar maxfiy guruh ulangan bo'lsa)
+    from ofd_bridge import ofd_bridge
+    if ofd_bridge.is_configured():
+        ofd_inn = None
+        if results:
+            r_stir = results[0].get("stir", "-")
+            r_jsh = results[0].get("jshshir", "-")
+            if r_stir and r_stir != "-":
+                ofd_inn = r_stir
+            elif r_jsh and r_jsh != "-":
+                ofd_inn = r_jsh
+        if not ofd_inn:
+            ofd_inn = extract_clean_inn(query_num)
+
+        if ofd_inn:
+            ofd_reply = await ofd_bridge.query_inn(bot, ofd_inn)
+            if ofd_reply:
+                header = adapt_to_user_script(
+                    "🏛 <b>OFD / Soliq tizimi (Yillik fiskal modul) ma'lumoti:</b>",
+                    user_script
+                )
+                full_ofd_text = f"{header}\n\n{ofd_reply}"
+                try:
+                    await message.reply(full_ofd_text, parse_mode="HTML")
+                except Exception:
+                    try:
+                        await message.reply(full_ofd_text)
+                    except Exception as e_ofd:
+                        logger.error(f"OFD javobini yuborishda xatolik: {e_ofd}")
+                user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
+
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI
 DEBT_INQUIRY_KEYWORDS = [
     "nimaga qarz", "nega qarz", "qayerdan qarz", "qanaqa qarz", "qanaqasiga qarz",
