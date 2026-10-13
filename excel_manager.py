@@ -11,6 +11,27 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 LATEST_EXCEL_PATH = os.path.join(DATA_DIR, "latest.xlsx")
 
+def _normalize_hex(color_val) -> str:
+    """openpyxl RGB/ARGB rangini 6 xonali standart hex formatga keltiradi."""
+    if not color_val:
+        return ""
+    s = str(color_val).upper().strip()
+    if len(s) == 8:
+        # 8 xonali ARGB: alfa kanalni kesib tashlash (FF000000 -> 000000 [qora], FFFF0000 -> FF0000 [qizil])
+        return s[2:]
+    return s
+
+def _is_red_color(color_val) -> bool:
+    """Qizil rangni aniqlash (FF000000 kabi qora ranglar bilan chalkashmasligi shart)."""
+    c = _normalize_hex(color_val)
+    return c in ("FF0000", "C00000", "E74C3C", "ED1C24")
+
+def _is_yellow_color(color_val) -> bool:
+    """Sariq rangni aniqlash (P3 Humo apparat)."""
+    c = _normalize_hex(color_val)
+    return c in ("FFFF00", "FFFFE0", "FFF200")
+
+
 class ExcelManager:
     def __init__(self, excel_path: str = LATEST_EXCEL_PATH):
         self.excel_path = excel_path
@@ -73,17 +94,16 @@ class ExcelManager:
                         if fill and getattr(fill, "fill_type", None) == "solid":
                             fg = getattr(c.fill, "fgColor", None)
                             if fg and getattr(fg, "type", None) == "rgb" and fg.rgb:
-                                rgb_str = str(fg.rgb).upper()
-                                if any(r in rgb_str for r in ["FF0000", "C00000"]):
+                                if _is_red_color(fg.rgb):
                                     is_red = True
                                     break
-                                elif "FFFF00" in rgb_str:
+                                elif _is_yellow_color(fg.rgb):
                                     is_p3 = True
                         font = getattr(c, "font", None)
                         if font and getattr(font, "color", None):
                             fc = font.color
                             frgb = getattr(fc, "rgb", None)
-                            if frgb and any(r in str(frgb).upper() for r in ["FF0000", "C00000"]):
+                            if frgb and _is_red_color(frgb):
                                 is_red = True
                                 break
                 # Ustunlar:
