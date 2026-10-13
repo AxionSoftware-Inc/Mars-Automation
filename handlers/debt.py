@@ -19,8 +19,8 @@ def format_debt_response(results: list) -> str:
     if not results:
         return (
             "❌ <b>Bazada ushbu raqam bo'yicha ma'lumot topilmadi.</b>\n\n"
-            "Iltimos, INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingiz to'g'ri kiritilganini tekshirib qayta yuboring.\n"
-            "📸 <i>Agar apparatingiz xatolik berayotgan bo'lsa, ekranini rasmga olib yuborsangiz, nosozlik sababini aniqlab beramiz.</i>"
+            "Iltimos, korxonangiz СТИР (INN) yoki JSHSHIR raqami to'g'ri kiritilganini tekshirib qayta yuboring.\n"
+            "👨‍💻 <i>Yordam kerak bo'lsa, «Usta kerak» yoki «Admin» deb yozing.</i>"
         )
 
     first = results[0]
@@ -242,8 +242,29 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
     """Matnda INN/JSHSHIR yoki telefon raqami aniqlanganda xabarni tekshirish va guruhlarda to'g'ri filtr qilish"""
     if not message.text:
         return False
+
+    # 1. Agar matnda Fiskal modul (LG..., YG... va h.k.) aniqlansa -> bu qarz emas, fiskal modul tekshiruvi!
+    from core.models import extract_fiscal_module
+    if extract_fiscal_module(message.text):
+        return False
+
     query_num = extract_clean_inn(message.text) or extract_clean_phone(message.text)
     if not query_num:
+        return False
+
+    # 2. Agar mijoz texnik yoki yo'riqnoma savol berayotgan bo'lsa (masalan "chek qanday uriladi", "zaryad olmayapti")
+    # INNni eslab qolamiz, lekin qarz qopqoniga tushirmasdan texnik javob berish uchun chat_router ga o'tkazamiz!
+    lower = message.text.lower()
+    TECH_QUESTION_WORDS = [
+        "qanday", "qanaqa", "qilish kerak", "qo'yish", "urish", "bekor qilish",
+        "vozvrat", "qaytaring", "qaytarish", "zaryad", "zaryatka", "qog'oz", "qogoz",
+        "x-otchet", "x otchet", "z-otchet", "z otchet", "inkassatsiya", "wifi",
+        "parol", "ulanish", "ochish", "yoqish", "ulash", "tushuntiring", "yo'riqnoma",
+        "как", "как пробить", "возврат", "зарядка", "бумага", "инкассация"
+    ]
+    if any(tw in lower for tw in TECH_QUESTION_WORDS):
+        user_id = message.from_user.id if message.from_user else 0
+        user_memory.set_last_id(message.chat.id, user_id, query_num)
         return False
 
     # Shaxsiy chatda har doim qabul qilinadi

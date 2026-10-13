@@ -115,12 +115,22 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             user_memory.add_assistant_message(chat_id, user_id, fm_fallback)
             return
 
-    # 0.1 AGAR MATNDA INN BO'LSA VA APPARAT/QARZ SO'RALSA -> OYLIK QARZ TEKSHIRUVI
+    # 0.1 AGAR MATNDA INN BO'LSA
     found_inn = extract_clean_inn(text)
     if found_inn:
-        from handlers.debt import process_and_send_debt_result
-        await process_and_send_debt_result(message, bot, found_inn)
-        return
+        user_memory.set_last_id(chat_id, user_id, found_inn)
+        TECH_QUESTION_WORDS = [
+            "qanday", "qanaqa", "qilish kerak", "qo'yish", "urish", "bekor qilish",
+            "vozvrat", "qaytaring", "qaytarish", "zaryad", "zaryatka", "qog'oz", "qogoz",
+            "x-otchet", "x otchet", "z-otchet", "z otchet", "inkassatsiya", "wifi",
+            "parol", "ulanish", "ochish", "yoqish", "ulash", "tushuntiring", "yo'riqnoma",
+            "как", "как пробить", "возврат", "зарядка", "бумага", "инкассация"
+        ]
+        # Agar texnik amaliyot yoki yo'riqnoma so'ralmagan bo'lsa -> oylik qarz natijasi yuboriladi
+        if not any(tw in lower_text for tw in TECH_QUESTION_WORDS):
+            from handlers.debt import process_and_send_debt_result
+            await process_and_send_debt_result(message, bot, found_inn)
+            return
 
     # 0.2 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR" DEB SO'RASA -> FISKAL MODUL SO'RASH
     ofd_check_keywords = [
@@ -154,7 +164,9 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         "ishlamayapti apparat", "ishlamayapti kassa", "ishlamayapti",
         "ishlamay qoldi", "o'chib qoldi", "ochib qoldi", "o'chib qolgan",
         "blok bo'ldi", "bloklandi", "blok bolgan", "buzildi", "buzilib qoldi",
-        "ne rabotayet", "не работает", "сломался", "заблокирован"
+        "xatolik", "xato", "xatolik chiqyapti", "xato chiqyapti", "xatolik beryapti",
+        "xato beryapti", "xatolik kodi", "xatolik 406", "kod 406", "kod 102",
+        "oshibka", "ошибка", "ne rabotayet", "не работает", "сломался", "заблокирован"
     ]
     if any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES):
         remembered_id = user_memory.get_last_id(chat_id, user_id)
