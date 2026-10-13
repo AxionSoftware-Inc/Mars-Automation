@@ -1,1 +1,16 @@
-{}
+{
+  "txsuccess777": {
+    "recorded_at": "2026-10-13 10:54:13",
+    "inn": "206011507",
+    "amount": 1500400.0,
+    "user_id": 888,
+    "payment_date": ""
+  },
+  "txuniquerepair001": {
+    "recorded_at": "2026-10-13 10:54:33",
+    "inn": "302568138",
+    "amount": 150000.0,
+    "user_id": 888,
+    "payment_date": "2026-10-10 10:00"
+  }
+}

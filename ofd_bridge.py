@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import asyncio
@@ -242,43 +243,43 @@ class OFDBridgeManager:
             logger.error(f"❌ Telethon query xatoligi: {e}")
         return None
 
-    async def query_inn(self, bot: Bot, inn: str, timeout: float = 9.0) -> Optional[str]:
+    async def query_fiscal_module(self, bot: Optional[Bot], fiscal_code: str, timeout: float = 9.0) -> Optional[str]:
         """
-        Maxfiy guruhga yoki @ofd943_bot ga INN yuborib, javobni olish.
+        Maxfiy guruhga yoki @ofd943_bot ga Fiskal modul seriya raqamini (LG..., YG... va h.k.) yuborib javob olish.
         Agar Telethon user-akkaunt ulangan bo'lsa -> Userbot orqali so'raydi (Bot-to-Bot cheklovini 100% chetlab o'tadi!).
         Aks holda -> Bot API orqali maxfiy guruhga yuboradi.
         """
-        clean_inn = "".join(ch for ch in str(inn) if ch.isdigit())
-        if not clean_inn or len(clean_inn) not in (9, 14):
+        clean_code = re.sub(r"[^A-Za-z0-9]", "", str(fiscal_code)).upper()
+        if not clean_code or len(clean_code) < 8 or len(clean_code) > 20:
             return None
 
         # 1. Keshni tekshirish
         now = time.time()
-        cached = self._cache.get(clean_inn)
+        cached = self._cache.get(clean_code)
         if cached and (now - cached["ts"] < CACHE_TTL_SECONDS):
             return cached["text"]
 
         # 2. Navbat bilan so'rov yuborish
         async with self._query_lock:
             now = time.time()
-            cached = self._cache.get(clean_inn)
+            cached = self._cache.get(clean_code)
             if cached and (now - cached["ts"] < CACHE_TTL_SECONDS):
                 return cached["text"]
 
             # A) Agar Telethon user session mavjud bo'lsa -> Userbot orqali so'rash
             if self.has_user_session():
-                tele_res = await self._query_telethon(clean_inn, timeout=timeout)
+                tele_res = await self._query_telethon(clean_code, timeout=timeout)
                 if tele_res:
-                    self._cache[clean_inn] = {"text": tele_res, "ts": time.time()}
+                    self._cache[clean_code] = {"text": tele_res, "ts": time.time()}
                     return tele_res
 
             # B) Agar Telethon bo'lmasa -> Bot API orqali maxfiy guruhga yozish
-            if not self.is_configured() or not self.ofd_group_id:
+            if not self.is_configured() or not self.ofd_group_id or not bot:
                 return None
 
             first_event = asyncio.Event()
             collector: Dict[str, Any] = {
-                "inn": clean_inn,
+                "inn": clean_code,
                 "chunks": [],
                 "first_chunk_event": first_event,
                 "done": False
@@ -286,8 +287,8 @@ class OFDBridgeManager:
             self._active_collector = collector
 
             try:
-                await bot.send_message(chat_id=self.ofd_group_id, text=clean_inn)
-                logger.info(f"📤 OFDBridge (Bot API): Maxfiy guruhga ({self.ofd_group_id}) INN yuborildi: {clean_inn}")
+                await bot.send_message(chat_id=self.ofd_group_id, text=clean_code)
+                logger.info(f"📤 OFDBridge (Bot API): Maxfiy guruhga ({self.ofd_group_id}) FM yuborildi: {clean_code}")
 
                 await asyncio.wait_for(first_event.wait(), timeout=timeout)
                 await asyncio.sleep(0.6)
@@ -295,14 +296,14 @@ class OFDBridgeManager:
 
                 full_reply = "\n\n".join(collector["chunks"]).strip()
                 if full_reply:
-                    self._cache[clean_inn] = {"text": full_reply, "ts": time.time()}
-                    logger.info(f"📥 OFDBridge: @{self.ofd_username} dan javob olindi (INN={clean_inn}, len={len(full_reply)})")
+                    self._cache[clean_code] = {"text": full_reply, "ts": time.time()}
+                    logger.info(f"📥 OFDBridge: @{self.ofd_username} dan javob olindi (FM={clean_code}, len={len(full_reply)})")
                     return full_reply
 
             except asyncio.TimeoutError:
-                logger.warning(f"⏳ OFDBridge: @{self.ofd_username} {timeout}s ichida javob bermadi (INN={clean_inn})")
+                logger.warning(f"⏳ OFDBridge: @{self.ofd_username} {timeout}s ichida javob bermadi (FM={clean_code})")
             except Exception as e:
-                logger.error(f"❌ OFDBridge query_inn xatoligi (INN={clean_inn}): {e}")
+                logger.error(f"❌ OFDBridge query_fiscal_module xatoligi (FM={clean_code}): {e}")
             finally:
                 collector["done"] = True
                 if self._active_collector is collector:
@@ -310,6 +311,11 @@ class OFDBridgeManager:
 
         return None
 
+    async def query_inn(self, bot: Optional[Bot], inn: str, timeout: float = 9.0) -> Optional[str]:
+        """Eski kod bilan moslik uchun alias"""
+        return await self.query_fiscal_module(bot, inn, timeout=timeout)
+
 
 ofd_bridge = OFDBridgeManager()
+
 

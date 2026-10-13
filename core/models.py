@@ -83,6 +83,37 @@ def extract_clean_phone(text: str) -> Optional[str]:
 
     return None
 
+def extract_fiscal_module(text: str) -> Optional[str]:
+    """
+    Fiskal modul seriya raqamini matndan ajratib olish:
+    - Odatda chiqarilgan chekda bo'ladi, 2 ta katta harf (LG, YG, FM, UZ va h.k.) + 10-14 ta raqam;
+    - Masalan: LG420210630789, YG202106307890;
+    - Yoki FM: / Fiskal modul: bilan kelgan 12-16 xonali seriya raqami.
+    """
+    if not text:
+        return None
+    t = text.strip()
+
+    # 1. 2 ta harf bilan boshlangan format (LG, YG, FM, UZ, TJ va h.k.) + 8..14 ta raqam
+    m_code = re.search(r"\b([A-Za-z]{2}\d{8,14})\b", t, re.IGNORECASE)
+    if m_code:
+        return m_code.group(1).upper()
+
+    # 2. Maxsus prefiks bilan: FM:, FM-, Fiskal modul: LG...
+    m_pref = re.search(r"(?:fiskal\s*modul|фискал\s*модул|fm|фм)[\s\-_:#№]*([A-Za-z0-9]{10,16})", t, re.IGNORECASE)
+    if m_pref:
+        cleaned = re.sub(r"[\s\-_:#№]", "", m_pref.group(1))
+        if len(cleaned) >= 10:
+            return cleaned.upper()
+
+    # 3. Agar matnda aniq fiskal modul so'zi bo'lsa va 14 xonali raqam kelsa
+    if any(w in t.lower() for w in ["fiskal", "modul", "фискал", "модул"]):
+        m14 = re.search(r"\b(\d{14})\b", t)
+        if m14:
+            return m14.group(1)
+
+    return None
+
 class ActionType(Enum):
     IGNORE = "IGNORE"                          # Begona rasm yoki ob'ekt — javob bermay jim turish
     ASK_FULL_SCREEN = "ASK_FULL_SCREEN"        # Status bar (soat va tarmoq) ko'rinmagan — to'liq ekranni talab qilish
