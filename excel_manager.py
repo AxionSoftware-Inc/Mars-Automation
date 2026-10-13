@@ -51,7 +51,18 @@ class ExcelManager:
             MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
 
             # 3-qatordan boshlab o'qish (1 va 2-qator sarlavhalar)
-            for row in sheet.iter_rows(min_row=3, values_only=True):
+            # P3 apparatlar Excelda sariq qator (FFFFFF00), oddiy SmartPOS apparatlar esa oq qator bilan belgilangan.
+            p3_count = 0
+            for row_cells in sheet.iter_rows(min_row=3, values_only=False):
+                row = [c.value if c is not None else None for c in row_cells]
+                is_p3 = False
+                for c in row_cells[1:5]:
+                    if c is not None and getattr(c, "fill", None) and getattr(c.fill, "fill_type", None) == "solid":
+                        fg = getattr(c.fill, "fgColor", None)
+                        if fg and getattr(fg, "type", None) == "rgb" and fg.rgb:
+                            if str(fg.rgb).upper().endswith("FFFF00"):
+                                is_p3 = True
+                                break
                 # Ustunlar:
                 # 0: Telefon
                 # 1: Sana
@@ -82,6 +93,8 @@ class ExcelManager:
 
                 if not stir and not jshshir and not terminal and not name_raw:
                     continue
+                if is_p3:
+                    p3_count += 1
 
                 # Qarz summasi
                 debt_val = 0.0
@@ -141,6 +154,8 @@ class ExcelManager:
                     "terminal": terminal or "-",
                     "debt": debt_val,
                     "tuman": str(tuman_raw or "-").strip(),
+                    "is_p3": is_p3,
+                    "device_model": "P3" if is_p3 else "SmartPOS",
                     "old_debt_2026": old_debt,
                     "payments_2026": payments_2026,
                     "charges_2026": charges_2026,
@@ -168,7 +183,7 @@ class ExcelManager:
             self.phone_index = new_phone
             self.records_count = count
             wb.close()
-            logger.info(f"Excel muvaffaqiyatli yuklandi: {count} ta yozuv indekslandi (Phone: {len(new_phone)} ta).")
+            logger.info(f"Excel muvaffaqiyatli yuklandi: {count} ta yozuv indekslandi (P3: {p3_count} ta, SmartPOS: {count - p3_count} ta, Phone: {len(new_phone)} ta).")
             return True
         except Exception as e:
             logger.error(f"Excel faylni o'qishda xatolik: {e}")
@@ -217,6 +232,21 @@ class ExcelManager:
         if results:
             return str(results[0].get("tuman", "")).strip()
         return ""
+
+    def is_p3_for_inn(self, query: str) -> Optional[bool]:
+        """
+        Berilgan INN / JSHSHIR / Terminal / Telefon bo'yicha apparat P3 (sariq qator) yoki
+        SmartPOS (oq qator) ekanligini aniqlash:
+        - True: P3 apparati (Excelda sariq qator)
+        - False: SmartPOS (oddiy apparat, Excelda oq qator)
+        - None: Bazadan topilmadi
+        """
+        if not query:
+            return None
+        results = self.search(query)
+        if not results:
+            return None
+        return any(bool(r.get("is_p3", False)) for r in results)
 
     def format_payment_history(self, results: List[Dict[str, Any]]) -> str:
         """

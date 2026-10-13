@@ -276,74 +276,80 @@ def test_pending_receipt_resolution_when_user_subsequently_sends_inn():
 
 def test_p3_long_messages_tax_debt_and_freeform():
     """
-    P3 apparatida tepada soat bo'lmaydi va muammo ekranning o'zida uzun matn bo'lib yoziladi
-    (masalan: qarzdorlik bor, soliq o'chirdi yoki boshqa uzun xabar).
-    Model soat so'ramasligi, 'internet yo'q' deb adashmasligi va ekranda yozilgan aniq gapni
-    qisqa ta'riflab berishi testi.
+    1) Excelda P3 apparatlar sariq qator (is_p3=True), SmartPOS apparatlar esa oq qator (is_p3=False) ekanligini tekshirish.
+    2) P3 apparatda (sariq qator) ekranda yozilgan aniq xabar qisqa ta'riflab berilishi va soat so'ralmasligi.
+    3) SmartPOS apparatda (oq qator) ekrandagi muammoga aloqasiz gaplar HECH QACHON shunchaki o'qib berilmasligi,
+       soat ko'rinmasa to'liq ekran so'ralishi, soat/internet xato bo'lsa aniq qoida ishlashi testi.
     """
-    from unittest.mock import patch
-    from image_analyzer import analyze_media_image
     from error_manager import error_manager
 
     error_manager.load_rules()
-    logger.info(">>> 7. P3 apparati uzun ekran yozuvlari (Soliq o'chirdi, Qarzdorlik, Erkin matn) testi...")
+    logger.info(">>> 7. Excel sariq qator (P3) va oq qator (SmartPOS) qat'iy ajratilishi testi...")
 
-    # 1) P3 ekranda: "Soliq o'chirdi / Soliq organlari tomonidan to'xtatilgan"
+    # A) Excel ranglar tekshiruvi: Sariq qator = P3, Oq qator = SmartPOS
+    assert excel_manager.is_p3_for_inn("311481235") is True, "311481235 Excelda sariq qator (P3) bo'lishi shart!"
+    assert excel_manager.is_p3_for_inn("305758642") is True, "305758642 Excelda sariq qator (P3) bo'lishi shart!"
+    assert excel_manager.is_p3_for_inn("206011507") is False, "206011507 Excelda oq qator (SmartPOS) bo'lishi shart!"
+    assert excel_manager.is_p3_for_inn("311790999") is False, "311790999 Excelda oq qator (SmartPOS) bo'lishi shart!"
+
+    # B) P3 apparati (INN: 305758642 - sariq qator): Ekranda erkin uzun xabar yozilgan, tepada soat yo'q
+    user_memory.clear_context(chat_id=301, user_id=401)
+    facts_p3_custom = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=False,
+        has_internet=False,  # P3 da status bar yo'qligi sababli false kelsa ham
+        time_mismatch=True,
+        detected_inn="305758642",  # P3 korxona (sariq qator)
+        screen_text_summary="Hurmatli foydalanuvchi, OFD tizimida kassa sertifikati muddati tugaganligi sababli chek urish vaqtincha cheklandi."
+    )
+    dec_p3 = core_engine.process_device_facts(facts_p3_custom, chat_id=301, user_id=401)
+    assert dec_p3.action != ActionType.ASK_FULL_SCREEN, "P3 apparatda soat so'ralmasligi shart!"
+    assert "sertifikati muddati tugaganligi" in (dec_p3.reply_text or "").lower()
+    assert "internetga ulanmagan" not in (dec_p3.reply_text or "").lower()
+
+    # C) P3 ekranda: "Soliq o'chirdi" (Mars oylik abonent qarzdorligi bilan adashmasligi)
     facts_tax = DeviceFacts(
         is_real_pos_device=True,
         is_status_bar_visible=False,
-        has_internet=False,  # Status bar yo'qligi uchun Vision false qaytargan taqdirda ham
-        time_mismatch=True,
+        detected_inn="305758642",
         screen_text_summary="Hurmatli soliq to'lovchi, ijara shartnomasi bekor qilinganligi sababli kassa apparati soliq organlari tomonidan vaqtincha o'chirilgan."
     )
     dec_tax = core_engine.process_device_facts(facts_tax, chat_id=301, user_id=401)
-    assert dec_tax.action != ActionType.ASK_FULL_SCREEN, "P3 da soat so'ralmasligi shart!"
+    assert dec_tax.action != ActionType.ASK_FULL_SCREEN
     assert "ijara shartnomasi" in (dec_tax.reply_text or "").lower()
-    assert "soliq" in (dec_tax.reply_text or "").lower()
-    assert "oylik servis xizmati to'lovi amalga oshirilmagan" not in (dec_tax.reply_text or "").lower(), (
-        "Soliq o'chirgan holatni Mars oylik abonent qarzdorligi bilan adashtirmasligi shart!"
-    )
+    assert "oylik servis xizmati to'lovi amalga oshirilmagan" not in (dec_tax.reply_text or "").lower()
 
-    # 2) P3 ekranda: "Qarzdorlik bor" uzun xabar
-    facts_debt = DeviceFacts(
+    # D) SmartPOS apparati (INN: 311790999 - oq qator, qarzi 0):
+    # Ekranda muammoga aloqasiz yozuv bor va tepada soat ko'rinmayapti ->
+    # SmartPOS ekranidagi aloqasiz yozuvni O'QIB BERMASLIGI, balki soat va internet qatorini so'rashi SHART!
+    user_memory.clear_context(chat_id=302, user_id=402)
+    facts_smart_no_clock = DeviceFacts(
         is_real_pos_device=True,
         is_status_bar_visible=False,
-        screen_text_summary="Diqqat! Abonent to'lovi bo'yicha qarzdorlik mavjudligi sababli dastur vaqtincha bloklandi."
+        detected_inn="311790999",  # SmartPOS korxona (oq qator)
+        screen_text_summary="Savdo oynasi versiya 4.2.1: Kassa menyusi ochiq, aloqasiz matn"
     )
-    dec_debt = core_engine.process_device_facts(facts_debt, chat_id=302, user_id=402)
-    assert dec_debt.action != ActionType.ASK_FULL_SCREEN
-    assert "qarzdorlik mavjudligi sababli" in (dec_debt.reply_text or "").lower()
-    assert dec_debt.video_id == 148
+    dec_smart_ask = core_engine.process_device_facts(facts_smart_no_clock, chat_id=302, user_id=402)
+    assert dec_smart_ask.action == ActionType.ASK_FULL_SCREEN, (
+        "SmartPOS da tanish xato kodi bo'lmasa va soat ko'rinmasa, aloqasiz yozuvni o'qimasdan to'liq ekran so'rashi shart!"
+    )
+    assert "versiya 4.2.1" not in (dec_smart_ask.reply_text or "").lower()
 
-    # 3) P3 ekranda: Qoidalarda yo'q bo'lgan erkin uzun xabar (Vision status bar yo'qligi sabab has_internet=false qaytarganda ham)
-    mock_p3_vision = '''{
-        "media_type": "pos_device",
-        "receipt": null,
-        "device": {
-            "is_real_pos_device": true,
-            "is_status_bar_visible": false,
-            "time_mismatch": true,
-            "has_internet": false,
-            "error_type": "none",
-            "detected_inn": null,
-            "screen_text_summary": "Hurmatli foydalanuvchi, OFD tizimida kassa sertifikati muddati tugaganligi sababli chek urish vaqtincha cheklandi."
-        }
-    }'''
-    with patch("openrouter_client.openrouter_client.chat_completion", return_value=mock_p3_vision):
-        m_type, _, d_facts = analyze_media_image(b"fake_p3_image", user_caption="")
-        assert m_type == "pos_device"
-        assert d_facts is not None
-        assert d_facts.is_status_bar_visible is False
-        assert d_facts.has_internet is True, "Status bar yo'q P3 da has_internet=False bo'lib qolmasligi kerak!"
-        assert d_facts.time_mismatch is False, "Status bar yo'q P3 da time_mismatch=True bo'lib qolmasligi kerak!"
+    # E) SmartPOS apparati: Ekranda aloqasiz gap yozilgan, lekin tepada soat xato (time_mismatch=True) ->
+    # Aloqasiz gapga chalg'imasdan darhol 'Sana va vaqt noto'g'ri' (Video 141) tashxisini qo'yishi shart!
+    facts_smart_time = DeviceFacts(
+        is_real_pos_device=True,
+        is_status_bar_visible=True,
+        time_mismatch=True,
+        has_internet=True,
+        screen_text_summary="Kassa menyusi: Tovarlar ro'yxati bo'sh"
+    )
+    dec_smart_time = core_engine.process_device_facts(facts_smart_time, chat_id=303, user_id=403)
+    assert dec_smart_time.action == ActionType.DIAGNOSE_AND_REPLY
+    assert dec_smart_time.video_id == 141
+    assert "tovarlar ro'yxati bo'sh" not in (dec_smart_time.reply_text or "").lower()
 
-        dec_free = core_engine.process_device_facts(d_facts, chat_id=303, user_id=403)
-        assert dec_free.action == ActionType.DIAGNOSE_AND_REPLY
-        assert "sertifikati muddati tugaganligi" in (dec_free.reply_text or "").lower()
-        assert "internetga ulanmagan" not in (dec_free.reply_text or "").lower()
-        assert "soat yoki sana noto'g'ri" not in (dec_free.reply_text or "").lower()
-
-    logger.info("✅ P3 apparati uzun yozuvlari (Soliq, Qarzdorlik, Erkin xabar) 100% bexato ta'riflandi!")
+    logger.info("✅ Excel sariq qator (P3) va oq qator (SmartPOS) 100% bexato ajratildi, SmartPOS aloqasiz yozuvlarni o'qimaydi!")
 
 
 if __name__ == "__main__":

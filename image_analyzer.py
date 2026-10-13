@@ -205,22 +205,12 @@ Foydalanuvchi izohi: "{user_caption}"
         # 2. SMART POS KASSA APPARATI
         elif media_type == "pos_device":
             detected_inn = extract_clean_inn(str(dev_raw.get("detected_inn") or caption_inn or ""))
-            is_status_bar_visible = bool(dev_raw.get("is_status_bar_visible", False))
-
-            # P3 kabi apparatlarda tepada soat/status bar bo'lmaydi.
-            # Agar status bar ko'rinmasa, status bardagi ikonkalarga qarab soat xato yoki internet yo'q deb xulosa qilinmaydi
-            # (agar ekranda yozuv ko'rinishida internet/vaqt xatosi bo'lsa, u screen_text_summary orqali aniqlanadi).
-            time_mismatch = bool(dev_raw.get("time_mismatch", False)) if is_status_bar_visible else False
-            has_internet = bool(dev_raw.get("has_internet", True)) if is_status_bar_visible else True
-            if isinstance(dev_raw, dict) and not is_status_bar_visible:
-                dev_raw["time_mismatch"] = False
-                dev_raw["has_internet"] = True
 
             device_facts = DeviceFacts(
                 is_real_pos_device=bool(dev_raw.get("is_real_pos_device", True)),
-                is_status_bar_visible=is_status_bar_visible,
-                time_mismatch=time_mismatch,
-                has_internet=has_internet,
+                is_status_bar_visible=bool(dev_raw.get("is_status_bar_visible", False)),
+                time_mismatch=bool(dev_raw.get("time_mismatch", False)),
+                has_internet=bool(dev_raw.get("has_internet", True)),
 
                 error_type=str(dev_raw.get("error_type", "none")),
                 detected_inn=detected_inn,

@@ -108,7 +108,39 @@ class CoreEngine:
                 user_comment=user_comment
             )
 
-        # 2-BOSQICH: EKRAN TASHXISI (P3 va barcha modellarda avval ekrandagi yozuv va xatolikni tekshirish)
+        # 2-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN, QARZ VA APPARAT TURI: P3 vs SmartPOS)
+        # Excelda P3 apparatlar sariq qator (is_p3=True), asosiy SmartPOS apparatlar esa oq qator (is_p3=False).
+        from core.models import extract_clean_inn
+        debt_text: Optional[str] = None
+        total_debt: float = 0.0
+        org_name: str = ""
+        is_p3_device: bool = bool((facts.raw_facts or {}).get("is_p3_device", False))
+
+        target_inn = (
+            facts.detected_inn
+            or (extract_clean_inn(user_comment) if user_comment else None)
+            or user_memory.get_last_id(chat_id, user_id)
+        )
+
+        if target_inn:
+            from handlers.debt import format_debt_response
+            results = excel_manager.search(target_inn)
+            if results:
+                org_name = results[0].get("name", "")
+                total_debt = sum(item.get("debt", 0.0) for item in results)
+                is_p3_device = any(bool(item.get("is_p3", False)) for item in results)
+                debt_text = format_debt_response(results)
+
+                # Xotiraga korxona va qarzni yozish
+                user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
+                user_memory.set_last_topic(chat_id, user_id, "screen_diagnostics_with_inn")
+
+        # 3-BOSQICH: EKRAN TASHXISI (SmartPOS va P3 qat'iy ajratilgan holda)
+        # - SmartPOS (asosiy apparat, oq qator): Ekranda muammoga aloqasiz gaplar chiqishi mumkin,
+        #   shuning uchun faqat aniq xatolik qoidalari/kodlari (screen_errors.json), soat va internet tekshiriladi.
+        #   SmartPOS ekranidagi erkin yozuv HECH QACHON shunchaki o'qib berilmaydi!
+        # - P3 apparat (sariq qator): Tepasida soat bo'lmaydi, muammo sababi ekranda aniq yozilgan bo'ladi;
+        #   faqat P3 apparatlarida ekranda yozilgan xabar qisqa ta'riflab beriladi.
         diag_text: Optional[str] = None
         diag_video_id: Optional[int] = None
         has_error: bool = False
@@ -118,60 +150,51 @@ class CoreEngine:
             match_payload["screen_text_summary"] = facts.screen_text_summary
         if facts.error_type and not match_payload.get("error_type"):
             match_payload["error_type"] = facts.error_type
-        match_payload["is_status_bar_visible"] = facts.is_status_bar_visible
-        match_payload["has_internet"] = facts.has_internet if facts.is_status_bar_visible else True
-        match_payload["time_mismatch"] = facts.time_mismatch if facts.is_status_bar_visible else False
+        if is_p3_device and not facts.is_status_bar_visible:
+            # P3 apparatda tepada status bar bo'lmagani uchun soat/internet bayroqlari o'chiriladi
+            match_payload["has_internet"] = True
+            match_payload["time_mismatch"] = False
+        else:
+            match_payload["has_internet"] = facts.has_internet
+            match_payload["time_mismatch"] = facts.time_mismatch
 
         matched_rule = error_manager.match_error(match_payload)
         clean_summary = (facts.screen_text_summary or "").strip()
         is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
 
-        if matched_rule:
-            has_error = True
-            rule_resp = matched_rule.get("response_text", "")
-            diag_video_id = matched_rule.get("video_id")
-            if is_meaningful_summary and clean_summary.lower() not in rule_resp.lower():
-                diag_text = f"🖥 <b>Ekrandagi holat:</b> {clean_summary}\n\n{rule_resp}"
-            else:
-                diag_text = rule_resp
-        elif is_meaningful_summary:
-            has_error = True
-            diag_text = f"ℹ️ <b>Ekrandagi holat:</b> {clean_summary}"
-
-        if (facts.is_status_bar_visible and facts.time_mismatch) or facts.error_type != "none":
-            has_error = True
-
-        # 3-BOSQICH: BIZNES VA EXCEL INTEGRATSIYASI (INN VA QARZ)
-        debt_text: Optional[str] = None
-        total_debt: float = 0.0
-        org_name: str = ""
-
-        # INN qidirish: Ekranda yoki xotirada
-        target_inn = facts.detected_inn or user_memory.get_last_id(chat_id, user_id)
-
-        if target_inn:
-            from handlers.debt import format_debt_response
-            results = excel_manager.search(target_inn)
-            if results:
-                org_name = results[0].get("name", "")
-                total_debt = sum(item.get("debt", 0.0) for item in results)
-                debt_text = format_debt_response(results)
-
-                # Xotiraga korxona va qarzni yozish
-                user_memory.set_last_id(chat_id, user_id, target_inn, org_name=org_name, debt=total_debt)
-                user_memory.set_last_topic(chat_id, user_id, "screen_diagnostics_with_inn")
+        if is_p3_device:
+            # P3 APPARATI (Sariq qator): Ekranda yozilgan aniq gapni qisqa ta'riflab berish
+            if matched_rule:
+                has_error = True
+                rule_resp = matched_rule.get("response_text", "")
+                diag_video_id = matched_rule.get("video_id")
+                if is_meaningful_summary and clean_summary.lower() not in rule_resp.lower():
+                    diag_text = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {clean_summary}\n\n{rule_resp}"
+                else:
+                    diag_text = rule_resp
+            elif is_meaningful_summary:
+                has_error = True
+                diag_text = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {clean_summary}"
+        else:
+            # SMARTPOS APPARATI (Oq qator / Asosiy apparat):
+            # Faqat aniq qoida va kodlar bo'yicha tashxis qo'yiladi, ekrandagi aloqasiz yozuvlar o'qib berilmaydi!
+            if matched_rule:
+                has_error = True
+                diag_text = matched_rule.get("response_text", "")
+                diag_video_id = matched_rule.get("video_id")
+            if facts.time_mismatch or facts.error_type != "none":
+                has_error = True
 
         # 4-BOSQICH: PRE-CONDITION (STATUS BAR / SOAT VA TARMOQ QATORI)
-        # P3 kabi modellarda tepada soat qatori bo'lmaydi.
-        # Avval ekrandagi yozuvni o'qib yechishga harakat qilinadi.
-        # Faqatgina ekranda va qarzda hech qanday muammo aniqlanmasa va status bar ko'rinmasa -> to'liq ekran so'raladi!
-        if not has_error and total_debt <= 0 and not facts.is_status_bar_visible:
-            logger.info("Pre-condition: Ekrandan muammo aniqlanmadi va status bar ko'rinmayapti. To'liq ekran talab qilinadi.")
+        # SmartPOS apparatda ekrandan aniq xatolik qoidasi topilmasa va tepada soat qatori ko'rinmasa -> to'liq ekran so'raladi!
+        # P3 apparatda esa tepada soat bo'lmaydi.
+        if not is_p3_device and not has_error and total_debt <= 0 and not facts.is_status_bar_visible:
+            logger.info("Pre-condition: SmartPOS ekranidan aniq xatolik kodi topilmadi va status bar ko'rinmayapti. To'liq ekran talab qilinadi.")
             return DecisionResult(
                 action=ActionType.ASK_FULL_SCREEN,
                 reply_text=INCOMPLETE_SCREEN_REPLY,
                 detected_inn=facts.detected_inn,
-                log_reason="No error diagnosed from screen and status bar invisible"
+                log_reason="No error rule matched on SmartPOS screen and status bar invisible"
             )
 
         # 5-BOSQICH: ADMINGA ESKALATSIYA HOLATI (INTERNET BOR + QARZ YO'Q + LEKIN XATOLIK BOR, YOKI JIDDIY APPARAT XATOSI)

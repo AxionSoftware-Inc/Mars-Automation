@@ -113,21 +113,17 @@ class ErrorManager:
         if best_rule:
             return best_rule
 
-        summary_clean = str(screen_facts.get("screen_text_summary") or "").strip().lower()
-        has_custom_screen_message = summary_clean not in ["", "none", "normal", "asosiy oyna", "bosh oyna"]
-        status_bar_visible = screen_facts.get("is_status_bar_visible", True)
-
-        # 3. Agar ekranda boshqa maxsus xatolik matni yozilmagan bo'lsa va status bar ko'rinsa: Internet yo'qligi
-        if status_bar_visible and not has_custom_screen_message and screen_facts.get("has_internet") is False:
+        # 3. Agar maxsus xatolik matni bo'lmasa: Internet yo'qligi
+        if screen_facts.get("has_internet") is False:
             return self.get_rule_by_id("no_internet")
 
-        # 4. Agar ekranda boshqa maxsus xatolik matni yozilmagan bo'lsa va status bar ko'rinsa: Soat va sana xatoligi
-        if status_bar_visible and not has_custom_screen_message and screen_facts.get("time_mismatch"):
+        # 4. Agar maxsus xatolik matni bo'lmasa: Soat va sana xatoligi
+        if screen_facts.get("time_mismatch"):
             return self.get_rule_by_id("time_error")
 
         # 5. Standart error_type toifalari bo'yicha zaxira tanlash
         err_type = str(screen_facts.get("error_type", "")).lower()
-        if err_type in ["debt", "blocked"] and not has_custom_screen_message:
+        if err_type in ["debt", "blocked"]:
             return self.get_rule_by_id("debt_blocked")
         elif err_type == "fiscal_module":
             return self.get_rule_by_id("fiscal_module_error")
