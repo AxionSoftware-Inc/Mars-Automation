@@ -86,16 +86,19 @@ class UserMemoryManager:
         if len(session["history"]) > self.max_turns * 2:
             session["history"] = session["history"][-(self.max_turns * 2):]
 
-    def set_last_id(self, chat_id: int, user_id: int, identifier: str, org_name: str = "", debt: float = 0.0):
+    def set_last_id(self, chat_id: int, user_id: int, identifier: str, org_name: str = "", debt: float = 0.0, device_models: str = ""):
         """Foydalanuvchi qidirgan oxirgi INN/JSHSHIR va korxona ma'lumotlarini eslab qolish"""
         session = self._get_or_create_session(chat_id, user_id)
         session["last_id"] = str(identifier).strip()
         if org_name:
             session["org_name"] = str(org_name).strip()
+        if device_models:
+            session["device_models"] = str(device_models).strip()
         session["debt_info"] = {
             "identifier": str(identifier).strip(),
             "org_name": session.get("org_name") or org_name,
-            "debt": debt
+            "debt": debt,
+            "device_models": session.get("device_models") or device_models
         }
 
     def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
@@ -162,6 +165,9 @@ class UserMemoryManager:
             org_str = org_name or (debt_info.get("org_name") if debt_info else "Noma'lum korxona")
             parts.append(f"• Korxona nomi: {org_str}")
             parts.append(f"• INN / JSHSHIR: {last_id}")
+            dev_models = session.get("device_models") or (debt_info.get("device_models") if debt_info else "")
+            if dev_models:
+                parts.append(f"• Korxonaning kassa apparati modeli: {dev_models}")
             parts.append("• QAT'IY QOIDA: Ushbu mijozning INN raqami va korxonasi ALLAQACHON ma'lum! Qayta INN so'rash qat'iyan taqiqlanadi!")
         else:
             parts.append("• Ushbu mijoz tizimga hali o'z korxona INN/JSHSHIR raqamini kiritmagan va to'lov kvitansiyasini yubormagan.")

@@ -38,7 +38,25 @@ def format_debt_response(results: list) -> str:
     if tuman != "-":
         text += f"📍 <b>Hudud / Tuman:</b> {tuman}\n"
     
-    text += f"📟 <b>Biriktirilgan apparatlar soni:</b> {device_count} ta\n"
+    p3_items = [item for item in results if item.get("is_p3", False)]
+    smart_items = [item for item in results if not item.get("is_p3", False)]
+
+    if device_count == 1:
+        single_model = "P3 Humo" if p3_items else "Smart One"
+        text += f"📟 <b>Apparat modeli:</b> {single_model}\n"
+        terminal_id = results[0].get("terminal", "-")
+        if terminal_id and terminal_id != "-":
+            text += f"🔢 <b>Terminal ID:</b> <code>{terminal_id}</code>\n"
+    else:
+        text += f"📟 <b>Biriktirilgan apparatlar soni:</b> {device_count} ta\n"
+        if p3_items and smart_items:
+            text += f"   • <b>P3 Humo:</b> {len(p3_items)} ta\n"
+            text += f"   • <b>Smart One:</b> {len(smart_items)} ta\n"
+        elif p3_items:
+            text += f"   • <b>Modeli:</b> P3 Humo ({len(p3_items)} ta)\n"
+        elif smart_items:
+            text += f"   • <b>Modeli:</b> Smart One ({len(smart_items)} ta)\n"
+
     text += "────────────────────\n"
 
     total_debt = sum(item.get("debt", 0.0) for item in results)
@@ -158,7 +176,8 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     else:
         primary_id = query_num
 
-    user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt)
+    model_summary = excel_manager.get_device_model_summary(results)
+    user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt, device_models=model_summary)
     user_memory.set_last_topic(chat_id, user_id, "debt_checked")
 
     resp = format_debt_response(results)
@@ -168,7 +187,7 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         is_p3 = any(bool(item.get("is_p3", False)) for item in results) if results else False
         saved_summary = (pending_screen.get("screen_text_summary") or "").strip()
         if is_p3 and saved_summary:
-            resp = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {saved_summary}\n\n──────────────\n{resp}"
+            resp = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {saved_summary}\n\n──────────────\n{resp}"
 
     resp = adapt_to_user_script(resp, user_script)
     logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")

@@ -61,7 +61,7 @@ class ExcelManager:
             MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
 
             # 3-qatordan boshlab o'qish (1 va 2-qator sarlavhalar)
-            # - P3 apparatlar Excelda sariq qator (FFFFFF00), oddiy SmartPOS apparatlar esa oq qator bilan belgilangan.
+            # - P3 Humo apparatlar Excelda sariq qator (FFFFFF00), Smart One apparatlar esa oq qator bilan belgilangan.
             # - Qizil qatorlar (FFFF0000 yoki C00000) hisobdan chiqarilgan / o'chirib tashlangan deb hisoblanadi va hisoblanmaydi!
             for row_cells in sheet.iter_rows(min_row=3, values_only=False):
                 row = [c.value if c is not None else None for c in row_cells]
@@ -177,7 +177,7 @@ class ExcelManager:
                     "tuman": str(tuman_raw or "-").strip(),
                     "is_p3": is_p3,
                     "is_decommissioned": is_red,
-                    "device_model": "P3" if is_p3 else "SmartPOS",
+                    "device_model": "P3 Humo" if is_p3 else "Smart One",
                     "old_debt_2026": old_debt,
                     "payments_2026": payments_2026,
                     "charges_2026": charges_2026,
@@ -226,7 +226,7 @@ class ExcelManager:
             wb.close()
             logger.info(
                 f"Excel muvaffaqiyatli yuklandi: {count} ta faol yozuv indekslandi "
-                f"(P3: {p3_count} ta, SmartPOS: {count - p3_count} ta, Qizil/O'chirilgan: {decom_count} ta, Phone: {len(new_phone)} ta)."
+                f"(P3 Humo: {p3_count} ta, Smart One: {count - p3_count} ta, Qizil/O'chirilgan: {decom_count} ta, Phone: {len(new_phone)} ta)."
             )
             return True
         except Exception as e:
@@ -309,10 +309,10 @@ class ExcelManager:
 
     def is_p3_for_inn(self, query: str) -> Optional[bool]:
         """
-        Berilgan INN / JSHSHIR / Terminal / Telefon bo'yicha apparat P3 (sariq qator) yoki
-        SmartPOS (oq qator) ekanligini aniqlash:
-        - True: P3 apparati (Excelda sariq qator)
-        - False: SmartPOS (oddiy apparat, Excelda oq qator)
+        Berilgan INN / JSHSHIR / Terminal / Telefon bo'yicha apparat P3 Humo (sariq qator) yoki
+        Smart One (oq qator) ekanligini aniqlash:
+        - True: P3 Humo apparati (Excelda sariq qator)
+        - False: Smart One (Excelda oq qator)
         - None: Bazadan topilmadi
         """
         if not query:
@@ -321,6 +321,21 @@ class ExcelManager:
         if not results:
             return None
         return any(bool(r.get("is_p3", False)) for r in results)
+
+    def get_device_model_summary(self, results: List[Dict[str, Any]]) -> str:
+        """Apparatlar modellarini 'P3 Humo' va 'Smart One' bo'yicha qisqa va aniq ifodalash"""
+        if not results:
+            return ""
+        p3_count = sum(1 for r in results if r.get("is_p3", False))
+        smart_count = sum(1 for r in results if not r.get("is_p3", False))
+        total = len(results)
+        if total == 1:
+            return "P3 Humo" if p3_count > 0 else "Smart One"
+        if p3_count > 0 and smart_count > 0:
+            return f"P3 Humo: {p3_count} ta, Smart One: {smart_count} ta"
+        if p3_count > 0:
+            return f"P3 Humo ({p3_count} ta)"
+        return f"Smart One ({smart_count} ta)"
 
     def format_payment_history(self, results: List[Dict[str, Any]]) -> str:
         """

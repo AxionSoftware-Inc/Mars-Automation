@@ -163,20 +163,20 @@ class CoreEngine:
         is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
 
         if is_p3_device:
-            # P3 APPARATI (Sariq qator): Ekranda yozilgan aniq gapni qisqa ta'riflab berish
+            # P3 HUMO APPARATI (Sariq qator): Ekranda yozilgan aniq gapni qisqa ta'riflab berish
             if matched_rule:
                 has_error = True
                 rule_resp = matched_rule.get("response_text", "")
                 diag_video_id = matched_rule.get("video_id")
                 if is_meaningful_summary and clean_summary.lower() not in rule_resp.lower():
-                    diag_text = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {clean_summary}\n\n{rule_resp}"
+                    diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}\n\n{rule_resp}"
                 else:
                     diag_text = rule_resp
             elif is_meaningful_summary:
                 has_error = True
-                diag_text = f"🖥 <b>P3 apparat ekranidagi xabar:</b> {clean_summary}"
+                diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}"
         else:
-            # SMARTPOS APPARATI (Oq qator / Asosiy apparat):
+            # SMART ONE APPARATI (Oq qator / Asosiy apparat):
             # Faqat aniq qoida va kodlar bo'yicha tashxis qo'yiladi, ekrandagi aloqasiz yozuvlar o'qib berilmaydi!
             if matched_rule:
                 has_error = True
