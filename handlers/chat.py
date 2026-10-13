@@ -141,6 +141,23 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             from handlers.debt import format_debt_response
             from excel_manager import excel_manager
             results = excel_manager.search(remembered_id)
+            if not results and excel_manager.is_decommissioned(remembered_id):
+                decom_list = excel_manager.get_decommissioned(remembered_id)
+                decom_org = decom_list[0].get("name", "") if decom_list else ""
+                decom_msg = (
+                    f"ℹ️ <b>{decom_org}</b> korxonasi xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan).\n"
+                    f"Qarzdorlik hisoblanmaydi (0 so'm).\n\n"
+                    f"Agar yangitdan xizmat ko'rsatish yoki apparatni qayta faollashtirish kerak bo'lsa, «Usta kerak» yoki «Admin» deb yozishingiz mumkin."
+                )
+                decom_msg = adapt_to_user_script(decom_msg, user_script)
+                try:
+                    await message.reply(decom_msg, parse_mode="HTML")
+                except Exception:
+                    await message.reply(decom_msg)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, decom_msg)
+                return
+
             total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
             tuman = excel_manager.get_district_for_inn(remembered_id)
 

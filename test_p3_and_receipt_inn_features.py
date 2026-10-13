@@ -526,6 +526,67 @@ def test_four_layer_hierarchical_diagnostic_system():
     logger.info("✅ 4-Bosqichli iyerarxik standart tashxis tizimi 100% ideal ishladi!")
 
 
+async def test_red_rows_are_decommissioned_and_not_calculated():
+    """
+    Excelda qizil bilan belgilangan (hisobdan chiqarilgan / o'chirib tashlangan) qatorlar testi:
+    1) Qizil qatorlar faol qidiruv va qarz hisob-kitobiga kiritilmaydi (search() da chiqmaydi, qarzi hisoblanmaydi).
+    2) Faqat qizil qatorda bo'lgan korxona is_decommissioned() = True bo'ladi.
+    3) Ham oq/sariq, ham qizil qatori bo'lgan korxonaning faqat faol qatorlari hisoblanadi, qizil qatori chetlab o'tiladi.
+    4) process_and_send_debt_result qizil korxonaga 'Hisobdan chiqarilgan, qarzdorlik 0 so'm' deb to'g'ri javob beradi.
+    """
+    from types import SimpleNamespace
+    from excel_manager import excel_manager
+    from handlers.debt import process_and_send_debt_result
+
+    logger.info(">>> 10. Qizil qatorlar (hisobdan chiqarilgan/o'chirib tashlangan) testi...")
+
+    # 1. Qizil qatorlar yuklangani va ajratilgani
+    assert excel_manager.decommissioned_count > 0, "Excelda qizil qatorlar (hisobdan chiqarilganlar) mavjud bo'lishi shart!"
+
+    # 2. Faqat qizil qatorda bo'lgan korxona (INN: 311629658 - GREAT LEADER BECK)
+    only_red_inn = "311629658"
+    active_records = excel_manager.search(only_red_inn)
+    assert len(active_records) == 0, f"{only_red_inn} faol bazada bo'lmasligi kerak (chunki qizil)!"
+    assert excel_manager.is_decommissioned(only_red_inn) is True, f"{only_red_inn} hisobdan chiqarilgan deb belgilanishi shart!"
+    decom_info = excel_manager.get_decommissioned(only_red_inn)
+    assert len(decom_info) > 0
+    assert "GREAT LEADER BECK" in decom_info[0]["name"]
+
+    # 3. Aralash (ham faol, ham qizil) korxona (INN: 303004506 - JALILBEK GAZ SERVIS)
+    # Row 26 (qizil) terminal 2020011036 ga ega edi. U hisoblanmasligi shart!
+    mixed_inn = "303004506"
+    mixed_active = excel_manager.search(mixed_inn)
+    assert len(mixed_active) > 0, "Faol qatorlari bo'lgan korxona bazada topilishi kerak"
+    assert excel_manager.is_decommissioned(mixed_inn) is False, "Kamida 1 ta faol apparati bo'lsa korxona is_decommissioned=False bo'lishi kerak"
+    for r in mixed_active:
+        assert r.get("is_decommissioned") is False
+        assert r.get("terminal") != "2020011036", "Qizil (o'chirilgan) terminal faol qidiruvga kirmasligi shart!"
+
+    # 4. Foydalanuvchiga javob berish simulyatsiyasi
+    sent_replies = []
+    class FakeMessage:
+        def __init__(self, text, chat_id=112233, user_id=445566):
+            self.text = text
+            self.chat = SimpleNamespace(id=chat_id, type="private")
+            self.from_user = SimpleNamespace(id=user_id, username="test_client", first_name="Client")
+            self.message_id = 999
+        async def reply(self, text, parse_mode=None):
+            sent_replies.append(text)
+            return self
+
+    fake_msg = FakeMessage(text=only_red_inn)
+    fake_bot = SimpleNamespace()
+    await process_and_send_debt_result(fake_msg, fake_bot, only_red_inn)
+
+    assert len(sent_replies) == 1
+    reply_out = sent_replies[0]
+    assert "Hisobdan chiqarilgan" in reply_out or "hisobdan chiqarilgan" in reply_out
+    assert "0 so'm" in reply_out
+    assert "GREAT LEADER BECK" in reply_out
+
+    logger.info("✅ Qizil qatorlar (hisobdan chiqarilgan/o'chirib tashlangan) 100% to'g'ri ishlamoqda va hisob-kitobga aralashmaydi!")
+
+
 if __name__ == "__main__":
     test_extract_clean_inn_rejects_dummies()
     test_p3_device_without_status_bar_diagnoses_screen_error()
@@ -536,6 +597,7 @@ if __name__ == "__main__":
     test_p3_long_messages_tax_debt_and_freeform()
     asyncio.run(test_ofd_bridge_secret_group_flow())
     test_four_layer_hierarchical_diagnostic_system()
-    print("\n🎉 BARCHA P3, KVITANSIYA INN, OFD VA 4-BOSQICHLI TASHXIS TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
+    asyncio.run(test_red_rows_are_decommissioned_and_not_calculated())
+    print("\n🎉 BARCHA P3, KVITANSIYA INN, OFD, 4-BOSQICHLI TASHXIS VA QIZIL QATOR TESTLARI 100% MUVAFFAQIYATLI O'TDI!")
 
 

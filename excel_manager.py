@@ -20,7 +20,12 @@ class ExcelManager:
         self.jshshir_index: Dict[str, List[Dict[str, Any]]] = {}
         self.terminal_index: Dict[str, List[Dict[str, Any]]] = {}
         self.phone_index: Dict[str, List[Dict[str, Any]]] = {}
+        # Hisobdan chiqarilgan (qizil qator) yozuvlar indeksi:
+        self.decommissioned_stir_index: Dict[str, List[Dict[str, Any]]] = {}
+        self.decommissioned_jshshir_index: Dict[str, List[Dict[str, Any]]] = {}
+        self.decommissioned_terminal_index: Dict[str, List[Dict[str, Any]]] = {}
         self.records_count = 0
+        self.decommissioned_count = 0
         self.load_data()
 
     def clean_digits(self, val: Any) -> str:
@@ -46,22 +51,40 @@ class ExcelManager:
             new_jshshir = {}
             new_terminal = {}
             new_phone = {}
+            new_decom_stir = {}
+            new_decom_jshshir = {}
+            new_decom_terminal = {}
             count = 0
+            p3_count = 0
+            decom_count = 0
 
             MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
 
             # 3-qatordan boshlab o'qish (1 va 2-qator sarlavhalar)
-            # P3 apparatlar Excelda sariq qator (FFFFFF00), oddiy SmartPOS apparatlar esa oq qator bilan belgilangan.
-            p3_count = 0
+            # - P3 apparatlar Excelda sariq qator (FFFFFF00), oddiy SmartPOS apparatlar esa oq qator bilan belgilangan.
+            # - Qizil qatorlar (FFFF0000 yoki C00000) hisobdan chiqarilgan / o'chirib tashlangan deb hisoblanadi va hisoblanmaydi!
             for row_cells in sheet.iter_rows(min_row=3, values_only=False):
                 row = [c.value if c is not None else None for c in row_cells]
+                is_red = False
                 is_p3 = False
-                for c in row_cells[1:5]:
-                    if c is not None and getattr(c, "fill", None) and getattr(c.fill, "fill_type", None) == "solid":
-                        fg = getattr(c.fill, "fgColor", None)
-                        if fg and getattr(fg, "type", None) == "rgb" and fg.rgb:
-                            if str(fg.rgb).upper().endswith("FFFF00"):
-                                is_p3 = True
+                for c in row_cells[:6]:
+                    if c is not None:
+                        fill = getattr(c, "fill", None)
+                        if fill and getattr(fill, "fill_type", None) == "solid":
+                            fg = getattr(c.fill, "fgColor", None)
+                            if fg and getattr(fg, "type", None) == "rgb" and fg.rgb:
+                                rgb_str = str(fg.rgb).upper()
+                                if any(r in rgb_str for r in ["FF0000", "C00000"]):
+                                    is_red = True
+                                    break
+                                elif "FFFF00" in rgb_str:
+                                    is_p3 = True
+                        font = getattr(c, "font", None)
+                        if font and getattr(font, "color", None):
+                            fc = font.color
+                            frgb = getattr(fc, "rgb", None)
+                            if frgb and any(r in str(frgb).upper() for r in ["FF0000", "C00000"]):
+                                is_red = True
                                 break
                 # Ustunlar:
                 # 0: Telefon
@@ -93,8 +116,6 @@ class ExcelManager:
 
                 if not stir and not jshshir and not terminal and not name_raw:
                     continue
-                if is_p3:
-                    p3_count += 1
 
                 # Qarz summasi
                 debt_val = 0.0
@@ -155,12 +176,28 @@ class ExcelManager:
                     "debt": debt_val,
                     "tuman": str(tuman_raw or "-").strip(),
                     "is_p3": is_p3,
+                    "is_decommissioned": is_red,
                     "device_model": "P3" if is_p3 else "SmartPOS",
                     "old_debt_2026": old_debt,
                     "payments_2026": payments_2026,
                     "charges_2026": charges_2026,
                     "payments_2025": payments_2025
                 }
+
+                # QIZIL BILAN BELGILANGANLAR (Hisobdan chiqarilgan / o'chirib tashlangan):
+                # Faol qarz va faol apparatlar hisob-kitobiga KIRITILMAYDI!
+                if is_red:
+                    decom_count += 1
+                    if stir:
+                        new_decom_stir.setdefault(stir, []).append(record)
+                    if jshshir:
+                        new_decom_jshshir.setdefault(jshshir, []).append(record)
+                    if terminal:
+                        new_decom_terminal.setdefault(terminal, []).append(record)
+                    continue
+
+                if is_p3:
+                    p3_count += 1
 
                 if stir:
                     new_stir.setdefault(stir, []).append(record)
@@ -181,9 +218,16 @@ class ExcelManager:
             self.jshshir_index = new_jshshir
             self.terminal_index = new_terminal
             self.phone_index = new_phone
+            self.decommissioned_stir_index = new_decom_stir
+            self.decommissioned_jshshir_index = new_decom_jshshir
+            self.decommissioned_terminal_index = new_decom_terminal
             self.records_count = count
+            self.decommissioned_count = decom_count
             wb.close()
-            logger.info(f"Excel muvaffaqiyatli yuklandi: {count} ta yozuv indekslandi (P3: {p3_count} ta, SmartPOS: {count - p3_count} ta, Phone: {len(new_phone)} ta).")
+            logger.info(
+                f"Excel muvaffaqiyatli yuklandi: {count} ta faol yozuv indekslandi "
+                f"(P3: {p3_count} ta, SmartPOS: {count - p3_count} ta, Qizil/O'chirilgan: {decom_count} ta, Phone: {len(new_phone)} ta)."
+            )
             return True
         except Exception as e:
             logger.error(f"Excel faylni o'qishda xatolik: {e}")
@@ -224,6 +268,36 @@ class ExcelManager:
         if p_key in self.phone_index:
             return self.phone_index[p_key]
 
+        return []
+
+    def is_decommissioned(self, query: str) -> bool:
+        """
+        Berilgan INN / JSHSHIR / Terminal hisobdan chiqarilgan (Excelda qizil qator) ekanligini tekshirish.
+        - Agar ayni shu raqam bo'yicha kamida 1 ta faol (oq/sariq) apparat bo'lsa -> False (chunki korxona faol).
+        - Agar faol apparat umuman bo'lmay, faqat qizil qator bo'lsa -> True (hisobdan chiqarilgan).
+        """
+        clean_q = re.sub(r"\D", "", query.strip())
+        if not clean_q:
+            return False
+        if clean_q in self.stir_index or clean_q in self.jshshir_index or clean_q in self.terminal_index:
+            return False
+        return (
+            clean_q in self.decommissioned_stir_index or
+            clean_q in self.decommissioned_jshshir_index or
+            clean_q in self.decommissioned_terminal_index
+        )
+
+    def get_decommissioned(self, query: str) -> List[Dict[str, Any]]:
+        """Hisobdan chiqarilgan (qizil qator) yozuvlarni olish"""
+        clean_q = re.sub(r"\D", "", query.strip())
+        if not clean_q:
+            return []
+        if clean_q in self.decommissioned_stir_index:
+            return self.decommissioned_stir_index[clean_q]
+        if clean_q in self.decommissioned_jshshir_index:
+            return self.decommissioned_jshshir_index[clean_q]
+        if clean_q in self.decommissioned_terminal_index:
+            return self.decommissioned_terminal_index[clean_q]
         return []
 
     def get_district_for_inn(self, inn: str) -> str:

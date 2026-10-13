@@ -118,6 +118,35 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         return
 
     results = excel_manager.search(query_num)
+    if not results and excel_manager.is_decommissioned(query_num):
+        decom_list = excel_manager.get_decommissioned(query_num)
+        org_name = decom_list[0].get("name", "-") if decom_list else "-"
+        tuman = decom_list[0].get("tuman", "-") if decom_list else "-"
+        tuman_str = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if (tuman and tuman != "-") else ""
+        decom_text = (
+            f"🏢 <b>Korxona:</b> {org_name}\n"
+            f"🆔 <b>Qidiruv raqami:</b> <code>{query_num}</code>\n"
+            f"{tuman_str}"
+            f"────────────────────\n"
+            f"ℹ️ <b>Holati:</b> Hisobdan chiqarilgan (o'chirilgan)\n"
+            f"✅ <b>Qarzdorlik:</b> 0 so'm\n\n"
+            f"⚠️ <i>Ushbu apparat / korxona xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan) bo'lib, unga abonent to'lovi yoki qarzdorlik hisoblanmaydi.</i>"
+        )
+        decom_text = adapt_to_user_script(decom_text, user_script)
+        logger.info(f"📤 HISOBDAN CHIQARILGAN [chat_id={chat_id}, query={query_num}]: {org_name}")
+        try:
+            await message.reply(decom_text, parse_mode="HTML")
+        except Exception:
+            try:
+                await message.reply(decom_text)
+            except Exception as e_dec:
+                logger.error(f"Hisobdan chiqarilgan xabarni yuborishda xatolik: {e_dec}")
+        user_memory.set_last_id(chat_id, user_id, query_num, org_name=org_name, debt=0.0)
+        user_memory.set_last_topic(chat_id, user_id, "debt_checked")
+        user_memory.add_user_message(chat_id, user_id, f"Mening qidiruv raqamim (INN/Tel): {query_num}")
+        user_memory.add_assistant_message(chat_id, user_id, decom_text)
+        return
+
     org_name = results[0].get("name", "") if results else ""
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
 
@@ -249,6 +278,15 @@ async def handle_debt_inquiry(message: types.Message):
 
     results = excel_manager.search(last_id)
     if not results:
+        if excel_manager.is_decommissioned(last_id):
+            decom_list = excel_manager.get_decommissioned(last_id)
+            org_name = decom_list[0].get("name", "-") if decom_list else "-"
+            nf_msg = adapt_to_user_script(
+                f"ℹ️ <b>{org_name}</b> (<code>{last_id}</code>) xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan). Joriy qarzdorlik hisoblanmaydi.",
+                user_script
+            )
+            await message.reply(nf_msg, parse_mode="HTML")
+            return
         nf_msg = adapt_to_user_script(
             f"❌ <code>{last_id}</code> bo'yicha ma'lumot topilmadi. INN yoki telefon raqami to'g'ri kiritilganini tekshiring.",
             user_script
