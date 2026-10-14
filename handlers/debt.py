@@ -57,6 +57,10 @@ def format_debt_response(results: list) -> str:
         elif smart_items:
             text += f"   • <b>Modeli:</b> Smart One ({len(smart_items)} ta)\n"
 
+    decom_items = excel_manager.get_decommissioned(inn) if inn != "-" else []
+    if decom_items:
+        text += f"ℹ️ <i>Eslatma: Korxonaning {len(decom_items)} ta apparati avval hisobdan chiqarilgan (o'chirilgan) va qarz hisoblanmaydi.</i>\n"
+
     text += "────────────────────\n"
 
     total_debt = sum(item.get("debt", 0.0) for item in results)

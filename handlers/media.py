@@ -131,6 +131,9 @@ async def handle_document(message: types.Message, bot: Bot):
 
     # B) PDF FORMATDAGI TO'LOV KVITANSIYASI
     if file_name.endswith(".pdf"):
+        if message.media_group_id and not _check_and_register_media_group(message.media_group_id):
+            logger.info(f"Media group {message.media_group_id} ning keyingi PDF kvitansiyasi o'tkazib yuborildi.")
+            return
         try:
             file_io = io.BytesIO()
             await bot.download(doc, destination=file_io)
@@ -362,6 +365,12 @@ async def handle_photo(message: types.Message, bot: Bot):
     caption = message.caption or ""
     if message.media_group_id and not _check_and_register_media_group(message.media_group_id):
         logger.info(f"Media group {message.media_group_id} ning keyingi rasmi o'tkazib yuborildi.")
+        if message.photo:
+            try:
+                user_id = message.from_user.id if message.from_user else 0
+                user_memory.set_last_photo(message.chat.id, user_id, message.photo[-1].file_id)
+            except Exception:
+                pass
         return
 
     try:
