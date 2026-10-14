@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 
 OPERATOR_KEYWORDS = [
     "operator", "adminga", "admin kerak", "mutaxassis", "usta kerak", "usta chaqir",
-    "bog'lanish", "boglanish", "telefon raqam", "aloqaga chiq", "operatorga ula",
+    "bog'lan", "boglan", "telefon raqam", "aloqa", "kontakt", "operatorga ula",
     "yordam bering usta", "hal bo'lmadi", "hal bolmadi", "tushunmadim usta",
-    "operator bilan gaplashmoqchiman", "menga usta kerak", "bog'laning", "boglaning",
+    "operator bilan", "menga usta kerak", "admin bilan", "usta bilan",
     "operator chaqir", "оператор", "админ", "мастер", "помогите",
+    "боғлан", "боглан", "админ билан", "уста билан",
     "ishlamadi", "ishlamayapti baribir", "baribir ishlamadi", "ochmadi",
     "o'xshamadi", "oxshamadi", "yoqilmadi", "reboot qildim ishlamadi",
     "ochirib yoqdim ishlamadi", "usta yuboring", "usta jonating", "usta jo'nating",

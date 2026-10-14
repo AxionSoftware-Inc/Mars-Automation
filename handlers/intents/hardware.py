@@ -17,7 +17,7 @@ DEVICE_ISSUE_PHRASES = [
     "ishlamayapti apparat", "ishlamayapti kassa", "ishlamayapti",
     "ishlamay qoldi", "o'chib qoldi", "ochib qoldi", "o'chib qolgan",
     "blok bo'ldi", "bloklandi", "blok bolgan", "buzildi", "buzilib qoldi",
-    "xatolik", "xato", "xatolik chiqyapti", "xato chiqyapti", "xatolik beryapti",
+    "xatolik", "xatolik chiqyapti", "xato chiqyapti", "xatolik beryapti",
     "xato beryapti", "xatolik kodi", "xatolik 406", "kod 406", "kod 102",
     "oshibka", "ошибка", "ne rabotayet", "не работает", "сломался", "заблокирован"
 ]
@@ -31,6 +31,10 @@ class HardwareIntentHandler:
         lower_text = text.lower()
         user_id = message.from_user.id if message.from_user else 0
         chat_id = message.chat.id
+
+        # 0. Agar mijoz aniq soat/vaqt nosozligini so'rayotgan bo'lsa -> maxsus katalog videosi (141) ishlashi uchun o'tkazib yuborish
+        if any(w in lower_text for w in ["soat", "vaqt", "время", "часы"]):
+            return False
 
         if not any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES):
             return False

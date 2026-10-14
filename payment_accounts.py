@@ -272,12 +272,17 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "shot raqam", "shot raqamlar", "hisob raqam", "hisob raqamlar",
         "rekvizit", "rekvizitlar", "/tolov", "to'lov qilish tartibi",
         "qayerga to'layman", "qayerga tolayman", "qayerga to'lash kerak",
-        "bank rekvizitlari", "to'lov hisobi", "shotini ber",
+        "bank rekvizitlari", "to'lov hisobi", "shotini ber", "shot bering",
+        "shot tashlang", "shot tashvorin", "to'lov uchun shot", "tolov uchun shot",
+        "hisob raqam bering", "hisob bering", "schet bering", "schet tashlang",
         "шот рақам", "шот рақамлар", "ҳисоб рақам", "хисоб ракам",
         "ҳисоб рақамлар", "хисоб ракамлар", "реквизит", "реквизитlar", "реквизитлар",
         "тўлов қилиш тартиби", "толов килиш тартиби", "қаерга тўлайман", "каерга толайман",
         "қаерга тўлаш керак", "каерга толаш керак", "банк реквизитлари",
-        "тўлов ҳисоби", "толов хисоби", "шотини бер"
+        "тўлов ҳисоби", "толов хисоби", "шотини бер",
+        "счёт беринг", "счет беринг", "счёт ташланг", "счет ташланг",
+        "шот беринг", "шот ташланг", "тўлов учун счёт", "толов учун счет",
+        "тўлов учун ҳисоб", "толов учун хисоб", "тўлов учун шот", "толов учун шот"
     ]
     if any(w in t for w in general_payment_words) or (is_annual and is_monthly):
         return "both"
