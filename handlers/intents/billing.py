@@ -74,9 +74,15 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
             return True
 
-        # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa ("ikkalasidanchi", "umumiy qarzim bormi")
-        if is_both_check_intent(text):
-            remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+        # 1.1 INN aniqlansa, xotiraga olish
+        found_inn = extract_clean_inn(text)
+        if found_inn:
+            user_memory.set_last_id(chat_id, user_id, found_inn)
+
+        # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
+        is_both = is_both_check_intent(text) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
+        if is_both:
+            remembered_id = found_inn or user_memory.get_last_id(chat_id, user_id)
             remembered_fm = user_memory.get_last_fm(chat_id, user_id)
 
             if remembered_id and remembered_fm:
