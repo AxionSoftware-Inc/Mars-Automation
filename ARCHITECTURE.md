@@ -211,7 +211,8 @@ async def cmd_yangi_buyruq(message: types.Message):
 | `handlers/commands.py` | 🕹 Barcha Telegram komandalar (`/start`, `/help`, `/tekshir`, `/tolov`, `/tarix`) |
 | `handlers/debt.py` | 💳 Qarz tekshiruvi (INN) va to'lov tarixi so'rovlari |
 | `handlers/media.py` | 📸 Ekran rasmlari, to'lov kvitansiyalari (rasm/PDF) va Excel yangilash |
-| `handlers/chat.py` | 💬 Erkin matnli muloqot, video katalog va operator eskalatsiyasi |
+| `handlers/chat.py` | 💬 Erkin matnli muloqot dispetcheri (Intent Pipeline koordinatori) |
+| `handlers/intents/` | 🧩 Modulli Intent protsessorlari (`billing`, `hardware`, `mxik`, `operator`, `conversation`) |
 | `handlers/channel.py` | 📢 Kanaldan postlarni forward qilish va avto-indekslash |
 | `image_analyzer.py` | 👁 Kassa ekrani tasviridan sof faktlarni ajratuvchi Sensor |
 | `excel_manager.py` | 📊 7,200+ korxona bazasi, qarz va to'lovlar hisob-kitobi |
@@ -239,4 +240,37 @@ Ilgari botga mayda shartlar (masalan: *"Wi-Fi parolini qayerdan o'zgartirish ker
    Bitta yangi kiritilgan patchda xatolik bo'lsa ham, `RuleEngine` uni logga yozadi va asosiy 4 bosqichli yadro o'z ishini hech to'xtovsiz davom ettiradi.
 4. **Kodga tegmasdan deklarativ patch qo'shish:**
    `rule_engine.add_patch(patch_id, keywords, reply_text, priority)` orqali yoki to'g'ridan-to'g'ri `data/custom_patches.json` ga yozish orqali yangi javoblar bir zumda ishga tushadi.
+
+---
+
+## 9. Yangi Modulli Intent Pipeline (Intent-Based Architecture 2.0)
+
+`handlers/chat.py` dagi avvalgi 700 qatorli monolit `if/elif` zanjiri to'liq ajratilib, 5 ta mustaqil Intent protsessoriga bo'lindi:
+
+1. **`BillingIntentHandler` (`handlers/intents/billing.py`)**:
+   - Fiskal modul (LG..., YG..., UZ...) to'g'ridan-to'g'ri kiritilishi va `@ofd943_bot` so'rovi;
+   - Yillik (`is_annual_check_intent`) va Oylik (`is_monthly_check_intent`) qarz tekshiruvi;
+   - Ikkala to'lovni birgalikda tekshirish (`is_both_check_intent`);
+   - Aniq to'lov rekvizitlari va hisob raqamlari (`is_annual_pay_intent`, `is_monthly_pay_intent`, `classify_payment_intent`);
+   - Click to'lov yo'riqnomasi videosi.
+
+2. **`HardwareIntentHandler` (`handlers/intents/hardware.py`)**:
+   - Apparat ishlamay qolganida 4 bosqichli standart tashxis:
+     - 1-bosqich: Mars oylik abonent qarzini tekshirish;
+     - 2-bosqich: Soliq (OFD) yillik litsenziya muddatini tekshirish;
+     - 3-bosqich: Wi-Fi/Internet, soat/sana va kassa apparatini reboot qilish;
+     - 4-bosqich: Hududiy usta va mutaxassisga yo'naltirish.
+
+3. **`MxikIntentHandler` (`handlers/intents/mxik.py`)**:
+   - MXIK (IKPU), tasnif.soliq va tovar qo'shish qoidalari;
+   - Maxsus video-qo'llanmalar (Post 15, Post 133).
+
+4. **`OperatorIntentHandler` (`handlers/intents/operator.py`)**:
+   - Mijoz "usta kerak", "operator", "admin" deb murojaat qilganda hududiy usta yoki adminga kassa rasmi va INN bilan eskalatsiya qilish.
+
+5. **`ConversationIntentHandler` (`handlers/intents/conversation.py`)**:
+   - Davomiy suhbat konteksti va Gemini 3.5 Flash Lite AI tahlili;
+   - Qat'iy himoyalangan video katalog qidiruvi (faqat texnik savollarga video beriladi, qarz/to'lov savollariga tasodifiy video berilmaydi);
+   - Tushunarsiz savollar yuzaga kelganda admin bildirishnomasi.
+
 
