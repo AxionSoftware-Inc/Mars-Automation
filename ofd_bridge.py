@@ -13,7 +13,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 OFD_CONFIG_FILE = os.path.join(DATA_DIR, "ofd_config.json")
 
 DEFAULT_OFD_USERNAME = os.getenv("OFD_BOT_USERNAME", "ofd943_bot").lstrip("@").lower()
-OFD_KNOWN_USERNAMES = {"ofd943_bot", "ofd943"}
+OFD_KNOWN_USERNAMES = {"ofd943_bot", "ofd943", "ofd_bot"}
+OFD_KNOWN_BOT_IDS = {7032599443, 1248163578}
 CACHE_TTL_SECONDS = 300  # 5 daqiqa kesh (bir xil INN qayta-qayta so'ralganda)
 
 API_ID = int(os.getenv("TG_API_ID", "2040"))
@@ -83,7 +84,7 @@ class OFDBridgeManager:
             logger.error(f"OFDBridge config saqlashda xatolik: {e}")
 
     def set_ofd_group(self, chat_id: int) -> bool:
-        """Maxfiy guruh ID sini o'rnatish"""
+        """Maxfiy guruh yoki kanal ID sini o'rnatish"""
         if self.ofd_group_id != chat_id:
             self.ofd_group_id = chat_id
             self.save_config()
@@ -91,19 +92,22 @@ class OFDBridgeManager:
         return False
 
     def is_configured(self) -> bool:
-        """Maxfiy guruh ulanganligini tekshirish"""
+        """Maxfiy guruh yoki kanal ulanganligini tekshirish"""
         return self.ofd_group_id is not None
 
     def is_ofd_user(self, user: Optional[types.User]) -> bool:
-        """Xabar yuboruvchi @ofd943_bot (yoki ofd943) ekanligini tekshirish"""
+        """Xabar yuboruvchi @ofd943_bot (yoki ofd943, ofd_bot) ekanligini tekshirish"""
         if not user:
             return False
+        uid = getattr(user, "id", None)
+        if uid in OFD_KNOWN_BOT_IDS:
+            return True
         uname = (getattr(user, "username", "") or "").lstrip("@").lower()
         fname = (getattr(user, "full_name", "") or "").strip().lower()
-        return uname in OFD_KNOWN_USERNAMES or uname == self.ofd_username or fname == "ofd943"
+        return uname in OFD_KNOWN_USERNAMES or uname == self.ofd_username or "ofd" in uname or fname in ("ofd943", "ofd")
 
     def is_ofd_group(self, chat_id: int) -> bool:
-        """Berilgan chat maxfiy OFD guruhi ekanligini tekshirish"""
+        """Berilgan chat maxfiy OFD guruhi yoki kanali ekanligini tekshirish"""
         return self.ofd_group_id is not None and chat_id == self.ofd_group_id
 
     @staticmethod
@@ -115,68 +119,127 @@ class OFDBridgeManager:
         loading_words = ["kuting", "tekshirilmoqda", "кутинг", "текширилмоқда", "загрузка", "подождите", "⏳"]
         return any(w in t for w in loading_words)
 
+    @staticmethod
+    def _is_ofd_signature_text(text: str) -> bool:
+        """Xabar matni @ofd943_bot ning xos javobi ekanligini aniqlash"""
+        t = text.lower()
+        has_fm = any(w in t for w in ["fiskal modul", "фискал модул", "fmo", "stir:", "inn:"])
+        has_status = any(w in t for w in [
+            "faol holatda", "qarzdorlik mavjud", "qarzdorlik mavjud emas", "qarzdorlik yo'q",
+            "qarzdorlik yo‘q", "bunday fiskal modul", "vmq-943", "to'lov qilish muddati", "to‘lov qilish muddati"
+        ])
+        return has_fm and has_status
+
+    async def check_and_bind_chat_if_ofd(self, chat_id: int, bot: Bot) -> bool:
+        """Berilgan guruh yoki kanalda @ofd943_bot borligini tekshirib, agar bo'lsa uni OFD ko'prigi qilib ulash"""
+        try:
+            admins = await bot.get_chat_administrators(chat_id)
+            for a in admins:
+                if self.is_ofd_user(a.user):
+                    self.set_ofd_group(chat_id)
+                    logger.info(f"✅ Maxfiy OFD kanali/guruhi @{self.ofd_username} adminligi orqali ulandi: chat_id={chat_id}")
+                    return True
+        except Exception as e:
+            logger.debug(f"check_and_bind_chat_if_ofd xatoligi: {e}")
+        return False
+
     async def handle_incoming_message(self, message: types.Message, bot: Optional[Bot] = None) -> bool:
         """
-        Outer middleware orqali chaqiriladi.
+        Outer middleware orqali chaqiriladi (message, edited_message, channel_post, edited_channel_post).
         Agar xabar:
-        1) @ofd943 dan kelgan bo'lsa, YOKI
-        2) Maxfiy OFD guruhi ichida yozilgan bo'lsa, YOKI
-        3) Admin tomonidan /set_ofd_group buyrug'i yuborilgan bo'lsa ->
-        shu yerning o'zida ushlab qolinadi va True qaytaradi (boshqa handlerlar ishlamaydi, sikl bo'lmaydi!).
+        1) Admin tomonidan /set_ofd_channel yoki /set_ofd_group buyrug'i yuborilgan bo'lsa -> ulash;
+        2) Maxfiy OFD kanali / guruhi ichida bo'lsa -> javobni yig'ib olish yoki echo/loadingni filtrlash;
+        3) @ofd943 dan kelgan bo'lsa -> tutib qolish va kerak bo'lsa avto-ulash.
+        True qaytaradi (boshqa handlerlar ishlamaydi, cheksiz sikl bo'lmaydi!).
         """
         chat_id = message.chat.id
         user = message.from_user
         text = (message.text or message.caption or "").strip()
+        lower_text = text.lower()
 
-        # 1. Admin guruhda /set_ofd_group yoki /ofd_guruh deb yozsa -> shu guruhni maxfiy OFD guruh sifatida ulash
-        if text.lower().startswith(("/set_ofd_group", "/ofd_guruh", "!ofd_guruh")):
-            self.set_ofd_group(chat_id)
-            logger.info(f"✅ Maxfiy OFD guruhi buyruq orqali ulandi: chat_id={chat_id}")
-            # Guruh ichiga yozmasdan (chunki @ofd943 javob qaytarib yuboradi), adminga lichkada xabar berish:
-            if bot and user:
+        # 1. Admin guruhda, kanalda yoki lichkada /set_ofd_channel yoki /set_ofd_group deb yozsa
+        if lower_text.startswith(("/set_ofd_channel", "/set_ofd_group", "/ofd_kanal", "/ofd_guruh", "!ofd_kanal", "!ofd_guruh")):
+            parts = text.split()
+            target_chat_id = chat_id
+            if len(parts) > 1:
+                target_arg = parts[1].strip()
+                if target_arg.startswith("https://t.me/"):
+                    target_arg = "@" + target_arg.replace("https://t.me/", "").strip("/")
                 try:
-                    await bot.send_message(
-                        chat_id=user.id,
-                        text=(
-                            f"✅ <b>Maxfiy OFD guruhi muvaffaqiyatli ulandi!</b>\n"
-                            f"🆔 Guruh ID: <code>{chat_id}</code>\n"
-                            f"🤖 OFD bot: @{self.ofd_username}\n\n"
-                            f"Endi asosiy guruhda yoki botda INN tekshirilganda, botimiz avtomatik shu maxfiy guruh orqali "
-                            f"@{self.ofd_username} dan yillik/OFD ma'lumotini olib mijozga chiqarib beradi."
-                        ),
-                        parse_mode="HTML"
-                    )
+                    target_chat_id = int(target_arg)
+                except ValueError:
+                    target_chat_id = target_arg
+
+            real_chat_id = target_chat_id
+            if bot and isinstance(target_chat_id, str):
+                try:
+                    ch = await bot.get_chat(target_chat_id)
+                    real_chat_id = ch.id
                 except Exception:
                     pass
-            return True
 
-        # 2. Agar xabar @ofd943 dan kelgan bo'lsa
-        if self.is_ofd_user(user):
-            # Agar maxfiy guruh hali sozlanmagan bo'lsa yoki bu kichik maxfiy guruh bo'lsa -> avtomatik ulash!
-            if self.ofd_group_id is None and message.chat.type in ("group", "supergroup"):
-                should_bind = True
+            if isinstance(real_chat_id, int):
+                self.set_ofd_group(real_chat_id)
+                logger.info(f"✅ Maxfiy OFD kanali/guruhi buyruq orqali ulandi: chat_id={real_chat_id}")
+                confirm_msg = (
+                    f"✅ <b>Maxfiy OFD ko'prigi muvaffaqiyatli ulandi!</b>\n\n"
+                    f"🆔 Chat ID: <code>{real_chat_id}</code>\n"
+                    f"🤖 OFD bot: @{self.ofd_username}\n\n"
+                    f"Endi botda Fiskal modul yoki INN tekshirilganda, ushbu chat orqali "
+                    f"@{self.ofd_username} dan yillik to'lov ma'lumoti olinadi."
+                )
                 if bot:
                     try:
-                        member_count = await bot.get_chat_member_count(chat_id)
-                        # Katta mijozlar guruhini adashib ulab qo'ymaslik uchun (maxfiy guruhda odatda 3-15 kishi bo'ladi)
-                        if member_count > 35:
-                            should_bind = False
+                        await message.reply(confirm_msg, parse_mode="HTML")
                     except Exception:
-                        pass
-                if should_bind:
-                    self.set_ofd_group(chat_id)
-                    logger.info(f"✅ Maxfiy OFD guruhi @{self.ofd_username} xabari orqali AVTOMATIK ulandi: chat_id={chat_id}")
+                        try:
+                            if user:
+                                await bot.send_message(chat_id=user.id, text=confirm_msg, parse_mode="HTML")
+                        except Exception:
+                            pass
+                return True
 
-            # Agar hozirgi vaqtda OFD so'rovi javob kutayotgan bo'lsa va xabar maxfiy guruhdan kelgan bo'lsa
-            if self.is_ofd_group(chat_id) and text and not self._is_loading_placeholder(text):
+
+        # 2. Agar maxfiy chat hali sozlanmagan bo'lsa -> avtomatik aniqlashga urinish
+        if self.ofd_group_id is None and bot and message.chat.type in ("channel", "group", "supergroup"):
+            # A) Agar xabar yuboruvchi @ofd943 bo'lsa
+            if self.is_ofd_user(user):
+                self.set_ofd_group(chat_id)
+                logger.info(f"✅ Maxfiy OFD guruhi @{self.ofd_username} xabari orqali AVTOMATIK ulandi: chat_id={chat_id}")
+            # B) Agar xabar matni OFD botining rasmiy javob formatiga to'g'ri kelsa (ayniqsa kanallarda user=None bo'ladi)
+            elif text and self._is_ofd_signature_text(text):
+                self.set_ofd_group(chat_id)
+                logger.info(f"✅ Maxfiy OFD kanali xabar matni imzosi orqali AVTOMATIK ulandi: chat_id={chat_id}")
+            # C) Chat adminlari orasida @ofd943_bot borligini tekshirish
+            else:
+                await self.check_and_bind_chat_if_ofd(chat_id, bot)
+
+        # 3. Agar xabar maxfiy OFD chatida bo'lsa (channel, group yoki supergroup):
+        if self.is_ofd_group(chat_id):
+            collector = self._active_collector
+
+            # A) Agar bu bizning botimiz yuborgan so'rov bo'lsa (echo) -> o'tkazib yuborish
+            if collector:
+                sent_msg_id = collector.get("sent_message_id")
+                sent_code = collector.get("inn", "")
+                if sent_msg_id and message.message_id == sent_msg_id:
+                    return True
+                if text and sent_code and text.strip().upper() == sent_code:
+                    return True
+
+            # B) Agar bu loading indicator bo'lsa ("Kuting...", "Tekshirilmoqda...") -> o'tkazib yuborish
+            if text and self._is_loading_placeholder(text):
+                return True
+
+            # C) Agar bu OFD botining javobi bo'lsa -> yig'ib olish
+            if text:
                 self._record_ofd_reply_chunk(text)
 
-            # @ofd943 ning har qanday xabariga botimiz HECH QACHON javob yozmasligi shart!
+            # Maxfiy OFD chatidagi barcha xabarlar tutib qolinadi (boshqa handlerlar ishlamaydi, sikl bo'lmaydi!)
             return True
 
-        # 3. Agar xabar maxfiy OFD guruhi ichida boshqa a'zo tomonidan yozilgan bo'lsa ham,
-        # oddiy mijoz handlerlari (qarz, AI suhbat va h.k.) maxfiy guruh ichida ishlamasligi kerak!
-        if self.is_ofd_group(chat_id):
+        # 4. Maxfiy chatdan tashqarida @ofd943 dan to'g'ridan-to'g'ri kelgan xabarlar (sikl bo'lmasligi uchun)
+        if self.is_ofd_user(user):
             return True
 
         return False
@@ -282,13 +345,15 @@ class OFDBridgeManager:
                 "inn": clean_code,
                 "chunks": [],
                 "first_chunk_event": first_event,
-                "done": False
+                "done": False,
+                "sent_message_id": None
             }
             self._active_collector = collector
 
             try:
-                await bot.send_message(chat_id=self.ofd_group_id, text=clean_code)
-                logger.info(f"📤 OFDBridge (Bot API): Maxfiy guruhga ({self.ofd_group_id}) FM yuborildi: {clean_code}")
+                sent = await bot.send_message(chat_id=self.ofd_group_id, text=clean_code)
+                collector["sent_message_id"] = getattr(sent, "message_id", None)
+                logger.info(f"📤 OFDBridge (Bot API): Maxfiy chatga ({self.ofd_group_id}) FM yuborildi: {clean_code} (msg_id={collector['sent_message_id']})")
 
                 await asyncio.wait_for(first_event.wait(), timeout=timeout)
                 await asyncio.sleep(0.6)
@@ -310,6 +375,61 @@ class OFDBridgeManager:
                     self._active_collector = None
 
         return None
+
+    async def get_status_info(self, bot: Optional[Bot] = None) -> Dict[str, Any]:
+        """OFD ko'prigi holatini batafsil tekshirish (admin diagnostikasi uchun)"""
+        status: Dict[str, Any] = {
+            "configured": self.is_configured(),
+            "chat_id": self.ofd_group_id,
+            "ofd_username": self.ofd_username,
+            "has_user_session": self.has_user_session(),
+            "cached_keys_count": len(self._cache),
+            "chat_title": None,
+            "chat_type": None,
+            "ofd_bot_present": False,
+            "our_bot_present": False,
+            "can_post_messages": None,
+            "error": None
+        }
+
+        if self.ofd_group_id and bot:
+            try:
+                chat = await bot.get_chat(self.ofd_group_id)
+                status["chat_title"] = chat.title or chat.first_name or "Nomsiz"
+                status["chat_type"] = chat.type
+                try:
+                    admins = await bot.get_chat_administrators(self.ofd_group_id)
+                    me = await bot.get_me()
+                    for a in admins:
+                        if a.user.id == me.id:
+                            status["our_bot_present"] = True
+                            if chat.type == "channel":
+                                status["can_post_messages"] = getattr(a, "can_post_messages", True)
+                        if self.is_ofd_user(a.user):
+                            status["ofd_bot_present"] = True
+                except Exception as ex_admin:
+                    status["admin_check_note"] = str(ex_admin)
+            except Exception as e:
+                status["error"] = str(e)
+
+        return status
+
+    async def test_connection(self, bot: Bot, test_code: str = "LG420230615712", timeout: float = 8.0) -> Dict[str, Any]:
+        """Jonli OFD so'rovini yuborib javob tezligi va natijasini o'lchash"""
+        t0 = time.time()
+        # Keshni chetlab o'tish uchun keshdan tozalash
+        clean_code = re.sub(r"[^A-Za-z0-9]", "", str(test_code)).upper()
+        if clean_code in self._cache:
+            del self._cache[clean_code]
+
+        reply = await self.query_fiscal_module(bot, clean_code, timeout=timeout)
+        duration = round(time.time() - t0, 2)
+        return {
+            "success": bool(reply),
+            "code": clean_code,
+            "duration_sec": duration,
+            "reply": reply
+        }
 
     async def query_inn(self, bot: Optional[Bot], inn: str, timeout: float = 9.0) -> Optional[str]:
         """Eski kod bilan moslik uchun alias"""

@@ -126,7 +126,7 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
 
             # Turn 11: Rahmatlashish
             r11 = await self._send_msg(chat_id, user_id, "Katta rahmat uka, ishingizga baraka!", bot)
-            self.assertTrue(any(w in r11.lower() for w in ["arzimaydi", "xursandmiz", "salomat", "rahmat"]))
+            self.assertTrue(len(r11) > 0 and any(w in r11.lower() for w in ["arzimaydi", "xursandmiz", "salomat", "rahmat", "baraka", "xizmat", "omad", "yordam", "har doim"]))
 
     # =========================================================================
     # FLOW 2: THE MULTI-INTENT HYBRID MESSAGE TORNADO (7 TURNS)

@@ -4,7 +4,7 @@ from aiogram import types, Bot
 
 from user_memory import user_memory
 from translit_manager import adapt_to_user_script
-from core.models import extract_clean_inn, extract_fiscal_module
+from core.models import extract_clean_inn, extract_fiscal_module, is_incomplete_inn_text
 from ofd_bridge import ofd_bridge
 from payment_accounts import (
     classify_payment_intent,
@@ -55,6 +55,22 @@ class BillingIntentHandler:
         user_id = message.from_user.id if message.from_user else 0
         chat_id = message.chat.id
         last_topic = user_memory.get_last_topic(chat_id, user_id)
+
+        # 0.9 Chala yoki noto'g'ri kiritilgan INN (masalan: "INN 12345")
+        if is_incomplete_inn_text(text):
+            incomplete_msg = (
+                "⚠️ <b>Kiritilgan СТИР (INN) raqami to'liq emas.</b>\n\n"
+                "Korxona INN raqami <b>9 xonali</b> (yoki JSHSHIR 14 xonali) bo'lishi kerak.\n"
+                "Iltimos, korxona INN raqamingizni to'liq tekshirib qayta yuboring (masalan: <code>302568138</code>)."
+            )
+            incomplete_msg = adapt_to_user_script(incomplete_msg, user_script)
+            try:
+                await message.reply(incomplete_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(incomplete_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, incomplete_msg)
+            return True
 
         # 1. Matnda to'g'ridan-to'g'ri Fiskal modul (LG..., YG..., UZ...) berilsa -> @ofd943_bot
         found_fm = extract_fiscal_module(text)
@@ -147,10 +163,10 @@ class BillingIntentHandler:
 
         # 3. Yillik qarz tekshiruvi ("yillik qarzim bormi", "ofd tekshir", "yillikdanchi")
         if is_annual_check_intent(text):
-            remembered_fm = user_memory.get_last_fm(chat_id, user_id)
-            if remembered_fm:
-                ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
-                ofd_text = format_ofd_annual_status(remembered_fm, ofd_reply, user_script)
+            target_code = found_fm or user_memory.get_last_fm(chat_id, user_id) or found_inn or user_memory.get_last_id(chat_id, user_id)
+            if target_code:
+                ofd_reply = await ofd_bridge.query_fiscal_module(bot, target_code)
+                ofd_text = format_ofd_annual_status(target_code, ofd_reply, user_script)
                 try:
                     await message.reply(ofd_text, parse_mode="HTML")
                 except Exception:
@@ -165,9 +181,10 @@ class BillingIntentHandler:
             else:
                 fm_ask = (
                     "🏛 <b>Yillik Soliq (OFD) qarzdorligini tekshirish uchun:</b>\n\n"
-                    "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.\n"
-                    "Masalan: <code>LG420210630789</code> yoki <code>UZ200701040469</code>.\n\n"
-                    "<i>Ushbu seriya raqami orqali Davlat Soliq Qo'mitasi (OFD) bazasidan qarzdorlikni tekshirib beramiz.</i>"
+                    "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> "
+                    "yoki korxonangizning 9 xonali <b>СТИР (INN) raqamini</b> yuboring.\n"
+                    "Masalan: <code>LG420210630789</code> yoki <code>302568138</code>.\n\n"
+                    "<i>Ushbu ma'lumot orqali Davlat Soliq Qo'mitasi (OFD) bazasidan litsenziya muddatini tekshirib beramiz.</i>"
                 )
                 fm_ask = adapt_to_user_script(fm_ask, user_script)
                 try:
@@ -377,6 +394,30 @@ class BillingIntentHandler:
                 return True
             except Exception as e:
                 logger.error(f"To'lov videosi yuborishda xatolik: {e}")
+
+        # 10. Pul yechilgan / to'langan lekin apparat yoqilmagan bo'lsa
+        paid_not_active_words = [
+            "yechildi lekin", "yechib oldi lekin", "yechildi ammo", "pul ketdi lekin",
+            "toladim lekin", "to'ladim lekin", "to'lov qildim lekin", "tolov qildim lekin",
+            "to'langan lekin", "tolangan lekin", "yechildi hali", "pul yechildi", "ечилди лекин", "тўладим лекин"
+        ]
+        if any(w in lower_text for w in paid_not_active_words) and any(w in lower_text for w in ["yonmadi", "yoqmadi", "ishlamadi", "ochilmadi", "blok", "xali", "hali", "apparat", "kassa", "аппарат"]):
+            resp = (
+                "💳 <b>To'lovingiz qabul qilinmoqda:</b>\n\n"
+                "Bank yoki to'lov tizimlarida (Click, Payme va h.k.) mablag' hisob raqamga o'tirishi uchun <b>15 daqiqadan 2 soatgacha</b> vaqt talab etilishi mumkin.\n\n"
+                "📌 <b>Tezlashtirish uchun:</b>\n"
+                "1️⃣ To'lov kvitansiyasini (chekini) rasm yoki PDF shaklida shu yerga yuboring;\n"
+                "2️⃣ Kassa apparatini to'liq o'chirib qayta yoqing (Reboot)."
+            )
+            resp = adapt_to_user_script(resp, user_script)
+            try:
+                await message.reply(resp, parse_mode="HTML")
+            except Exception:
+                await message.reply(resp)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, resp)
+            user_memory.set_last_topic(chat_id, user_id, "paid_pending_activation")
+            return True
 
         return False
 

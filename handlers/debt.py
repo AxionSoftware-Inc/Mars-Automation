@@ -95,13 +95,13 @@ def format_debt_response(results: list) -> str:
         text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
         text += (
             "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
-            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
         )
     else:
         text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
         text += (
             "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
-            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
         )
 
     return text
@@ -243,7 +243,7 @@ def is_debt_inquiry(message: types.Message) -> bool:
     t = message.text.lower()
     return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
 
-from core.models import extract_clean_inn, extract_clean_phone
+from core.models import extract_clean_inn, extract_clean_phone, is_incomplete_inn_text
 
 def is_inn_or_phone_query_message(message: types.Message) -> bool:
     """Matnda INN/JSHSHIR yoki telefon raqami aniqlanganda xabarni tekshirish va guruhlarda to'g'ri filtr qilish"""
@@ -362,4 +362,24 @@ async def handle_inn_query(message: types.Message, bot: Bot):
         return
 
     await process_and_send_debt_result(message, bot, query_num)
+ 
+ 
+@router.message(lambda msg: bool(msg.text and is_incomplete_inn_text(msg.text)))
+async def handle_incomplete_inn_query(message: types.Message):
+    """Foydalanuvchi chala yoki 9 xonadan kam INN yuborganida to'g'ri yo'naltirish"""
+    user_id = message.from_user.id if message.from_user else 0
+    chat_id = message.chat.id
+    user_script = user_memory.detect_and_update_script(chat_id, user_id, message.text or "")
+    incomplete_msg = (
+        "⚠️ <b>Kiritilgan СТИР (INN) raqami to'liq emas.</b>\n\n"
+        "Korxona INN raqami <b>9 xonali</b> (yoki JSHSHIR 14 xonali) bo'lishi kerak.\n"
+        "Iltimos, korxona INN raqamingizni to'liq tekshirib qayta yuboring (masalan: <code>302568138</code>)."
+    )
+    incomplete_msg = adapt_to_user_script(incomplete_msg, user_script)
+    try:
+        await message.reply(incomplete_msg, parse_mode="HTML")
+    except Exception:
+        await message.reply(incomplete_msg)
+    user_memory.add_user_message(chat_id, user_id, message.text or "")
+    user_memory.add_assistant_message(chat_id, user_id, incomplete_msg)
 

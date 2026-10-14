@@ -63,6 +63,19 @@ def extract_clean_inn(text: str) -> Optional[str]:
 
     return None
 
+def is_incomplete_inn_text(text: str) -> bool:
+    """
+    Matnda 'inn' yoki 'stir' prefiksi bilan 1 tadan 8 tagacha raqam yuborilgan bo'lsa
+    (lekin to'liq 9 xonali INN yoki 14 xonali JSHSHIR bo'lmasa).
+    """
+    if not text:
+        return False
+    t = text.strip()
+    if extract_clean_inn(t):
+        return False
+    match = re.search(r"\b(?:inn|stir|стир|инн|jshshir|жшшир)\b[:\s#№]*\d{1,8}\b", t, re.IGNORECASE)
+    return bool(match)
+
 def extract_clean_phone(text: str) -> Optional[str]:
     """
     O'zbekiston telefon raqamini matndan ajratib olish (9 xonali: 901234567).

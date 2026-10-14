@@ -7,6 +7,7 @@ from admin_manager import admin_manager
 from excel_manager import excel_manager
 from user_memory import user_memory
 from error_manager import error_manager
+from ofd_bridge import ofd_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +27,21 @@ async def cmd_admin_panel(message: types.Message):
     admin_ids = admin_manager.get_admin_ids()
     contacts = admin_manager.contacts
     rules_count = len(error_manager.rules)
+    ofd_status_text = "✅ Ulangan" if ofd_bridge.is_configured() else "⚠️ Ulanmagan"
 
     text = (
         "⚙️ <b>«Mars POS» Admin Boshqaruv Paneli</b>\n\n"
         f"📊 <b>Excel bazasi:</b> {excel_manager.records_count} ta yozuv indekslangan\n"
         f"🛠 <b>Ekran nosozliklari bazasi:</b> {rules_count} ta xatolik kiritilgan\n"
+        f"🏛 <b>OFD ko'prigi:</b> {ofd_status_text} (ID: <code>{ofd_bridge.ofd_group_id}</code>)\n"
         f"👥 <b>Adminlar soni:</b> {len(admin_ids)} ta\n"
         f"📞 <b>Mas'ul kontaktlar:</b> {len(contacts)} ta\n"
         f"💾 <b>Faol sessiyalar:</b> {len(user_memory.sessions)} ta foydalanuvchi\n\n"
         "<b>Mavjud buyruqlar:</b>\n"
         "🔹 /statistika — Qarz va tizim statistikasi\n"
+        "🔹 /ofd — OFD (@ofd943_bot) holati va diagnostika\n"
+        "🔹 /set_ofd_channel <code>&lt;chat_id&gt;</code> — OFD ko'prik kanalini sozlash\n"
+        "🔹 /test_ofd <code>[FM]</code> — Jonli OFD tekshiruvini sinab ko'rish\n"
         "🔹 /errors — Barcha 20+ ta kassa xatoliklari qoidalari\n"
         "🔹 /add_error <code>id | nom | kalit_sozlar | yechim | video_id</code>\n"
         "🔹 /del_error <code>&lt;id&gt;</code> — Xatolik qoidasini o'chirish\n"
@@ -245,3 +251,146 @@ async def cmd_del_contact(message: types.Message):
         await message.reply(f"✅ Kontakt o'chirildi: <code>{phone}</code>", parse_mode="HTML")
     else:
         await message.reply(f"Telefon raqam topilmadi: <code>{phone}</code>", parse_mode="HTML")
+
+# =============================================================================
+# OFD (@ofd943_bot) KO'PRIGI BOSHQARUVI VA DIAGNOSTIKASI
+# =============================================================================
+
+@router.message(Command("ofd", "ofd_status"), is_admin_filter)
+async def cmd_ofd_status(message: types.Message, bot: Bot):
+    """OFD ko'prigi (@ofd943_bot) holati va sozlamalarini ko'rsatish"""
+    st = await ofd_bridge.get_status_info(bot=bot)
+
+    configured_emoji = "✅ Ulangan" if st["configured"] else "⚠️ Ulanmagan"
+    chat_id = st["chat_id"] or "Mavjud emas"
+    chat_title = st["chat_title"] or "Noma'lum"
+    chat_type = st["chat_type"] or "Noma'lum"
+
+    our_bot_badge = "✅ Mavjud" if st["our_bot_present"] else "❌ Yo'q / Aniqlanmadi"
+    ofd_bot_badge = "✅ Mavjud" if st["ofd_bot_present"] else "❌ Yo'q / Aniqlanmadi"
+    can_post = "✅ Ruxsat berilgan" if st.get("can_post_messages") else ("ℹ️ Noma'lum" if st.get("can_post_messages") is None else "❌ Ruxsat yo'q")
+
+    text = (
+        "🏛 <b>Davlat Soliq (OFD) Ko'prigi Holati</b>\n\n"
+        f"🔘 <b>Holat:</b> {configured_emoji}\n"
+        f"🆔 <b>Ko'prik Chat ID:</b> <code>{chat_id}</code>\n"
+        f"📛 <b>Chat nomi:</b> {chat_title} ({chat_type})\n"
+        f"🤖 <b>Bizning bot (@marselektrontexnikamchj_bot):</b> {our_bot_badge}\n"
+        f"📝 <b>Post yozish huquqi:</b> {can_post}\n"
+        f"🤖 <b>OFD bot (@{st['ofd_username']}):</b> {ofd_bot_badge}\n"
+        f"💾 <b>Keshdagi FM lar:</b> {st['cached_keys_count']} ta\n"
+        f"👤 <b>Telethon Userbot sessiyasi:</b> {'✅ Faol' if st['has_user_session'] else '❌ Yo\'q (Bot API ishlamoqda)'}\n"
+    )
+
+    if st.get("error"):
+        text += f"\n⚠️ <b>Xatolik:</b> <code>{st['error']}</code>\n"
+
+    text += (
+        "\n<b>Buyruqlar:</b>\n"
+        "🔹 /set_ofd_channel <code>&lt;chat_id&gt;</code> — Yangi kanal/guruh ID sini ulash\n"
+        "🔹 /test_ofd <code>[FM_KOD]</code> — Jonli tekshirish (masalan: <code>/test_ofd LG420230615712</code>)\n\n"
+        "💡 <i>Eslatma: Botimiz va @ofd943_bot admin bo'lgan kanalga post yuborilsa yoki shu kanalda /set_ofd_channel yozilsa, ko'prik avtomatik ulanadi.</i>"
+    )
+
+    await message.reply(text, parse_mode="HTML")
+
+@router.message(Command("set_ofd_channel", "set_ofd_group"), is_admin_filter)
+async def cmd_set_ofd_channel(message: types.Message, bot: Bot):
+    """OFD kanali yoki guruhini qo'lda sozlash"""
+    raw_args = message.text.split()
+    target_chat_id = None
+
+    if len(raw_args) > 1:
+        target_arg = raw_args[1].strip()
+        if target_arg.startswith("https://t.me/"):
+            target_arg = "@" + target_arg.replace("https://t.me/", "").strip("/")
+        try:
+            target_chat_id = int(target_arg)
+        except ValueError:
+            target_chat_id = target_arg
+    else:
+        target_chat_id = message.chat.id
+
+    try:
+        chat = await bot.get_chat(target_chat_id)
+        chat_title = chat.title or chat.first_name or "Nomsiz"
+        chat_type = chat.type
+        real_chat_id = chat.id
+    except Exception as e:
+        await message.reply(
+            f"❌ Chatni topib bo'lmadi: <code>{target_chat_id}</code>\n"
+            f"Sabab: <i>{e}</i>\n\n"
+            f"Bot avval ushbu chat/kanalga admin qilib qo'shilganiga ishonch hosil qiling.",
+            parse_mode="HTML"
+        )
+        return
+
+    ofd_bridge.set_ofd_group(real_chat_id)
+
+    # Adminlarni tekshirish
+    admins_text = ""
+    try:
+        admins = await bot.get_chat_administrators(target_chat_id)
+        ofd_found = any(ofd_bridge.is_ofd_user(a.user) for a in admins)
+        admins_text = (
+            f"\n🤖 <b>@{ofd_bridge.ofd_username}:</b> {'✅ Chatda admin sifatida topildi!' if ofd_found else '⚠️ Chatda adminlar ro\'yxatida ko\'rinmadi (OFD botni ham kanalga admin qilib qo\'shing!)'}"
+        )
+    except Exception:
+        pass
+
+    await message.reply(
+        f"✅ <b>OFD ko'prik kanali muvaffaqiyatli saqlandi!</b>\n\n"
+        f"🆔 <b>Chat ID:</b> <code>{target_chat_id}</code>\n"
+        f"📛 <b>Nomi:</b> {chat_title} ({chat_type})"
+        f"{admins_text}\n\n"
+        f"Endi <code>/test_ofd</code> buyrug'i orqali tekshirib ko'rishingiz mumkin.",
+        parse_mode="HTML"
+    )
+
+@router.message(Command("test_ofd"), is_admin_filter)
+async def cmd_test_ofd(message: types.Message, bot: Bot):
+    """Jonli OFD so'rovini yuborib tekshirish: /test_ofd LG420230615712"""
+    raw_args = message.text.split()
+    test_code = raw_args[1].strip() if len(raw_args) > 1 else "LG420230615712"
+
+    if not ofd_bridge.is_configured():
+        await message.reply(
+            "⚠️ <b>OFD ko'prigi hali ulanmagan!</b>\n\n"
+            "Avval <code>/set_ofd_channel &lt;chat_id&gt;</code> buyrug'i orqali kanalni sozlang yoki /ofd ni bosing.",
+            parse_mode="HTML"
+        )
+        return
+
+    wait_msg = await message.reply(
+        f"⏳ @{ofd_bridge.ofd_username} tizimiga so'rov yuborilmoqda...\n"
+        f"📟 <b>Fiskal modul:</b> <code>{test_code}</code>\n"
+        f"🆔 <b>Kanal:</b> <code>{ofd_bridge.ofd_group_id}</code>",
+        parse_mode="HTML"
+    )
+
+    res = await ofd_bridge.test_connection(bot=bot, test_code=test_code, timeout=9.0)
+
+    if res["success"]:
+        from payment_accounts import format_ofd_annual_status
+        formatted = format_ofd_annual_status(res["code"], res["reply"])
+        resp_text = (
+            f"✅ <b>OFD TIZIMI MUVAFFAQIYATLI JAVOB BERDI!</b>\n"
+            f"⏱ <b>Javob tezligi:</b> {res['duration_sec']} soniya\n\n"
+            f"📥 <b>Xom javob matni:</b>\n<i>{res['reply']}</i>\n\n"
+            f"────────────────────\n"
+            f"<b>Mijozga ko'rsatiladigan format:</b>\n{formatted}"
+        )
+    else:
+        resp_text = (
+            f"❌ <b>OFD TIZIMIDAN JAVOB OLINMADI! (Timeout {res['duration_sec']}s)</b>\n\n"
+            f"📌 <b>Mumkin bo'lgan sabablar:</b>\n"
+            f"1️⃣ @{ofd_bridge.ofd_username} kanalda/guruhda admin emas yoki xabar yozish ruxsati yo'q;\n"
+            f"2️⃣ Bizning botga kanalda xabar yozish ruxsati (Post messages) berilmagan;\n"
+            f"3️⃣ Soliq tizimi (@ofd943_bot) serverida vaqtinchalik uzilish mavjud."
+        )
+
+    try:
+        await wait_msg.edit_text(resp_text, parse_mode="HTML")
+    except Exception:
+        await message.reply(resp_text)
+

@@ -1,6 +1,6 @@
 import logging
 from typing import Callable, Dict, Any, Awaitable
-from aiogram import Router, BaseMiddleware, types
+from aiogram import Router, BaseMiddleware, types, Bot
 from aiogram.types import TelegramObject, User
 
 from admin_manager import admin_manager
@@ -18,7 +18,7 @@ class AdminAutoRegisterMiddleware(BaseMiddleware):
     """
     1) Bosh admin (@Yashnarbek_butaev) botga har qanday xabar yozganda uning numeric Telegram ID sini
        avtomatik aniqlab adminlar ro'yxatiga qo'shish.
-    2) @ofd943 va maxfiy OFD guruhidagi xabarlarni tutib olish (cheksiz sikl bo'lmasligi uchun).
+    2) @ofd943 va maxfiy OFD kanali/guruhidagi xabarlarni tutib olish (cheksiz sikl bo'lmasligi uchun).
     """
     async def __call__(
         self,
@@ -31,8 +31,9 @@ class AdminAutoRegisterMiddleware(BaseMiddleware):
             admin_manager.check_and_register_username(user.id, user.username)
 
         if isinstance(event, types.Message):
+            prefix = "📢 KANAL POSTI" if event.chat.type == "channel" else "📥 XABAR KELDI"
             logger.info(
-                f"📥 XABAR KELDI [chat_id={event.chat.id}, type={event.chat.type}, user={user.id if user else None} (@{user.username if user else None})]: "
+                f"{prefix} [chat_id={event.chat.id}, type={event.chat.type}, user={user.id if user else None} (@{user.username if user else None})]: "
                 f"text={repr(event.text)}, caption={repr(event.caption)}, photo={bool(event.photo)}, doc={bool(event.document)}"
             )
             bot = data.get("bot")
@@ -45,9 +46,23 @@ main_router = Router(name="main_router")
 main_router.message.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.edited_message.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.callback_query.outer_middleware(AdminAutoRegisterMiddleware())
+main_router.channel_post.outer_middleware(AdminAutoRegisterMiddleware())
+main_router.edited_channel_post.outer_middleware(AdminAutoRegisterMiddleware())
+main_router.my_chat_member.outer_middleware(AdminAutoRegisterMiddleware())
+
+@main_router.my_chat_member()
+async def handle_bot_chat_member_update(event: types.ChatMemberUpdated, bot: Bot):
+    """Bot yangi guruh yoki kanalga qo'shilganda yoki huquqlari o'zgarganda"""
+    chat = event.chat
+    status = event.new_chat_member.status
+    logger.info(f"🤖 Bot chat a'zoligi yangilandi: chat_id={chat.id}, type={chat.type}, title={repr(chat.title)}, status={status}")
+    if status in ("administrator", "member"):
+        # OFD bot borligini tekshirib avtomatik ulash
+        if await ofd_bridge.check_and_bind_chat_if_ofd(chat.id, bot):
+            logger.info(f"✅ Bot qo'shilgan {chat.type} ({chat.id}) OFD ko'prigi sifatida avtomatik ulandi!")
 
 # Routerlar qat'iy ustuvorlik ketma-ketligida ulanadi:
-# 1. Admin buyruqlari (/admin, /statistika, /errors, /admins, /add_admin, /contacts)
+# 1. Admin buyruqlari (/admin, /statistika, /errors, /admins, /add_admin, /contacts, /ofd)
 # 2. Umumiy bot buyruqlari (/start, /help, /tekshir, /tolov, /tarix)
 # 3. Media fayllar (Kassa rasmlari, to'lov kvitansiyalari, Excel bazasi)
 # 4. Qarz tekshirish va to'lov tarixi so'rovlari (INN/JSHSHIR)
@@ -60,4 +75,4 @@ main_router.include_router(debt_router)
 main_router.include_router(channel_router)
 main_router.include_router(chat_router)
 
-__all__ = ["main_router"]
+__all__ = ["main_router", "AdminAutoRegisterMiddleware", "handle_bot_chat_member_update"]

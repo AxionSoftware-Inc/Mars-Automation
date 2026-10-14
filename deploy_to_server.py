@@ -10,7 +10,7 @@ def deploy():
     print(f"Connecting to {hostname}...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username=username, password=password, timeout=15)
+    ssh.connect(hostname, username=username, password=password, timeout=15, banner_timeout=30, auth_timeout=30)
     
     sftp = ssh.open_sftp()
     
@@ -62,7 +62,9 @@ def deploy():
         'test_fiscal_chek_vs_kvitansiya.py',
         'test_channel_excel_and_untested_edge_cases.py',
         'test_long_conversation_multi_turn_stress.py',
-        'test_10x_ultra_complex_adversarial_stress.py'
+        'test_10x_ultra_complex_adversarial_stress.py',
+        'test_ofd_bridge_channel_integration.py',
+        'test_monthly_and_annual_billing_flows.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
