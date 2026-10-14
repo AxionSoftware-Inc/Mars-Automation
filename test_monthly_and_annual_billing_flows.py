@@ -124,7 +124,7 @@ class TestMonthlyAndAnnualBillingFlows(unittest.IsolatedAsyncioTestCase):
             self.assertIn("LG420210630789", r3)
             self.assertTrue("qarzdorlik mavjud" in r3.lower() or "440 000" in r3)
 
-    # 3. OYLIK TEKSHIRILGANDAN SO'NG INN ORQALI YILLIKNI SO'RASH
+    # 3. OYLIK TEKSHIRILGANDAN SO'NG YILLIKNI SO'RASH (OFD faqat Fiskal modul bilan ishlaydi)
     async def test_monthly_then_annual_using_remembered_inn(self):
         bot = AsyncMock(spec=Bot)
         chat_id = 1003
@@ -134,17 +134,22 @@ class TestMonthlyAndAnnualBillingFlows(unittest.IsolatedAsyncioTestCase):
         r1 = await self._send_msg(chat_id, user_id, "302568138", bot)
         self.assertIn("MARS ELEKTRON", r1)
 
-        # 2-qadam: Endi "yillikdanchi" deb so'raydi. Bot xotiradagi 302568138 INN orqali OFD ga so'rov yuborishi kerak!
+        # 2-qadam: Endi "yillikdanchi" deb so'raydi. OFD bot faqat Fiskal modul bilan ishlagani uchun
+        # bot foydalanuvchidan chekdagi FM raqamini (LG..., YG..., UZ...) so'rashi kerak!
+        r2 = await self._send_msg(chat_id, user_id, "yillikdanchi", bot)
+        self.assertTrue(any(w in r2.lower() for w in ["fiskal modul", "lg", "yg", "uz"]))
+
+        # 3-qadam: Foydalanuvchi Fiskal modul raqamini (LG420210630789) yuboradi
         with patch.object(ofd_bridge, "query_fiscal_module", new_callable=AsyncMock) as mock_ofd:
             mock_ofd.return_value = (
                 "🏢 STIR: 302568138\n"
                 "📟 Fiskal modul: LG420210630789\n"
                 "✅ Yillik to'lovdan qarzdorlik yo'q. Faol holatda."
             )
-            r2 = await self._send_msg(chat_id, user_id, "yillikdanchi", bot)
-            mock_ofd.assert_called_once()
-            self.assertIn("302568138", r2)
-            self.assertTrue("qarzdorlik yo'q" in r2.lower() or "faol" in r2.lower())
+            r3 = await self._send_msg(chat_id, user_id, "LG420210630789", bot)
+            mock_ofd.assert_called_once_with(bot, "LG420210630789")
+            self.assertIn("LG420210630789", r3)
+            self.assertTrue("qarzdorlik yo'q" in r3.lower() or "faol" in r3.lower())
 
     # 4. IKKALA TO'LOVNI BIRGALIKDA TEKSHIRISH (Dual Check)
     async def test_dual_check_both_monthly_and_annual(self):
@@ -152,13 +157,19 @@ class TestMonthlyAndAnnualBillingFlows(unittest.IsolatedAsyncioTestCase):
         chat_id = 1004
         user_id = 1004
 
-        # 1-qadam: INN berib, ikkalasini tekshirishni so'raydi
+        # A) INN va FM birgalikda yuborilganda ikkalasi birdan tekshiriladi
         with patch.object(ofd_bridge, "query_fiscal_module", new_callable=AsyncMock) as mock_ofd:
             mock_ofd.return_value = "Faol holatda, qarzdorlik yo'q"
-            r1 = await self._send_msg(chat_id, user_id, "302568138 ikkala to'lovni tekshir", bot)
-            # Ham Mars oylik natijasi, ham Yillik OFD natijasi ko'rinishi kerak
+            r1 = await self._send_msg(chat_id, user_id, "302568138 LG420210630789 ikkala to'lovni tekshir", bot)
+            mock_ofd.assert_called_once_with(bot, "LG420210630789")
             self.assertIn("MARS ELEKTRON", r1)
-            self.assertTrue("fiskal modul" in r1.lower() or "yillik" in r1.lower() or "ofd" in r1.lower())
+            self.assertIn("LG420210630789", r1)
+
+        # B) Faqat INN berilganda oylik tekshiriladi va yillik uchun FM so'raladi
+        user_memory.clear()
+        r2 = await self._send_msg(chat_id, user_id, "302568138 ikkala to'lovni tekshir", bot)
+        self.assertIn("MARS ELEKTRON", r2)
+        self.assertTrue(any(w in r2.lower() for w in ["fiskal modul", "lg", "yg"]))
 
     # 5. OFD KANALI ULANMAGAN HOLATDAGI TUSHUNTIRISH (Fallback)
     async def test_annual_check_fallback_when_not_configured(self):

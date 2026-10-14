@@ -95,6 +95,10 @@ class OFDBridgeManager:
         """Maxfiy guruh yoki kanal ulanganligini tekshirish"""
         return self.ofd_group_id is not None
 
+    def is_ready(self) -> bool:
+        """OFD ko'prigi tayyorligini (kanal yoki userbot sessiyasi borligini) tekshirish"""
+        return self.ofd_group_id is not None or self.has_user_session()
+
     def is_ofd_user(self, user: Optional[types.User]) -> bool:
         """Xabar yuboruvchi @ofd943_bot (yoki ofd943, ofd_bot) ekanligini tekshirish"""
         if not user:

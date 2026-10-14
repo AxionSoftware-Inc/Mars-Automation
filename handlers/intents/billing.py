@@ -72,34 +72,19 @@ class BillingIntentHandler:
             user_memory.add_assistant_message(chat_id, user_id, incomplete_msg)
             return True
 
-        # 1. Matnda to'g'ridan-to'g'ri Fiskal modul (LG..., YG..., UZ...) berilsa -> @ofd943_bot
+        # 1. Matnda INN va Fiskal modul (LG..., YG..., UZ...) borligini aniqlash
         found_fm = extract_fiscal_module(text)
-        if found_fm:
-            user_memory.set_last_fm(chat_id, user_id, found_fm)
-            ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
-            ofd_text = format_ofd_annual_status(found_fm, ofd_reply, user_script)
-            try:
-                await message.reply(ofd_text, parse_mode="HTML")
-            except Exception:
-                await message.reply(ofd_text)
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, ofd_text)
-            if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
-                user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
-            elif ofd_reply and "faol" in ofd_reply.lower():
-                user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
-            return True
-
-        # 1.1 INN aniqlansa, xotiraga olish
         found_inn = extract_clean_inn(text)
         if found_inn:
             user_memory.set_last_id(chat_id, user_id, found_inn)
+        if found_fm:
+            user_memory.set_last_fm(chat_id, user_id, found_fm)
 
         # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
-        is_both = is_both_check_intent(text) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
+        is_both = is_both_check_intent(text) or (bool(found_fm) and bool(found_inn)) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
         if is_both:
             remembered_id = found_inn or user_memory.get_last_id(chat_id, user_id)
-            remembered_fm = user_memory.get_last_fm(chat_id, user_id)
+            remembered_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
 
             if remembered_id and remembered_fm:
                 from handlers.debt import process_and_send_debt_result
@@ -161,12 +146,28 @@ class BillingIntentHandler:
                 user_memory.add_assistant_message(chat_id, user_id, both_ask)
                 return True
 
+        # 2.1 Agar to'g'ridan-to'g'ri faqat Fiskal modul (LG..., YG..., UZ...) yuborilgan bo'lsa -> darhol OFD tekshiruvi!
+        if found_fm and not is_annual_check_intent(text):
+            ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
+            ofd_text = format_ofd_annual_status(found_fm, ofd_reply, user_script)
+            try:
+                await message.reply(ofd_text, parse_mode="HTML")
+            except Exception:
+                await message.reply(ofd_text)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+            if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+                user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
+            elif ofd_reply and "faol" in ofd_reply.lower():
+                user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+            return True
+
         # 3. Yillik qarz tekshiruvi ("yillik qarzim bormi", "ofd tekshir", "yillikdanchi")
         if is_annual_check_intent(text):
-            target_code = found_fm or user_memory.get_last_fm(chat_id, user_id) or found_inn or user_memory.get_last_id(chat_id, user_id)
-            if target_code:
-                ofd_reply = await ofd_bridge.query_fiscal_module(bot, target_code)
-                ofd_text = format_ofd_annual_status(target_code, ofd_reply, user_script)
+            target_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
+            if target_fm:
+                ofd_reply = await ofd_bridge.query_fiscal_module(bot, target_fm)
+                ofd_text = format_ofd_annual_status(target_fm, ofd_reply, user_script)
                 try:
                     await message.reply(ofd_text, parse_mode="HTML")
                 except Exception:
@@ -179,20 +180,20 @@ class BillingIntentHandler:
                     user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
                 return True
             else:
-                fm_ask = (
-                    "🏛 <b>Yillik Soliq (OFD) qarzdorligini tekshirish uchun:</b>\n\n"
-                    "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> "
-                    "yoki korxonangizning 9 xonali <b>СТИР (INN) raqamini</b> yuboring.\n"
-                    "Masalan: <code>LG420210630789</code> yoki <code>302568138</code>.\n\n"
-                    "<i>Ushbu ma'lumot orqali Davlat Soliq Qo'mitasi (OFD) bazasidan litsenziya muddatini tekshirib beramiz.</i>"
+                # OFD tizimi faqat Fiskal modul (LG/YG/UZ) bilan ishlaydi, INN bilan emas
+                fm_prompt = (
+                    "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
+                    "OFD tizimi faqat <b>Fiskal modul seriya raqami</b> orqali tekshiriladi (STIR/INN bilan tekshirib bo'lmaydi).\n\n"
+                    "Iltimos, kassa chekining eng pastki qismidagi (yoki apparat orqasidagi) "
+                    "<b>Fiskal modul raqamini (masalan: <code>LG...</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring."
                 )
-                fm_ask = adapt_to_user_script(fm_ask, user_script)
+                fm_prompt = adapt_to_user_script(fm_prompt, user_script)
                 try:
-                    await message.reply(fm_ask, parse_mode="HTML")
+                    await message.reply(fm_prompt, parse_mode="HTML")
                 except Exception:
-                    await message.reply(fm_ask)
+                    await message.reply(fm_prompt)
                 user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, fm_ask)
+                user_memory.add_assistant_message(chat_id, user_id, fm_prompt)
                 user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
                 return True
 
