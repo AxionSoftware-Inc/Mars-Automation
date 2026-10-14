@@ -59,7 +59,8 @@ def deploy():
         'test_4_stage_pipeline_and_fiscal_check.py',
         'test_sequential_debt_flow.py',
         'test_adversarial_break_round2.py',
-        'test_fiscal_chek_vs_kvitansiya.py'
+        'test_fiscal_chek_vs_kvitansiya.py',
+        'test_channel_excel_and_untested_edge_cases.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
