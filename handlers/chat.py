@@ -6,6 +6,9 @@ from user_memory import user_memory
 from payment_accounts import (
     classify_payment_intent,
     is_mxik_intent,
+    is_annual_check_intent,
+    is_annual_pay_intent,
+    format_ofd_annual_status,
     get_monthly_payment_card,
     get_annual_payment_card,
     get_all_payment_accounts_card,
@@ -78,44 +81,85 @@ async def handle_user_chat(message: types.Message, bot: Bot):
     # Foydalanuvchi alifbosini aniqlash va yangilash (Lotin yoki Kirill)
     user_script = user_memory.detect_and_update_script(chat_id, user_id, text)
 
-    # 0. AGAR MATNDA FISKAL MODUL RAQAMI (LG..., YG... va h.k.) ANIQLANSA -> @ofd943_bot GA YUBORISH
+    # 0. AGAR MATNDA FISKAL MODUL RAQAMI (LG..., YG..., UZ... va h.k.) ANIQLANSA -> @ofd943_bot GA YUBORISH
     from core.models import extract_clean_inn, extract_fiscal_module
     found_fm = extract_fiscal_module(text)
     if found_fm:
         user_memory.set_last_fm(chat_id, user_id, found_fm)
         from ofd_bridge import ofd_bridge
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
-        if ofd_reply:
-            header = adapt_to_user_script(
-                f"🏛 <b>OFD / Soliq tizimi ma'lumoti (Fiskal modul: <code>{found_fm}</code>):</b>",
-                user_script
-            )
-            full_ofd_text = f"{header}\n\n{ofd_reply}"
+        ofd_text = format_ofd_annual_status(found_fm, ofd_reply, user_script)
+        try:
+            await message.reply(ofd_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(ofd_text)
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+        if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+            user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
+        elif ofd_reply and "faol" in ofd_reply.lower():
+            user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+        return
+
+    # 0.1 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR" DEB SO'RASA
+    if is_annual_check_intent(text):
+        remembered_fm = user_memory.get_last_fm(chat_id, user_id)
+        if remembered_fm:
+            from ofd_bridge import ofd_bridge
+            ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
+            ofd_text = format_ofd_annual_status(remembered_fm, ofd_reply, user_script)
             try:
-                await message.reply(full_ofd_text, parse_mode="HTML")
+                await message.reply(ofd_text, parse_mode="HTML")
             except Exception:
-                await message.reply(full_ofd_text)
+                await message.reply(ofd_text)
             user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, full_ofd_text)
+            user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+            if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+                user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
+            elif ofd_reply and "faol" in ofd_reply.lower():
+                user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
             return
         else:
-            fm_fallback = (
-                f"🏛 <b>Fiskal modul:</b> <code>{found_fm}</code> qabul qilindi.\n\n"
-                f"📌 <b>Apparatni ishga tushirish uchun tekshiring:</b>\n"
-                f"1️⃣ Agar Yillik Soliq (OFD - 440,000 so'm) to'lovi to'langan bo'lsa, apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanligini tekshiring;\n"
-                f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
-                f"🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, mutaxassisga bog'laymiz.</i>"
+            fm_ask = (
+                "🏛 <b>Yillik Soliq (OFD) qarzdorligini tekshirish uchun:</b>\n\n"
+                "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.\n"
+                "Masalan: <code>LG420210630789</code> yoki <code>UZ200701040469</code>.\n\n"
+                "<i>Ushbu seriya raqami orqali Davlat Soliq Qo'mitasi (OFD) bazasidan qarzdorlikni tekshirib beramiz.</i>"
             )
-            fm_fallback = adapt_to_user_script(fm_fallback, user_script)
+            fm_ask = adapt_to_user_script(fm_ask, user_script)
             try:
-                await message.reply(fm_fallback, parse_mode="HTML")
+                await message.reply(fm_ask, parse_mode="HTML")
             except Exception:
-                await message.reply(fm_fallback)
+                await message.reply(fm_ask)
             user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, fm_fallback)
+            user_memory.add_assistant_message(chat_id, user_id, fm_ask)
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
             return
 
-    # 0.1 AGAR MATNDA INN BO'LSA
+    # 0.2 AGAR MIJOZ "TO'LAYMAN / YILLIK SHOT RAQAM TASHLA" DESA
+    last_topic = user_memory.get_last_topic(chat_id, user_id)
+    if is_annual_pay_intent(text, last_topic):
+        annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
+        try:
+            await message.reply(annual_card, parse_mode="HTML")
+        except Exception:
+            await message.reply(annual_card)
+
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+            )
+        except Exception as e:
+            logger.warning(f"Video 145 nusxalashda xatolik: {e}")
+
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, annual_card)
+        user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
+        return
+
+    # 0.3 AGAR MATNDA INN BO'LSA
     found_inn = extract_clean_inn(text)
     if found_inn:
         user_memory.set_last_id(chat_id, user_id, found_inn)
@@ -131,30 +175,6 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             from handlers.debt import process_and_send_debt_result
             await process_and_send_debt_result(message, bot, found_inn)
             return
-
-    # 0.2 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR" DEB SO'RASA -> FISKAL MODUL SO'RASH
-    ofd_check_keywords = [
-        "yillik qarz", "yillikni tekshir", "ofd tekshir", "ofdni tekshir",
-        "fiskal modul muddat", "fiskal modul qachon", "yillik muddat", "fiskal modul tekshir",
-        "йиллик қарз", "йиллик карз", "йилликни текшир", "офд текшир", "фискал модул муддат"
-    ]
-    if any(kw in lower_text for kw in ofd_check_keywords):
-        fm_ask = (
-            "🏛 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini tekshirish:</b>\n\n"
-            "⚠️ <b>Muhim qoida:</b> Har bitta kassa apparatida faqat <b>bitta o'ziga xos Fiskal modul</b> bo'ladi! "
-            "Boshqa apparatingizning chekidan emas, <b>aynan o'sha muammoli (ishlamayotgan) apparatdan</b> chiqarilgan chekning pastki qismidagi seriya raqami kerak.\n\n"
-            "📌 <b>Uni qayerdan topish mumkin?</b>\n"
-            "Aynan o'sha apparat chekining eng pastki qismida <b>LG...</b> yoki <b>YG...</b> kabi 2 ta harf bilan boshlangan 12-16 xonali seriya raqami yozilgan bo'ladi.\n\n"
-            "📸 <i>O'sha fiskal modul raqamini (masalan: <code>LG420210...</code>) yozib yuboring yoki chekning pastki qismini rasmga olib tashlang, darhol tekshirib beramiz!</i>"
-        )
-        fm_ask = adapt_to_user_script(fm_ask, user_script)
-        try:
-            await message.reply(fm_ask, parse_mode="HTML")
-        except Exception:
-            await message.reply(fm_ask)
-        user_memory.add_user_message(chat_id, user_id, text)
-        user_memory.add_assistant_message(chat_id, user_id, fm_ask)
-        return
 
     # 0.2 4-BOSQICHLI STANDART TASHXIS MODELI (Qarzdorlik -> Texnik -> Reboot -> Hududiy Usta)
     DEVICE_ISSUE_PHRASES = [

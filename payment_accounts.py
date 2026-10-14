@@ -315,3 +315,118 @@ def classify_receipt_target(recipient_account: str, amount: float, raw_text: str
         return "monthly"
 
     return "other"
+
+
+def is_annual_check_intent(text: str) -> bool:
+    """Foydalanuvchi yillik to'lov yoki fiskal modul (OFD/Soliq) qarzdorligini tekshirishni so'rayaptimi?"""
+    t = text.lower().strip()
+    phrases = [
+        "yillik qarz", "yillikni tekshir", "yillik tekshir", "yillikni tekshirib",
+        "yillik to'lovni tekshir", "yillik tolovni tekshir", "yillik tulovni tekshir",
+        "yillik tulovniyam tekshir", "yillik to'lovniyam tekshir", "yillik tolovniyam tekshir",
+        "yillik to'lovim bormi", "yillik tolovim bormi", "yillik tulovim bormi",
+        "yillik qarzim bormi", "yillik qarzdorlik", "yillik muddat", "yillik holati",
+        "ofd tekshir", "ofdni tekshir", "ofd qarz", "ofd qarzdorlik",
+        "soliq qarz", "soliqni tekshir", "fiskal modul tekshir", "fiskal modul muddat",
+        "fiskal modulimni tekshir", "fmo qarz", "fmo tekshir",
+        "йиллик қарз", "йиллик карз", "йилликни текшир", "йиллик текшир",
+        "йиллик тўловни текшир", "йиллик толовни текшир", "офд текшир",
+        "фискал модул текшир", "фискал модул муддат"
+    ]
+    if any(p in t for p in phrases):
+        return True
+
+    has_target = any(w in t for w in ["yillik", "yilik", "fiskal", "ofd", "fmo", "йиллик", "фискал", "офд", "фмо"])
+    has_action = any(w in t for w in [
+        "tekshir", "kurib", "ko'rib", "korib", "qarz", "bormi", "muddat", "holat",
+        "провер", "текшир", "қарз", "карз", "борми", "муддат", "ҳолат", "холат"
+    ])
+    return has_target and has_action
+
+
+def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
+    """Foydalanuvchi yillik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
+    t = text.lower().strip()
+
+    # 1. Aniq yillik to'lov so'rovi
+    has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
+    has_pay = any(w in t for w in [
+        "to'layman", "tolayman", "to'lash", "tolash", "to'lay", "tolay",
+        "shot", "shot raqam", "shot tashla", "shot raqam tashla", "shotini tashla", "shot ber", "shotini ber",
+        "rekvizit", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
+        "тўлайман", "толайман", "шот ташла", "реквизит ташла"
+    ])
+    if has_annual and has_pay:
+        return True
+
+    # 2. Agar foydalanuvchi yaqinda yillik qarz tekshirgan bo'lsa va endi to'lashini aytsa
+    if last_topic in ("annual_debt_exists", "awaiting_fiscal_module", "annual_check"):
+        general_pay_phrases = [
+            "to'layman", "tolayman", "to'lashim kerak", "tolashim kerak", "to'lay", "tolay",
+            "shot raqam tashla", "shot tashla", "shot raqam", "shotini ber", "shot ber", "shotini tashla",
+            "rekvizit tashla", "rekvizit ber", "qayerga to'layman", "qayerga tolayman",
+            "qayerga to'lash", "hisob raqam tashla", "qanday to'layman", "qanday tolayman",
+            "тўлайман", "толайман", "шот ташла", "шот беринг"
+        ]
+        if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman"]):
+            return True
+
+    return False
+
+
+def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str = "latin") -> str:
+    """@ofd943_bot javobini tahlil qilib, qisqa va aniq qarz bor/yo'qligini xabar qilish"""
+    from translit_manager import adapt_to_user_script
+
+    if not ofd_text:
+        res = (
+            f"🏛 <b>Fiskal modul:</b> <code>{fm_code}</code>\n\n"
+            f"⏳ Davlat Soliq (OFD) tizimi bilan vaqtincha aloqa o'rnatib bo'lmadi.\n"
+            f"📌 <b>Apparatni tekshirish uchun:</b>\n"
+            f"1️⃣ Agar Yillik Soliq (440 000 so'm) to'langan bo'lsa, apparatda internet va soat/sana to'g'riligini tekshiring;\n"
+            f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
+            f"💳 <i>Yillik to'lov rekvizitlari kerak bo'lsa, «Shot raqam» deb yozing.</i>\n"
+            f"🛠 <i>Usta kerak bo'lsa, «Usta kerak» deb yozing.</i>"
+        )
+        return adapt_to_user_script(res, script)
+
+    lower = ofd_text.lower()
+
+    if "bunday fiskal modul" in lower or ("mavjud emas" in lower and "bunday" in lower) or "topilmadi" in lower:
+        res = (
+            f"❌ <b>Fiskal modul topilmadi:</b> <code>{fm_code}</code>\n\n"
+            f"Soliq (OFD) tizimida bunday fiskal modul raqami ro'yxatda yo'q. "
+            f"Iltimos, kassa chekining eng pastki qismidagi seriya raqamini to'g'ri kiritganingizni tekshirib qaytadan yuboring.\n"
+            f"Masalan: <code>LG420210630789</code> yoki <code>UZ200701040469</code>."
+        )
+        return adapt_to_user_script(res, script)
+
+    has_no_debt = any(w in lower for w in [
+        "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q"
+    ]) or ("mavjud emas" in lower and "fiskal modul" not in lower)
+
+    is_debt = (not has_no_debt) and any(w in lower for w in [
+        "qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik bor", "qarzdorlik",
+        "to‘lov qilish muddati", "to'lov qilish muddati", "muddati o‘tgan", "muddati o'tgan"
+    ])
+
+    clean_summary = ofd_text.strip()
+
+    if is_debt:
+        res = (
+            f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
+            f"🏛 <b>Fiskal modul:</b> <code>{fm_code}</code>\n"
+            f"📋 <b>OFD tizimi xabari:</b>\n<i>{clean_summary}</i>\n\n"
+            f"💰 <b>To'lov summasi:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
+            f"💳 <b>To'lash uchun:</b> <b>«To'layman»</b> yoki <b>«Shot raqam»</b> deb yozing, to'lov rekvizitlarini yuboraman."
+        )
+    else:
+        res = (
+            f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
+            f"🏛 <b>Fiskal modul:</b> <code>{fm_code}</code>\n"
+            f"✅ <b>OFD holati:</b>\n<i>{clean_summary}</i>\n\n"
+            f"ℹ️ Kassa apparatingiz Davlat Soliq Qo'mitasi (OFD) bazasida faol holatda va yillik to'lov muddati joyida.\n\n"
+            f"📌 Agar apparat chek urmayotgan bo'lsa, internet (Wi-Fi/SIM) va soat/sanani tekshirib, apparatni o'chirib yoqing (Reboot)."
+        )
+
+    return adapt_to_user_script(res, script)
