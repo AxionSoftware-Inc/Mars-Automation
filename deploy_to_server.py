@@ -50,12 +50,24 @@ def deploy():
         'handlers/commands.py',
         'handlers/debt.py',
         'handlers/media.py',
-        'test_4_stage_pipeline_and_fiscal_check.py'
+        'handlers/intents/__init__.py',
+        'handlers/intents/billing.py',
+        'handlers/intents/hardware.py',
+        'handlers/intents/mxik.py',
+        'handlers/intents/operator.py',
+        'handlers/intents/conversation.py',
+        'test_4_stage_pipeline_and_fiscal_check.py',
+        'test_sequential_debt_flow.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
     try:
         sftp.mkdir(f"{remote_dir}/handlers")
+    except Exception:
+        pass
+
+    try:
+        sftp.mkdir(f"{remote_dir}/handlers/intents")
     except Exception:
         pass
 
