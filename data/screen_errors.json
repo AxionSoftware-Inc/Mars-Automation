@@ -460,6 +460,23 @@
     "escalate_to_admin": false
   },
   {
+    "id": "pax_d210_menu_help",
+    "name": "Pax D210 tugmali kassa apparati yordami",
+    "screen_keywords": [
+      "pax d210",
+      "d210",
+      "tugmali apparat",
+      "klaviaturali apparat",
+      "smena yopish d210",
+      "d210 menyu",
+      "d210 smena"
+    ],
+    "response_text": "📟 <b>Pax D210 tugmali kassa apparati uchun tezkor ko'rsatmalar:</b>\n\n1️⃣ <b>Smena yopish (Z-hisobot olish):</b>\n🔹 <b>Menu</b> tugmasini bosing -> <b>1</b> (Hisobotlar / Отчеты) -> <b>Smena yopish (Z-otchet)</b> ni tanlang va <b>Yashil (Enter)</b> tugmasini bosing.\n\n2️⃣ <b>Servis menyusi:</b>\n🔹 <b>Func + 0</b> tugmalarini birgalikda bosish orqali servis menyusiga o'tishingiz mumkin.\n🔹 Qog'oz o'rnatilganda lenta tekis va to'g'ri joylashganiga e'tibor bering.",
+    "video_id": 2,
+    "require_inn": false,
+    "escalate_to_admin": false
+  },
+  {
     "id": "printer_cover_open",
     "name": "Printer qopqog'i ochiq (Cover Open)",
     "screen_keywords": [

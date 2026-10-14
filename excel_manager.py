@@ -316,6 +316,32 @@ class ExcelManager:
 
         return []
 
+    def check_debt(self, query: str) -> Dict[str, Any]:
+        """INN / JSHSHIR bo'yicha qarz holatini tekshirish"""
+        results = self.search(query)
+        if not results:
+            return {"found": False, "results": [], "record": None, "total_debt": 0.0, "status": "not_found"}
+
+        first = results[0]
+        total_debt = sum(item.get("debt", 0.0) for item in results)
+        status = "qarzdor" if total_debt > 0 else "qarzi yo'q"
+        record = {
+            "org_name": first.get("name", ""),
+            "inn": first.get("stir", ""),
+            "status": status,
+            "debt_amount": total_debt,
+            "tuman": first.get("tuman", ""),
+            "paid_up_to": first.get("paid_date", ""),
+            "payment_date": first.get("paid_date", "")
+        }
+        return {
+            "found": True,
+            "results": results,
+            "record": record,
+            "total_debt": total_debt,
+            "status": status
+        }
+
     def is_decommissioned(self, query: str) -> bool:
         """
         Berilgan INN / JSHSHIR / Terminal hisobdan chiqarilgan (Excelda qizil qator) ekanligini tekshirish.

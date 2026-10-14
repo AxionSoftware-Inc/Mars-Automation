@@ -303,12 +303,12 @@ class CoreEngine:
                 log_reason=f"Receipt extraction failed: {facts.extraction_error}"
             )
 
-        # 1. Guardrail: Haqiqatan kvitansiyami?
-        if not facts.is_receipt:
-            logger.info("Guardrail: Hujjat/tasvir to'lov kvitansiyasi emas.")
+        # 1. Guardrail: Haqiqatan to'lov kvitansiyasimi? (Kassa cheki to'lov kvitansiyasi EMAS)
+        if not facts.is_receipt or getattr(facts, "is_fiscal_chek", False):
+            logger.info("Guardrail: Hujjat/tasvir to'lov kvitansiyasi emas (yoki kassa cheki).")
             return DecisionResult(
                 action=ActionType.IGNORE,
-                log_reason="Not a payment receipt"
+                log_reason="Not a payment receipt or is a fiscal chek"
             )
 
         # 1.1. Firibgarlik va takrorlanishdan himoya & to'lov maqsadi (Fraud & Duplicates)

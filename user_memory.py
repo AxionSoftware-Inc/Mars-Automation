@@ -255,4 +255,8 @@ class UserMemoryManager:
         if key in self.sessions:
             del self.sessions[key]
 
+    def clear(self):
+        """Barcha sessiyalarni tozalash (testlar va qayta ishga tushirish uchun)"""
+        self.sessions.clear()
+
 user_memory = UserMemoryManager()

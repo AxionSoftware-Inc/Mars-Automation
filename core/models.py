@@ -142,11 +142,34 @@ class DeviceFacts:
     extraction_error: Optional[str] = None # Sensor uzilib qolsa xatolik izohi
 
 @dataclass
+class FiscalChekFacts:
+    """
+    Kassa apparatidan (Onlayn-NKM / Smart POS) chop etilgan savdo cheki yoki fiskal hisobotdan
+    olingan sof faktlar (to'lov kvitansiyasi EMAS).
+    """
+    is_fiscal_chek: bool = False               # Kassa chekimi (haqiqiy kassa/fiskal chek)
+    inn: Optional[str] = None                  # 9 xonali STIR / INN
+    fiscal_module: Optional[str] = None        # Fiskal modul seriya raqami (LG..., YG..., UZ...)
+    org_name: str = ""                         # Korxona / tashkilot nomi
+    terminal_id: Optional[str] = None          # Terminal yoki apparat seriya raqami
+    check_number: Optional[str] = None         # Chek raqami
+    date_time: str = ""                        # Sana va vaqt
+    total_amount: float = 0.0                  # Xarid jami summasi
+    receipt_type: str = "sale"                 # "sale" (xarid/savdo), "z_report", "x_report", "other"
+    raw_text: str = ""                         # Chekdagi matnlar qisqartmasi
+    raw_facts: Dict[str, Any] = field(default_factory=dict)
+    extraction_error: Optional[str] = None
+
+@dataclass
 class ReceiptFacts:
     """
     To'lov kvitansiyasidan (rasm yoki PDF) ajratilgan sof faktlar.
     """
     is_receipt: bool = False               # Bu to'lov kvitansiyasi / chekmi
+    is_fiscal_chek: bool = False           # Bu kassa chekimi (Onlayn-NKM savdo cheki)
+    fiscal_module: Optional[str] = None    # Fiskal modul seriya raqami (LG..., YG..., UZ...)
+    terminal_id: Optional[str] = None      # Terminal ID
+    fiscal_facts: Optional[FiscalChekFacts] = None
     recipient_account: str = ""            # Qabul qiluvchi hisob raqami yoki nomi
     is_mars_recipient: bool = False        # "Mars Elektron Texnika" ga yo'naltirilganmi
     is_annual_fiscal_fee: bool = False     # "Yangi Texnologiyalar" DUK yillik fiskal modul to'lovimi

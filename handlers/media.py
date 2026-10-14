@@ -12,9 +12,12 @@ from image_analyzer import analyze_media_image, extract_device_facts
 from receipt_analyzer import extract_receipt_facts
 from admin_manager import admin_manager
 from core import core_engine, ActionType
+from core.models import extract_clean_inn, extract_fiscal_module, ReceiptFacts, FiscalChekFacts
 from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
 from translit_manager import adapt_to_user_script, detect_script
+from ofd_bridge import ofd_bridge
+from payment_accounts import MARS_ACCOUNT, YANGI_TEXNOLOGIYALAR_ACCOUNT, format_ofd_annual_status
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +149,23 @@ async def handle_document(message: types.Message, bot: Bot):
                 user_caption=caption
             )
 
+            # Agar bu kassa cheki bo'lsa (fiskal chek)
+            if facts.is_fiscal_chek:
+                user_script = user_memory.get_preferred_script(chat_id, user_id)
+                if caption:
+                    sc = detect_script(caption)
+                    if sc in ("cyrillic", "latin"):
+                        user_script = sc
+                await _process_fiscal_receipt_content(
+                    message=message,
+                    bot=bot,
+                    receipt_facts=facts,
+                    user_script=user_script,
+                    caption=caption,
+                    file_id=doc.file_id
+                )
+                return
+
             decision = core_engine.process_receipt_facts(
                 facts=facts,
                 chat_id=chat_id,
@@ -208,7 +228,157 @@ async def handle_document(message: types.Message, bot: Bot):
         return
 
 
-# 2. MARKAZIY RASM TAHLIL VA QAROR QABUL QILISH FUNKSIYASI
+# 2. KASSA CHEKI (FISKAL CHEK / SAVDO CHEKI / ONLAYN-NKM) QAYTA ISHLASH
+async def _process_fiscal_receipt_content(
+    message: types.Message,
+    bot: Bot,
+    receipt_facts: ReceiptFacts,
+    user_script: str,
+    caption: str,
+    file_id: str
+):
+    """
+    Kassa apparatidan chiqqan qog'oz savdo cheki (fiskal chek / Onlayn-NKM) tahlili:
+    1. INN (9 xonali) va Fiskal modul seriya raqami (LG..., YG..., UZ...) ni ajratib oladi.
+    2. user_memory ga INN va FM ni saqlaydi (keyingi savollarda bot eslab qolishi uchun).
+    3. Excel bazadan «Mars» oylik abonent to'lovi (100 000 so'm) qarzini tekshiradi.
+    4. Agar Fiskal modul bo'lsa, @ofd943_bot orqali Davlat Soliq (OFD) yillik litsenziyasini tekshiradi.
+    5. Foydalanuvchiga to'liq va tushunarli kartochka yuboradi.
+    6. Adminga to'lov kvitansiyasi sifatida soxta xabarnoma YUBORMAYDI!
+    """
+    user_id = message.from_user.id if message.from_user else 0
+    chat_id = message.chat.id
+
+    fisc = receipt_facts.fiscal_facts
+    inn = receipt_facts.payer_inn or (fisc.inn if fisc else None) or extract_clean_inn(caption)
+    fm = receipt_facts.fiscal_module or (fisc.fiscal_module if fisc else None) or extract_fiscal_module(caption)
+    org_name = (fisc.org_name if fisc and fisc.org_name else "") or receipt_facts.payer_name or ""
+    terminal_id = (fisc.terminal_id if fisc and fisc.terminal_id else "") or receipt_facts.terminal_id or ""
+
+    # Agar na INN, na FM topilmasa -> Foydalanuvchidan so'rash
+    if not inn and not fm:
+        fail_msg = (
+            "🧾 <b>Kassa cheki tasviri qabul qilindi.</b>\n\n"
+            "⚠️ Afsuski, chekdan <b>СТИР (INN)</b> yoki <b>Fiskal modul (LG..., YG..., UZ...)</b> raqamini aniq o'qib bo'lmadi.\n\n"
+            "📌 <b>Iltimos:</b>\n"
+            "🔹 Chekning yuqori (INN) yoki pastki (Fiskal modul) qismini yaqinroqdan aniq rasmga olib yuboring;\n"
+            "🔹 Yoki korxonangiz <b>9 xonali СТИР (INN)</b> raqamini yozib yuboring."
+        )
+        fail_msg = adapt_to_user_script(fail_msg, user_script)
+        try:
+            await message.reply(fail_msg, parse_mode="HTML")
+        except Exception:
+            await message.reply(fail_msg)
+        return
+
+    # Xotiraga saqlash
+    if inn:
+        user_memory.set_last_id(chat_id, user_id, inn)
+    if fm:
+        user_memory.set_last_fm(chat_id, user_id, fm)
+    user_memory.set_last_photo(chat_id, user_id, file_id)
+    user_memory.set_last_topic(chat_id, user_id, "fiscal_receipt_checked")
+
+    # 1. «Mars» oylik abonent to'lovi holati (100 000 so'm/oy)
+    monthly_status_lines = []
+    has_monthly_debt = False
+    if inn:
+        debt_res = excel_manager.check_debt(inn)
+        record = debt_res.get("record") if debt_res else None
+        if record:
+            org_from_rec = record.get("org_name")
+            if org_from_rec and not org_name:
+                org_name = org_from_rec
+            status = record.get("status", "")
+            debt_amount = float(record.get("debt_amount", 0.0) or 0.0)
+            paid_to = record.get("paid_up_to", "") or record.get("payment_date", "")
+
+            if status == "qarzdor" or debt_amount > 0:
+                has_monthly_debt = True
+                monthly_status_lines.append(
+                    f"⚠️ <b>Qarzdorlik mavjud:</b> <b>{debt_amount:,.0f} so'm</b>"
+                )
+                if paid_to:
+                    monthly_status_lines.append(f"📅 To'lov muddati: <b>{paid_to}</b> gacha to'langan.")
+                monthly_status_lines.append(f"💳 Mars X/R: <code>{MARS_ACCOUNT}</code>")
+            else:
+                monthly_status_lines.append("✅ <b>Qarzdorlik yo'q (To'langan).</b>")
+                if paid_to:
+                    monthly_status_lines.append(f"📅 Xizmat muddati: <b>{paid_to}</b> gacha faol.")
+        else:
+            monthly_status_lines.append(
+                f"ℹ️ СТИР: <code>{inn}</code> bo'yicha «Mars» ma'lumotlar bazasida yozuv topilmadi."
+            )
+    else:
+        monthly_status_lines.append(
+            "⚠️ <i>Chekdan СТИР (INN) aniqlanmadi. 9 xonali INN raqamingizni yuborsangiz, oylik to'lovni tekshirib beramiz.</i>"
+        )
+
+    # 2. Davlat Soliq (OFD) yillik litsenziyasi holati (440 000 so'm/yil)
+    annual_status_lines = []
+    has_annual_debt = False
+    if fm:
+        ofd_reply = await ofd_bridge.query_fiscal_module(bot, fm)
+        if ofd_reply:
+            ofd_fmt = format_ofd_annual_status(fm, ofd_reply, user_script)
+            annual_status_lines.append(ofd_fmt)
+            if any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+                has_annual_debt = True
+        else:
+            annual_status_lines.append(
+                f"📟 <b>Fiskal modul:</b> <code>{fm}</code>\n"
+                f"ℹ️ Soliq (@ofd943_bot) tizimi bilan tekshirilmoqda..."
+            )
+    else:
+        annual_status_lines.append(
+            "🏛 <i>Yillik Soliq (OFD) to'lovini tekshirish uchun kassa chekining pastki qismidagi "
+            "<b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.</i>"
+        )
+
+    # Xabarni chiroyli yig'ish
+    header_parts = ["🧾 <b>KASSA CHEKI MA'LUMOTLARI:</b>\n"]
+    if org_name:
+        header_parts.append(f"🏢 <b>Tashkilot:</b> {org_name}")
+    if inn:
+        header_parts.append(f"🔢 <b>СТИР (INN):</b> <code>{inn}</code>")
+    if fm:
+        header_parts.append(f"📟 <b>Fiskal modul:</b> <code>{fm}</code>")
+    if terminal_id:
+        header_parts.append(f"🆔 <b>Terminal:</b> <code>{terminal_id}</code>")
+
+    body_parts = [
+        "\n".join(header_parts),
+        "────────────────────",
+        "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n" + "\n".join(monthly_status_lines),
+        "────────────────────",
+        "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n" + "\n".join(annual_status_lines)
+    ]
+
+    if has_monthly_debt and not has_annual_debt:
+        body_parts.append(
+            "\n💡 <i>Oylik to'lovni Click orqali to'lash uchun «oylik to'layman» deb yozishingiz mumkin.</i>"
+        )
+    elif has_annual_debt and not has_monthly_debt:
+        body_parts.append(
+            "\n💡 <i>Yillik Soliq to'lovini to'lash uchun «yillik to'layman» deb yozishingiz mumkin.</i>"
+        )
+    elif has_monthly_debt and has_annual_debt:
+        body_parts.append(
+            "\n💡 <i>To'lov rekvizitlarini olish uchun «to'lov rekvizitlari» yoki «to'layman» deb yozing.</i>"
+        )
+
+    final_text = adapt_to_user_script("\n".join(body_parts), user_script)
+
+    try:
+        await message.reply(final_text, parse_mode="HTML")
+    except Exception:
+        await message.reply(final_text)
+
+    user_memory.add_user_message(chat_id, user_id, f"[Kassa cheki] {caption}".strip())
+    user_memory.add_assistant_message(chat_id, user_id, final_text)
+
+
+# 3. MARKAZIY RASM TAHLIL VA QAROR QABUL QILISH FUNKSIYASI
 async def _process_image_content(
     message: types.Message,
     bot: Bot,
@@ -220,10 +390,11 @@ async def _process_image_content(
 ):
     """
     Rasmlar (Photo yoki Image Document) uchun yagona tahlilchi:
-    1. analyze_media_image orqali tasvir turini aniqlaydi: "receipt", "pos_device", "other"
-    2. "receipt" bo'lsa -> core_engine.process_receipt_facts
-    3. "pos_device" bo'lsa -> core_engine.process_device_facts
-    4. "other" bo'lsa -> ignore (jim turish)
+    1. analyze_media_image orqali tasvir turini aniqlaydi:
+       - "fiscal_receipt" -> Kassa cheki (INN va FM o'qish, oylik va yillik qarz tekshirish)
+       - "receipt" -> To'lov kvitansiyasi (Click/Payme to'lovi, adminga eskalatsiya)
+       - "pos_device" -> Smart POS apparati ekrani (tashxis va video)
+       - "other" -> Begona tasvir (jim turish)
     """
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
@@ -241,8 +412,20 @@ async def _process_image_content(
         mime_type=mime_type
     )
 
-    # 1. TO'LOV KVITANSIYASI
-    if media_type == "receipt" and receipt_facts and receipt_facts.is_receipt:
+    # 1. KASSA CHEKI (FISKAL CHEK / SAVDO CHEKI / ONLAYN-NKM)
+    if media_type == "fiscal_receipt" or (receipt_facts and receipt_facts.is_fiscal_chek):
+        await _process_fiscal_receipt_content(
+            message=message,
+            bot=bot,
+            receipt_facts=receipt_facts,
+            user_script=user_script,
+            caption=caption,
+            file_id=file_id
+        )
+        return
+
+    # 2. TO'LOV KVITANSIYASI
+    elif media_type == "receipt" and receipt_facts and receipt_facts.is_receipt:
         decision = core_engine.process_receipt_facts(
             facts=receipt_facts,
             chat_id=chat_id,

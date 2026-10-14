@@ -102,8 +102,13 @@ class HardwareIntentHandler:
                 user_memory.add_assistant_message(chat_id, user_id, clear_msg)
                 return True
         else:
-            # INN hali kiritilmagan: qisqa va lo'nda INN so'rash
-            guide_msg = "🔍 <b>Kassa apparatingiz holatini tekshirishimiz uchun korxonangiz СТИР (INN) raqamini yuboring.</b>"
+            # INN hali kiritilmagan: INN va kassa chekidagi Fiskal modulni so'rash
+            guide_msg = (
+                "🔍 <b>Qarzdorlik va apparat holatini tekshirish:</b>\n\n"
+                "Kassa apparatlari to'xtab qolishining 60%+ sababi abonent yoki soliq to'lovidagi qarzdorlik bo'ladi.\n\n"
+                "Iltimos, korxonangizning <b>СТИР (INN) raqamini yuboring</b> hamda iloji bo'lsa kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring.\n\n"
+                "💡 <i>Biz bir vaqtning o'zida «Mars» oylik abonent to'lovini hamda Davlat Soliq Qo'mitasi (OFD) yillik litsenziya muddatini to'liq tekshirib beramiz!</i>"
+            )
             guide_msg = adapt_to_user_script(guide_msg, user_script)
             try:
                 await message.reply(guide_msg, parse_mode="HTML")

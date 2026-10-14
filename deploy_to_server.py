@@ -58,7 +58,8 @@ def deploy():
         'handlers/intents/conversation.py',
         'test_4_stage_pipeline_and_fiscal_check.py',
         'test_sequential_debt_flow.py',
-        'test_adversarial_break_round2.py'
+        'test_adversarial_break_round2.py',
+        'test_fiscal_chek_vs_kvitansiya.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
