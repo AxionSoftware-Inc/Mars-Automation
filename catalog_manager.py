@@ -75,10 +75,17 @@ class CatalogManager:
         conversational_guards = [
             "qarzim bormi", "qarz bormi", "qarzdorlik bormi", "ishlamayapti", "ochib qoldi", "blok boldi",
             "qachon qoshiladi", "qachon yoqiladi", "qachon ochiladi", "qachon ishlaydi",
-            "keyingi tolov", "qancha tolayman", "kvitansiya", "chek tushdimi", "tolov tushdimi", "adminga bordimi"
+            "keyingi tolov", "qancha tolayman", "kvitansiya", "chek tushdimi", "tolov tushdimi", "adminga bordimi",
+            "oylikdanchi", "oylikchi", "yillikdanchi", "yillikchi", "fiskaldanchi", "soliqdanchi",
+            "oylik qarz", "yillik qarz", "oylikdan qarz", "yillikdan qarz"
         ]
         if any(w in t for w in conversational_guards):
             return None
+
+        # Agar savol qarz, oylik/yillik holat yoki hisob haqida bo'lsa va video so'ralmagan bo'lsa -> video bermaslik
+        if any(w in t for w in ["oylik", "yillik", "fiskal", "qarz", "qarzdorlik", "tekshir"]):
+            if not any(w in t for w in ["video", "rolik", "kursat", "ko'rsat", "qollanma", "qo'llanma"]):
+                return None
 
         # Eng yuqori moslikdagi postni topish
         best_post_id = None
@@ -108,9 +115,17 @@ class CatalogManager:
         # Suhbat va kontekstli savollarni videoga aylantirmaslik
         if any(w in t for w in [
             "qoshiladi", "yoqiladi", "keyingi", "tolov tush", "kvitansiya", "adminga",
-            "qancha tolayman", "qancha qarz", "rahmat", "tushundim", "oldi", "boldi"
+            "qancha tolayman", "qancha qarz", "rahmat", "tushundim", "oldi", "boldi",
+            "oylikdanchi", "oylikchi", "yillikdanchi", "yillikchi", "fiskaldanchi", "soliqdanchi",
+            "oylik qarz", "yillik qarz", "oylikdan qarz", "yillikdan qarz",
+            "qarzim", "qarz", "qarzdorlik"
         ]):
             return None
+
+        # Agar savol qarz, oylik/yillik holat yoki hisob haqida bo'lsa va video so'ralmagan bo'lsa -> AI orqali ham video bermaslik
+        if any(w in t for w in ["oylik", "yillik", "fiskal", "qarz", "qarzdorlik", "tekshir"]):
+            if not any(w in t for w in ["video", "rolik", "kursat", "ko'rsat", "qollanma", "qo'llanma"]):
+                return None
 
         # 1-bosqich: Tezkor kalit so'zlar bo'yicha
         kw_match = self.find_post_by_keywords(user_text)

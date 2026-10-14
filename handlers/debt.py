@@ -187,7 +187,10 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
 
     model_summary = excel_manager.get_device_model_summary(results)
     user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt, device_models=model_summary)
-    user_memory.set_last_topic(chat_id, user_id, "debt_checked")
+    if total_debt > 0:
+        user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+    else:
+        user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
 
     resp = format_debt_response(results)
     pending_screen = user_memory.get_pending_device_screen(chat_id, user_id)

@@ -233,6 +233,11 @@ def classify_payment_intent(text: str) -> Optional[str]:
     """
     t = text.lower().strip()
 
+    # Agar savol qarz/tekshirish bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
+    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
+        if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "шот", "реквизит"]):
+            return None
+
     # Yillik to'lov alomatlari (Lotin va Kirill)
     is_annual = any(w in t for w in [
         "yillik shot", "yillik hisob", "yillik rekvizit", "fiskal modul", "fiskal modul shot",
@@ -320,6 +325,17 @@ def classify_receipt_target(recipient_account: str, amount: float, raw_text: str
 def is_annual_check_intent(text: str) -> bool:
     """Foydalanuvchi yillik to'lov yoki fiskal modul (OFD/Soliq) qarzdorligini tekshirishni so'rayaptimi?"""
     t = text.lower().strip()
+    
+    # Tezkor davomiy iboralar ("yillikdanchi?", "fiskalchi?", "yillikchi?")
+    followup_words = [
+        "yillikdanchi", "yillikchi", "yilikdanchi", "yilikchi",
+        "fiskaldanchi", "fiskalchi", "soliqdanchi", "soliqchi",
+        "ofddanchi", "ofdchi", "fmodanchi", "fmochi",
+        "йилликданчи", "йилликчи", "фискалданчи", "фискалчи", "солиқданчи", "солиқчи", "офдданчи"
+    ]
+    if any(w in t for w in followup_words) or t in ("yillik", "fiskal", "ofd", "йиллик", "фискал", "офд"):
+        return True
+
     phrases = [
         "yillik qarz", "yillikni tekshir", "yillik tekshir", "yillikni tekshirib",
         "yillik to'lovni tekshir", "yillik tolovni tekshir", "yillik tulovni tekshir",
@@ -336,12 +352,62 @@ def is_annual_check_intent(text: str) -> bool:
     if any(p in t for p in phrases):
         return True
 
-    has_target = any(w in t for w in ["yillik", "yilik", "fiskal", "ofd", "fmo", "йиллик", "фискал", "офд", "фмо"])
+    has_target = any(w in t for w in ["yillik", "yilik", "fiskal", "ofd", "fmo", "soliq", "йиллик", "фискал", "офд", "фмо", "солиқ", "солик"])
     has_action = any(w in t for w in [
         "tekshir", "kurib", "ko'rib", "korib", "qarz", "bormi", "muddat", "holat",
         "провер", "текшир", "қарз", "карз", "борми", "муддат", "ҳолат", "холат"
     ])
     return has_target and has_action
+
+
+def is_monthly_check_intent(text: str) -> bool:
+    """Foydalanuvchi oylik abonent to'lovi (Mars) qarzdorligini tekshirishni so'rayaptimi?"""
+    t = text.lower().strip()
+
+    # Tezkor davomiy iboralar ("oylikdanchi?", "oylikchi?", "marsdanchi?")
+    followup_words = [
+        "oylikdanchi", "oylikchi", "oylikdanam", "oylikdan-chi", "oylikchi-chi",
+        "marsdanchi", "marschi", "abonentdanchi", "abonentchi",
+        "ойликданчи", "ойликчи", "ойликданам", "марсданчи", "абонентданчи"
+    ]
+    if any(w in t for w in followup_words) or t in ("oylik", "oylik?", "mars", "mars?", "ойлик", "ойлик?"):
+        return True
+
+    phrases = [
+        "oylik qarz", "oylik qarzim", "oylik qarzim bormi", "oylikdan qarz",
+        "oylikdan qarzim bormi", "oylikdan qarzdorlik bormi", "oylik qarzdorlik",
+        "oylik holati", "oylik to'lov holati", "oylik tolov holati",
+        "oylikni tekshir", "oylikni tekshirib", "oylikni tekshirib ber",
+        "oylik to'lovni tekshir", "oylik tolovni tekshir", "oylik tulovni tekshir",
+        "oylik to'lovniyam tekshir", "oylik tolovniyam tekshir", "oylik tulovniyam tekshir",
+        "oylik to'lovim bormi", "oylik tolovim bormi", "oylik tulovim bormi",
+        "marsdan qarzim bormi", "marsga qarzim bormi", "mars qarzim", "marsni tekshir",
+        "marsdan qarz", "abonent to'lovini tekshir", "abonent qarz",
+        "ойлик қарз", "ойлик қарзим", "ойлик қарзим борми", "ойликдан қарзим борми",
+        "ойлик тўловни текшир", "марсдан қарз", "марс қарзим борми", "марсни текшир"
+    ]
+    if any(p in t for p in phrases):
+        return True
+
+    has_target = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
+    has_action = any(w in t for w in [
+        "tekshir", "kurib", "ko'rib", "korib", "qarz", "bormi", "holat", "qarzdorlik",
+        "провер", "текшир", "қарз", "карз", "борми", "ҳолат", "холат"
+    ])
+    return has_target and has_action
+
+
+def is_both_check_intent(text: str) -> bool:
+    """Foydalanuvchi ikkala to'lov (oylik va yillik) yoki umumiy qarzdorlikni so'rayaptimi?"""
+    t = text.lower().strip()
+    phrases = [
+        "ikkalasidanchi", "ikkalasidan", "ikkala tolov", "ikkala to'lov", "ikkalasiyam",
+        "ikkala tolovdan", "ikkala to'lovdan", "umumiy qarz", "umumiy qarzim",
+        "jami qarz", "jami qarzim", "barcha qarz", "qarzlarim bormi", "qarzlarimni tekshir",
+        "qarzlar bormi", "har ikkala", "ikkisi ham", "ikkisidan",
+        "иккаласиданчи", "иккаласидан", "умумий қарз", "жами қарз", "қарзларим борми"
+    ]
+    return any(p in t for p in phrases)
 
 
 def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
@@ -361,6 +427,36 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
 
     # 2. Agar foydalanuvchi yaqinda yillik qarz tekshirgan bo'lsa va endi to'lashini aytsa
     if last_topic in ("annual_debt_exists", "awaiting_fiscal_module", "annual_check"):
+        general_pay_phrases = [
+            "to'layman", "tolayman", "to'lashim kerak", "tolashim kerak", "to'lay", "tolay",
+            "shot raqam tashla", "shot tashla", "shot raqam", "shotini ber", "shot ber", "shotini tashla",
+            "rekvizit tashla", "rekvizit ber", "qayerga to'layman", "qayerga tolayman",
+            "qayerga to'lash", "hisob raqam tashla", "qanday to'layman", "qanday tolayman",
+            "тўлайман", "толайман", "шот ташла", "шот беринг"
+        ]
+        if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman"]):
+            return True
+
+    return False
+
+
+def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
+    """Foydalanuvchi oylik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
+    t = text.lower().strip()
+
+    # 1. Aniq oylik to'lov so'rovi
+    has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
+    has_pay = any(w in t for w in [
+        "to'layman", "tolayman", "to'lash", "tolash", "to'lay", "tolay",
+        "shot", "shot raqam", "shot tashla", "shot raqam tashla", "shotini tashla", "shot ber", "shotini ber",
+        "rekvizit", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
+        "тўлайман", "толайман", "шот ташла", "реквизит ташла"
+    ])
+    if has_monthly and has_pay:
+        return True
+
+    # 2. Agar foydalanuvchi yaqinda oylik qarz tekshirgan bo'lsa va endi to'lashini aytsa
+    if last_topic in ("monthly_debt_exists", "debt_checked", "awaiting_inn_for_monthly_debt"):
         general_pay_phrases = [
             "to'layman", "tolayman", "to'lashim kerak", "tolashim kerak", "to'lay", "tolay",
             "shot raqam tashla", "shot tashla", "shot raqam", "shotini ber", "shot ber", "shotini tashla",

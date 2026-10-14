@@ -7,7 +7,10 @@ from payment_accounts import (
     classify_payment_intent,
     is_mxik_intent,
     is_annual_check_intent,
+    is_monthly_check_intent,
+    is_both_check_intent,
     is_annual_pay_intent,
+    is_monthly_pay_intent,
     format_ofd_annual_status,
     get_monthly_payment_card,
     get_annual_payment_card,
@@ -101,7 +104,74 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
         return
 
-    # 0.1 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR" DEB SO'RASA
+    # 0.1 AGAR MIJOZ IKKALA TO'LOV / UMUMIY QARZDORLIKNI SO'RASA
+    if is_both_check_intent(text):
+        remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+        remembered_fm = user_memory.get_last_fm(chat_id, user_id)
+
+        if remembered_id and remembered_fm:
+            from handlers.debt import process_and_send_debt_result
+            await process_and_send_debt_result(message, bot, remembered_id)
+            from ofd_bridge import ofd_bridge
+            ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
+            ofd_text = format_ofd_annual_status(remembered_fm, ofd_reply, user_script)
+            try:
+                await message.reply(ofd_text, parse_mode="HTML")
+            except Exception:
+                await message.reply(ofd_text)
+            return
+        elif remembered_id and not remembered_fm:
+            from handlers.debt import process_and_send_debt_result
+            await process_and_send_debt_result(message, bot, remembered_id)
+            fm_ask = (
+                "🏛 <b>Yillik Soliq (OFD) qarzdorligini ham tekshirish uchun:</b>\n\n"
+                "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring."
+            )
+            fm_ask = adapt_to_user_script(fm_ask, user_script)
+            try:
+                await message.answer(fm_ask, parse_mode="HTML")
+            except Exception:
+                await message.answer(fm_ask)
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
+            return
+        elif remembered_fm and not remembered_id:
+            from ofd_bridge import ofd_bridge
+            ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
+            ofd_text = format_ofd_annual_status(remembered_fm, ofd_reply, user_script)
+            try:
+                await message.reply(ofd_text, parse_mode="HTML")
+            except Exception:
+                await message.reply(ofd_text)
+            inn_ask = (
+                "🏢 <b>«Mars» oylik abonent to'lovini ham tekshirish uchun:</b>\n\n"
+                "Korxonangizning 9 xonali <b>СТИР (INN) raqamini</b> yuboring."
+            )
+            inn_ask = adapt_to_user_script(inn_ask, user_script)
+            try:
+                await message.answer(inn_ask, parse_mode="HTML")
+            except Exception:
+                await message.answer(inn_ask)
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_inn_for_monthly_debt")
+            return
+        else:
+            both_ask = (
+                "🔍 <b>Smart POS kassa apparatlarida 2 xil to'lov tekshiriladi:</b>\n\n"
+                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
+                "Tekshirish uchun korxonangiz <b>СТИР (INN)</b> raqamini yuboring;\n\n"
+                "2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi (440 000 so'm/yil):</b>\n"
+                "Tekshirish uchun kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG...)</b> yuboring.\n\n"
+                "<i>Qaysi birini tekshirmoqchi bo'lsangiz, raqamini yuboring.</i>"
+            )
+            both_ask = adapt_to_user_script(both_ask, user_script)
+            try:
+                await message.reply(both_ask, parse_mode="HTML")
+            except Exception:
+                await message.reply(both_ask)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, both_ask)
+            return
+
+    # 0.2 AGAR MIJOZ "YILLIK QARZNI TEKSHIR / OFD TEKSHIR / YILLIKDANCHI" DEB SO'RASA
     if is_annual_check_intent(text):
         remembered_fm = user_memory.get_last_fm(chat_id, user_id)
         if remembered_fm:
@@ -136,7 +206,30 @@ async def handle_user_chat(message: types.Message, bot: Bot):
             user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
             return
 
-    # 0.2 AGAR MIJOZ "TO'LAYMAN / YILLIK SHOT RAQAM TASHLA" DESA
+    # 0.3 AGAR MIJOZ "OYLIK QARZNI TEKSHIR / OYLIKDANCHI / MARSDAN QARZIM BORMI" DEB SO'RASA
+    if is_monthly_check_intent(text):
+        remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+        if remembered_id:
+            from handlers.debt import process_and_send_debt_result
+            await process_and_send_debt_result(message, bot, remembered_id)
+            return
+        else:
+            ask_inn = (
+                "🏢 <b>«Mars» oylik abonent to'lovidan qarzdorlikni tekshirish uchun:</b>\n\n"
+                "Korxonangizning 9 xonali <b>СТИР (INN) raqamini</b> yuboring (masalan: <code>302568138</code>).\n\n"
+                "<i>Baza orqali oylik abonent to'lovi holatini tekshirib beramiz.</i>"
+            )
+            ask_inn = adapt_to_user_script(ask_inn, user_script)
+            try:
+                await message.reply(ask_inn, parse_mode="HTML")
+            except Exception:
+                await message.reply(ask_inn)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, ask_inn)
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_inn_for_monthly_debt")
+            return
+
+    # 0.4 AGAR MIJOZ "YILLIK SHOT RAQAM TASHLA / YILLIK TO'LAYMAN" DESA
     last_topic = user_memory.get_last_topic(chat_id, user_id)
     if is_annual_pay_intent(text, last_topic):
         annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
@@ -157,6 +250,39 @@ async def handle_user_chat(message: types.Message, bot: Bot):
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, annual_card)
         user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
+        return
+
+    # 0.5 AGAR MIJOZ "OYLIK SHOT RAQAM TASHLA / OYLIK TO'LAYMAN" DESA
+    if is_monthly_pay_intent(text, last_topic):
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=MARS_POST_ID,
+                reply_to_message_id=message.message_id
+            )
+        except Exception:
+            monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
+            await message.reply(monthly_card, parse_mode="HTML")
+
+        note = get_monthly_post_note(user_script)
+        try:
+            await message.answer(note, parse_mode="HTML")
+        except Exception:
+            await message.answer(note)
+
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=MARS_VIDEO_ID
+            )
+        except Exception as e:
+            logger.warning(f"Video 148 nusxalashda xatolik: {e}")
+
+        user_memory.add_user_message(chat_id, user_id, text)
+        user_memory.add_assistant_message(chat_id, user_id, note)
+        user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")
         return
 
     # 0.3 AGAR MATNDA INN BO'LSA
