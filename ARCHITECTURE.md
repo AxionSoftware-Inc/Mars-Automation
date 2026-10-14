@@ -62,7 +62,7 @@ flowchart TD
         EM[excel_manager.py - 7,200+ bazasi]
         ErrM[error_manager.py - screen_errors.json]
         CatM[catalog_manager.py - 50+ video katalog]
-        UM[user_memory.py - 12 soatlik sessiya]
+        UM[user_memory.py - 1 soatlik sessiya]
         AI[ai_helper.py / openrouter_client.py]
     end
 
@@ -123,7 +123,7 @@ Ekran tashxisi va qarz hisobi bitta lo'nda javobga jamlanib, `DecisionResult` ob
 
 Guruhlarda bir necha kishi bir vaqtda gaplashganda chalkashmaslik uchun quyidagi tizim ishlaydi:
 * **Izolyatsiya kaliti:** `chat_id:user_id` (Masalan: `-100999888:1001` va `-100999888:1002`).
-* **Sessiya muddati (TTL):** 12 soat. Eskirgan sessiyalar xotiradan avtomatik tozalanadi.
+* **Sessiya muddati (TTL):** 1 soat (3600 soniya). Eskirgan sessiyalar xotiradan avtomatik tozalanadi.
 * **Saqlanadigan ma'lumotlar:**
   * `last_id`: Foydalanuvchi qidirgan oxirgi INN/JSHSHIR raqami.
   * `debt_info`: Korxona nomi va oxirgi hisoblangan qarz summasi.

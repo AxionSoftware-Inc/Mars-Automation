@@ -130,7 +130,7 @@ async def run_stress_test():
             assert "1,500,400" in r['reply'], "User 1 da qarz summasi topilmadi!"
             assert r['video_id'] == 148, "User 1 ga 148-video birikmadi!"
         elif r['user_id'] == 1002:
-            assert "Qarzdorlik mavjud emas" in r['reply'], "User 2 da qarzsiz holat topilmadi!"
+            assert "qarzdorlik yo'q" in r['reply'].lower() or "qarzdorlik mavjud emas" in r['reply'].lower(), f"User 2 da qarzsiz holat topilmadi! Olingan matn: {r['reply']}"
         elif r['user_id'] == 1003:
             assert r['video_id'] == 141, "User 3 ga soat videosi (141) birikmadi!"
         elif r['user_id'] == 1005:

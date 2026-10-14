@@ -4,8 +4,8 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Xotiraning amal qilish muddati: 12 soat (soniyalarda)
-TTL_SECONDS = 12 * 3600  # 43,200 soniya
+# Xotiraning amal qilish muddati: 1 soat (soniyalarda)
+TTL_SECONDS = 1 * 3600  # 3,600 soniya (1 soat)
 MAX_HISTORY_TURNS = 10   # Har bir foydalanuvchi uchun oxirgi 10 ta xabar almashinuvi (20 ta xabar)
 
 class UserMemoryManager:
@@ -19,7 +19,7 @@ class UserMemoryManager:
         return f"{chat_id}:{user_id}"
 
     def _cleanup_expired(self):
-        """Eskirgan (12 soatdan oshgan) sessiyalarni tozalash"""
+        """Eskirgan (1 soatdan oshgan) sessiyalarni tozalash"""
         now = time.time()
         expired_keys = [
             k for k, v in self.sessions.items()
