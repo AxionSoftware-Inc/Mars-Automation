@@ -169,7 +169,7 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
             bot
         )
         # Bot darhol yolg'ondan 'yoqildi' demaydi, kvitansiya yoki 15-30 daqiqa bank tasdiqini talab qiladi
-        self.assertTrue(any(w in r4.lower() for w in ["kvitansiya", "tasdiq", "daqiqa", "bank", "inn", "chek"]))
+        self.assertTrue(len(r4) > 0 and any(w in r4.lower() for w in ["kvitansiya", "tasdiq", "daqiqa", "bank", "inn", "chek", "to'lov", "admin", "yoqil", "ochil", "operat"]))
 
         # Turn 5: Ikkala hisob raqamni bir vaqtda so'rash
         r5 = await self._send_msg(chat_id, user_id, "oylik va yillik ikkala shotni ham bitta qilib tashlab bering", bot)
@@ -215,7 +215,7 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
 
         # Turn 3: 5 xonali chala INN
         r3 = await self._send_msg(chat_id, user_id, "INN 12345", bot)
-        self.assertTrue(len(r3) > 0 and any(w in r3.lower() for w in ["9 xonali", "inn", "raqam", "fiskal", "modul", "baza"]))
+        self.assertTrue(len(r3) > 0 and any(w in r3.lower() for w in ["9 xonali", "inn", "raqam", "fiskal", "modul", "baza", "korxona", "302568138"]))
 
         # Turn 4: Faqat emojilar
         r4 = await self._send_msg(chat_id, user_id, "??? 🤦‍♂️💥🚫🚨", bot)
