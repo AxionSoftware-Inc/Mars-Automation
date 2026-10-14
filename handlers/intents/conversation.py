@@ -41,7 +41,10 @@ class ConversationIntentHandler:
 
         has_active_context = bool(user_memory.get_last_id(chat_id, user_id) or user_memory.get_last_receipt(chat_id, user_id))
         is_conversational = any(kw in lower_text for kw in CONVERSATIONAL_FOLLOWUPS)
-        explicit_video_request = any(kw in lower_text for kw in ["video", "rolik", "video tashla", "qo'llanma", "qollanma"])
+        explicit_video_request = any(kw in lower_text for kw in [
+            "video", "rolik", "video tashla", "qo'llanma", "qollanma",
+            "видео", "видеоси", "видеосини", "ролик", "қўлланма", "кулланма"
+        ])
 
         # 1. Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
         if is_conversational or (has_active_context and not explicit_video_request):

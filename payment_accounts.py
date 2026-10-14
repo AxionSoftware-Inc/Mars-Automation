@@ -262,6 +262,13 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "ойлик тўлов", "ойлик толов", "ойлик тулов"
     ])
 
+    has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
+    has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
+    has_pay = any(w in t for w in ["shot", "hisob", "rekvizit", "to'lov", "tolov", "tulov", "тўлов", "толов", "шот", "реквизит", "ҳисоб", "хисоб"])
+
+    if (has_annual and has_monthly and has_pay) or any(w in t for w in ["ikkala shot", "ikkala hisob", "ikkala to'lov", "ikkala tolov", "иккала шот", "иккала ҳисоб", "иккала тўлов"]):
+        return "both"
+
     if is_annual and not is_monthly:
         return "annual"
     if is_monthly and not is_annual:
@@ -417,6 +424,8 @@ def is_both_check_intent(text: str) -> bool:
 
 def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     """Foydalanuvchi yillik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
+    if classify_payment_intent(text) == "both":
+        return False
     t = text.lower().strip()
 
     # 1. Aniq yillik to'lov so'rovi
@@ -427,7 +436,8 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         "rekvizit", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
         "тўлайман", "толайман", "шот ташла", "реквизит ташла"
     ])
-    if has_annual and has_pay:
+    has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
+    if has_annual and has_pay and not has_monthly:
         return True
 
     # 2. Agar foydalanuvchi yaqinda yillik qarz tekshirgan bo'lsa va endi to'lashini aytsa
@@ -447,9 +457,12 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
 
 def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     """Foydalanuvchi oylik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
+    if classify_payment_intent(text) == "both":
+        return False
     t = text.lower().strip()
 
     # 1. Aniq oylik to'lov so'rovi
+    has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
     has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
     has_pay = any(w in t for w in [
         "to'layman", "tolayman", "to'lash", "tolash", "to'lay", "tolay",
@@ -457,7 +470,7 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         "rekvizit", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
         "тўлайман", "толайман", "шот ташла", "реквизит ташла"
     ])
-    if has_monthly and has_pay:
+    if has_monthly and has_pay and not has_annual:
         return True
 
     # 2. Agar foydalanuvchi yaqinda oylik qarz tekshirgan bo'lsa va endi to'lashini aytsa

@@ -61,7 +61,8 @@ def deploy():
         'test_adversarial_break_round2.py',
         'test_fiscal_chek_vs_kvitansiya.py',
         'test_channel_excel_and_untested_edge_cases.py',
-        'test_long_conversation_multi_turn_stress.py'
+        'test_long_conversation_multi_turn_stress.py',
+        'test_10x_ultra_complex_adversarial_stress.py'
     ]
     
     # Ensure handlers and core directories exist on remote server
