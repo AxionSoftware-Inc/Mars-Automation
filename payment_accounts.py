@@ -234,7 +234,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
     t = text.lower().strip()
 
     # Agar savol qarz/tekshirish/muddat/sana bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
-    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat", "qachongacha", "қачонгача", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"]):
+    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat", "qachongacha", "qachon", "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"]):
         if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "шот", "реквизит", "ҳисоб"]):
             return None
 
@@ -269,10 +269,11 @@ def classify_payment_intent(text: str) -> Optional[str]:
     if (has_annual and has_monthly and has_pay) or any(w in t for w in ["ikkala shot", "ikkala hisob", "ikkala to'lov", "ikkala tolov", "иккала шот", "иккала ҳисоб", "иккала тўлов"]):
         return "both"
 
-    if is_annual and not is_monthly:
+    if (is_annual or (has_annual and has_pay)) and not (is_monthly or (has_monthly and has_pay)):
         return "annual"
-    if is_monthly and not is_annual:
+    if (is_monthly or (has_monthly and has_pay)) and not (is_annual or (has_annual and has_pay)):
         return "monthly"
+
 
     # Umumiy rekvizit yoki to'lov so'rovlari (Lotin va Kirill)
     general_payment_words = [
@@ -476,7 +477,13 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     """Foydalanuvchi oylik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
     t = text.lower().strip()
 
+    # Agar savol muddat, qachon to'lanishi haqida bo'lsa (va shot/rekvizit so'ralmagan bo'lsa) -> to'lov intenti emas
+    if any(w in t for w in ["qachon", "qachongacha", "qaysi sana", "nechanchi sana", "muddat", "muddati", "қачон", "қачонгача", "муддат"]):
+        if not any(w in t for w in ["shot", "rekvizit", "hisob", "xisob", "шот", "реквизит", "ҳисоб"]):
+            return False
+
     # 1. Agar foydalanuvchi yaqinda oylik qarz tekshirgan bo'lsa va endi to'lashini aytsa (kontekst ustun)
+
     if last_topic in ("monthly_debt_exists", "debt_checked", "awaiting_inn_for_monthly_debt"):
         has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
         if not has_annual:

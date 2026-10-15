@@ -40,6 +40,8 @@ class HardwareIntentHandler:
             return False
 
         remembered_id = user_memory.get_last_id(chat_id, user_id)
+
+
         if remembered_id:
             # 1-bosqich: Oylik va Yillik qarzdorlikni tekshirish
             results = excel_manager.search(remembered_id)
