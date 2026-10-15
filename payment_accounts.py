@@ -363,6 +363,8 @@ def is_mxik_intent(text: str) -> bool:
         "tovarlar bazasi", "tovar bazasi", "baza yuklash", "bazani yuklash",
         "exceldan tovar", "excel tovar", "otkaz qilish", "chekni bekor",
         "tovarni bekor", "qqs stavka", "soliq stavka",
+        "tamaki", "sigaret", "alkogol", "zapravka",
+        "тамаки", "сигарет", "алкогол", "заправка",
         "солиқ сайтидан", "солиқ сайтидан код", "товар қўшиш", "товар киритиш",
         "товар коди", "товар кодлари", "код қаердан", "кодини қаердан",
         "база юклаш", "товарлар базаси", "бекор қилиш", "отказ қилиш"
