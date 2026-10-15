@@ -93,6 +93,8 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
    C) AGAR MIJOZDA QARZ BO'LMASA:
       - "nega ishlamayapti?", "apparatim o'chib qoldi":
         -> "Abonent to'lovidan qarzingiz yo'q. Apparat ekranidagi xatolikni yoki ko'rinishini rasmga olib yuborsangiz, nosozlik sababini aniqlab beramiz."
+      - "shot tashla", "shot bering", "shot tashlab beriyla", "hisob raqam", "to'lamoqchiman", "oldindan to'lamoqchiman", "keyingi oy uchun to'lamoqchiman":
+        -> Mijozda hozir qarz 0 bo'lsa ham, agar u hisob raqam/shot so'rasa yoki kelgusi oy uchun oldindan to'lamoqchi bo'lsa, ASLO "qarzdorlik yo'q" deb rad etmang! Darhol to'lov tegi bilan javob bering: oylik uchun [VIDEO:148], yillik uchun [VIDEO:145].
 
    D) AGAR KORXONA HISOBDAN CHIQARILGAN (O'CHIRILGAN) BO'LSA:
       - "nega ishlamayapti?", "qarzim bormi?", "qachon yoqiladi?":
