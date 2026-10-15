@@ -502,9 +502,10 @@ class BillingIntentHandler:
                 return True
             else:
                 ask_inn = (
-                    "🏢 <b>«Mars» oylik abonent to'lovidan qarzdorlikni tekshirish uchun:</b>\n\n"
-                    "Korxonangizning 9 xonali <b>СТИР (INN) raqamini</b> yuboring (masalan: <code>302568138</code>).\n\n"
-                    "<i>Baza orqali oylik abonent to'lovi holatini tekshirib beramiz.</i>"
+                    "🏢 <b>«Mars» oylik abonent to'lovidan qarzdorlikni tekshirish:</b>\n\n"
+                    "⚠️ <b>MUHIM QOIDA:</b> Oylik to'lovni <b>Fiskal modul raqami bilan tekshirib bo'lmaydi!</b>\n"
+                    "«Mars» servis bazasida oylik abonent to'lovi faqat <b>korxonangizning 9 xonali СТИР (INN) yoki 14 xonali JSHSHIR raqami</b> orqali tekshiriladi.\n\n"
+                    "Iltimos, korxonangiz <b>СТИР (INN) raqamini</b> yuboring (masalan: <code>302568138</code>)."
                 )
                 ask_inn = adapt_to_user_script(ask_inn, user_script)
                 try:

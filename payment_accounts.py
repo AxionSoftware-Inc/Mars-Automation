@@ -156,7 +156,8 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     from translit_manager import adapt_to_user_script
     text = (
         "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
-        "OFD tizimi faqat <b>Fiskal modul seriya raqami</b> orqali tekshiriladi (STIR/INN bilan tekshirib bo'lmaydi).\n\n"
+        "⚠️ <b>MUHIM QOIDA:</b> Yillik Soliq (OFD) to'lovini <b>СТИР (INN) raqami bilan tekshirib bo'lmaydi!</b>\n"
+        "Chunki Davlat Soliq tizimida bitta korxonaning bir nechta apparati bo'lishi mumkin va yillik litsenziya faqat apparatning o'ziga xos <b>Fiskal modul seriya raqami</b> orqali tekshiriladi.\n\n"
         "Iltimos, aynan o'sha muammoli apparatingizdan chiqarilgan kassa chekining eng pastki qismidagi "
         "<b>Fiskal modul seriya raqamini (masalan: <code>LG420210630789</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring.\n\n"
         "📸 <i>Kassa chekidan namuna rasmi quyidagi postda ko'rsatilgan.</i>\n\n"
