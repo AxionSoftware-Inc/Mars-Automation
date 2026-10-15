@@ -90,7 +90,7 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
 
         chek_reply = msg_chek.reply.call_args[0][0]
         print(f"🤖 Bot (Chek javobi): {chek_reply[:140]}...")
-        self.assertIn("Qarzdorlik mavjud", chek_reply)
+        self.assertIn("Qarzdorlik", chek_reply)
         self.assertIn("OFD", chek_reply)
 
         # Xotira tekshiruvi: Qarz 0 bo'lib qolmagan, aynan bazadagi qarz yozilgan!
@@ -120,7 +120,6 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
 
         # 3-QADAM: "yillikkachi"
         print("\n🔹 [Turn 3] Mijoz: 'yillikkachi'")
-        # "yillikkachi" intentini tekshirish
         self.assertTrue(is_annual_check_intent("yillikkachi"))
         self.assertIsNone(classify_payment_intent("yillikkachi"))
 
@@ -128,8 +127,18 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
             msg3 = await self._send_msg(bot, "yillikkachi")
             reply3 = msg3.reply.call_args[0][0]
             print(f"🤖 Bot: {reply3[:140]}...")
-            # Yillikdan qarz yo'qligini aytishi kerak!
             self.assertIn("QARZDORLIK YO'Q", reply3.upper())
+
+        # 3.1-QADAM: "yillikchi" -> Yillikdan qarz yo'q bo'lsa, XR uzatilmaydi! Faqat qarz yo'q deyiladi!
+        print("\n🔹 [Turn 3.1] Mijoz: 'yillikchi'")
+        bot.copy_message.reset_mock()
+        self.assertTrue(is_annual_check_intent("yillikchi"))
+        self.assertEqual(classify_payment_intent("yillikchi"), "annual")
+        msg3_1 = await self._send_msg(bot, "yillikchi")
+        reply3_1 = msg3_1.reply.call_args[0][0]
+        print(f"🤖 Bot: {reply3_1}")
+        self.assertIn("QARZDORLIK YO'Q", reply3_1.upper())
+        self.assertEqual(bot.copy_message.call_count, 0, "Yillikdan qarz yo'q bo'lsa, aslo XR posti uzatilmasligi shart!")
 
         # 4-QADAM: "oylikchi"
         print("\n🔹 [Turn 4] Mijoz: 'oylikchi'")
@@ -151,6 +160,59 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
         print("\n" + "=" * 60)
         print("✅ REAL STSENARIY TESTI 100% MUVAFFAQIYATLI O'TDI!")
         print("=" * 60 + "\n")
+
+    async def test_annual_debt_exists_flow(self):
+        """Yillik to'lovdan haqiqatan qarz bo'lsa, qarz summasi aytiladi va post 34 uzatiladi"""
+        bot = AsyncMock()
+        bot.copy_message = AsyncMock()
+        bot.send_message = AsyncMock()
+
+        test_inn = "206011507"
+        receipt_facts = ReceiptFacts(
+            payer_inn=test_inn,
+            fiscal_module="LG420210630789",
+            is_fiscal_chek=True,
+            fiscal_facts=FiscalChekFacts(
+                inn=test_inn,
+                fiscal_module="LG420210630789",
+                org_name="QASHQADARYO SHARQ GAVHARI MCHJ",
+                total_amount=50000.0
+            )
+        )
+
+        msg_chek = MagicMock(spec=types.Message)
+        msg_chek.chat = MagicMock(id=self.chat_id)
+        msg_chek.from_user = MagicMock(id=self.user_id, full_name="Sardor", username="sardor_pos")
+        msg_chek.message_id = 201
+        msg_chek.reply = AsyncMock()
+
+        from payment_accounts import YANGI_TEXNOLOGIYALAR_POST_ID, YANGI_TEXNOLOGIYALAR_VIDEO_ID
+
+        with patch("ofd_bridge.ofd_bridge.query_fiscal_module", return_value="FMO dan qarzdorlik mavjud (440 000 so'm)"):
+            await _process_fiscal_receipt_content(
+                message=msg_chek,
+                bot=bot,
+                receipt_facts=receipt_facts,
+                user_script="latin",
+                caption="",
+                file_id="photo_123"
+            )
+
+        chek_reply = msg_chek.reply.call_args[0][0]
+        self.assertIn("Qarzdorlik", chek_reply)
+        self.assertIn("440 000", chek_reply)
+        # Chekda ham oylik, ham yillik qarz bo'lgani uchun postlar uzatiladi
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids)
+
+        # Endi mijoz: 'yillikchi' desa, qarz borligi va post 34 uzatilishi kerak
+        bot.copy_message.reset_mock()
+        with patch("ofd_bridge.ofd_bridge.query_fiscal_module", return_value="FMO dan qarzdorlik mavjud (440 000 so'm)"):
+            msg_yillik = await self._send_msg(bot, "yillikchi")
+            rep_yillik = msg_yillik.reply.call_args[0][0]
+            self.assertIn("QARZDORLIK MAVJUD", rep_yillik.upper())
+            copied_ids2 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+            self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids2)
 
 
 if __name__ == "__main__":

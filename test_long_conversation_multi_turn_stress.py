@@ -206,7 +206,7 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
 
         # Turn 2: 123 (juda qisqa noaniq raqam)
         r2 = await self._send_msg(chat_id, user_id, "123", bot)
-        self.assertTrue("inn" in r2.lower() or "raqam" in r2.lower())
+        self.assertTrue(any(w in r2.lower() for w in ["inn", "stir", "raqam", "стир", "инн", "9 xonali"]))
 
         # Turn 3: Ism orqali qarz so'rash
         r3 = await self._send_msg(chat_id, user_id, "mening nomim Jamshid korxonam qarzdorligini ko'rib ber", bot)

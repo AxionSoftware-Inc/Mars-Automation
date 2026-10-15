@@ -291,52 +291,23 @@ async def _process_fiscal_receipt_content(
 
             if status == "qarzdor" or debt_amount > 0:
                 has_monthly_debt = True
-                monthly_status_lines.append(
-                    f"⚠️ <b>Qarzdorlik mavjud:</b> <b>{debt_amount:,.0f} so'm</b>"
-                )
-                if paid_to:
-                    monthly_status_lines.append(f"📅 To'lov muddati: <b>{paid_to}</b> gacha to'langan.")
-                monthly_status_lines.append(f"💳 Mars X/R: <code>{MARS_ACCOUNT}</code>")
-            else:
-                monthly_status_lines.append("✅ <b>Qarzdorlik yo'q (To'langan).</b>")
-                if paid_to:
-                    monthly_status_lines.append(f"📅 Xizmat muddati: <b>{paid_to}</b> gacha faol.")
-        else:
-            monthly_status_lines.append(
-                f"ℹ️ СТИР: <code>{inn}</code> bo'yicha «Mars» ma'lumotlar bazasida yozuv topilmadi."
-            )
         results = excel_manager.search(inn)
         if results:
             model_summary = excel_manager.get_device_model_summary(results)
-    else:
-        monthly_status_lines.append(
-            "⚠️ <i>Chekdan СТИР (INN) aniqlanmadi. 9 xonali INN raqamingizni yuborsangiz, oylik to'lovni tekshirib beramiz.</i>"
-        )
 
     # 2. Davlat Soliq (OFD) yillik litsenziyasi holati (440 000 so'm/yil)
-    annual_status_lines = []
     has_annual_debt = False
     ofd_details = "To'langan va faol"
     if fm:
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, fm)
         if ofd_reply:
-            ofd_fmt = format_ofd_annual_status(fm, ofd_reply, user_script)
-            annual_status_lines.append(ofd_fmt)
-            if any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+            lower_ofd = ofd_reply.lower()
+            has_no_debt = any(w in lower_ofd for w in ["qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"])
+            if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan"]):
                 has_annual_debt = True
                 ofd_details = "Qarzdorlik mavjud"
             else:
                 ofd_details = "Faol"
-        else:
-            annual_status_lines.append(
-                f"📟 <b>Fiskal modul:</b> <code>{fm}</code>\n"
-                f"ℹ️ Soliq (@ofd943_bot) tizimi bilan tekshirilmoqda..."
-            )
-    else:
-        annual_status_lines.append(
-            "🏛 <i>Yillik Soliq (OFD) to'lovini tekshirish uchun kassa chekining pastki qismidagi "
-            "<b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.</i>"
-        )
 
     # Xotiraga to'liq saqlash (qarz, apparat modeli va yillik holat bilan)
     if inn:
@@ -347,44 +318,82 @@ async def _process_fiscal_receipt_content(
     user_memory.set_last_photo(chat_id, user_id, file_id)
     user_memory.set_last_topic(chat_id, user_id, "fiscal_receipt_checked")
 
-    # Xabarni chiroyli yig'ish
-    header_parts = ["🧾 <b>KASSA CHEKI MA'LUMOTLARI:</b>\n"]
+    # Xabarni qisqa, lo'nda va tushunarli yig'ish (hisob raqamlarsiz)
+    lines = ["🧾 <b>KASSA CHEKI TEKSHIRUVI:</b>\n"]
     if org_name:
-        header_parts.append(f"🏢 <b>Tashkilot:</b> {org_name}")
+        lines.append(f"🏢 <b>Korxona:</b> {org_name}")
+    meta = []
     if inn:
-        header_parts.append(f"🔢 <b>СТИР (INN):</b> <code>{inn}</code>")
+        meta.append(f"🔢 <b>СТИР:</b> <code>{inn}</code>")
     if fm:
-        header_parts.append(f"📟 <b>Fiskal modul:</b> <code>{fm}</code>")
+        meta.append(f"📟 <b>FM:</b> <code>{fm}</code>")
     if terminal_id:
-        header_parts.append(f"🆔 <b>Terminal:</b> <code>{terminal_id}</code>")
+        meta.append(f"🆔 <b>Terminal:</b> <code>{terminal_id}</code>")
+    if meta:
+        lines.append(" | ".join(meta))
+    lines.append("────────────────────")
 
-    body_parts = [
-        "\n".join(header_parts),
-        "────────────────────",
-        "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n" + "\n".join(monthly_status_lines),
-        "────────────────────",
-        "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n" + "\n".join(annual_status_lines)
-    ]
+    # 1. Oylik abonent holati
+    if inn:
+        if has_monthly_debt:
+            debt_formatted = f"{debt_amount:,.0f}".replace(",", " ")
+            lines.append(f"1️⃣ <b>«Mars» oylik abonent to'lovi:</b>\n🔴 <b>Qarzdorlik: {debt_formatted} so'm</b>")
+        else:
+            lines.append("1️⃣ <b>«Mars» oylik abonent to'lovi:</b>\n🟢 <b>Qarzdorlik yo'q (To'langan)</b>")
+    else:
+        lines.append("1️⃣ <b>«Mars» oylik to'lovi:</b> СТИР (INN) aniqlanmadi (9 xonali INN raqamingizni yuborsangiz tekshirib beramiz)")
 
-    if has_monthly_debt and not has_annual_debt:
-        body_parts.append(
-            "\n💡 <i>Oylik to'lovni Click orqali to'lash uchun «oylik to'layman» deb yozishingiz mumkin.</i>"
-        )
-    elif has_annual_debt and not has_monthly_debt:
-        body_parts.append(
-            "\n💡 <i>Yillik Soliq to'lovini to'lash uchun «yillik to'layman» deb yozishingiz mumkin.</i>"
-        )
-    elif has_monthly_debt and has_annual_debt:
-        body_parts.append(
-            "\n💡 <i>To'lov rekvizitlarini olish uchun «to'lov rekvizitlari» yoki «to'layman» deb yozing.</i>"
-        )
+    lines.append("────────────────────")
 
-    final_text = adapt_to_user_script("\n".join(body_parts), user_script)
+    # 2. Yillik Soliq (OFD) holati
+    if fm:
+        if has_annual_debt:
+            lines.append("2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n🔴 <b>Qarzdorlik mavjud: 440 000 so'm</b>")
+        else:
+            lines.append("2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n🟢 <b>Qarzdorlik yo'q (Litsenziya muddati faol)</b>")
+    else:
+        lines.append("2️⃣ <b>Davlat Soliq (OFD) to'lovi:</b>\n<i>Fiskal modul seriya raqami aniqlanmadi. Yillik to'lovni tekshirish uchun Fiskal modul seriya raqamini (LG..., YG...) yuboring.</i>")
+
+    final_text = adapt_to_user_script("\n".join(lines), user_script)
 
     try:
         await message.reply(final_text, parse_mode="HTML")
     except Exception:
         await message.reply(final_text)
+
+    # Qarz bo'lsa hisob raqamni matnda yozmasdan, kanaldan rasmiy post uzatiladi
+    if has_monthly_debt:
+        from payment_accounts import MARS_POST_ID, MARS_VIDEO_ID
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=MARS_POST_ID,
+                reply_to_message_id=message.message_id
+            )
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=MARS_VIDEO_ID
+            )
+        except Exception as e:
+            logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
+
+    if has_annual_debt:
+        from payment_accounts import YANGI_TEXNOLOGIYALAR_POST_ID, YANGI_TEXNOLOGIYALAR_VIDEO_ID
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=YANGI_TEXNOLOGIYALAR_POST_ID
+            )
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+            )
+        except Exception as e:
+            logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
 
     user_memory.add_user_message(chat_id, user_id, f"[Kassa cheki] {caption}".strip())
     user_memory.add_assistant_message(chat_id, user_id, final_text)

@@ -63,7 +63,10 @@ ASOSIY BILIMLAR VA QOIDALAR:
    - Tasnif: MXIK kodlarni tasnif.soliq.uz saytidan qidirib topish mumkin. [VIDEO:28]
    - Kassa apparatiga kiritish: Kassa menyusida «Tovar qo'shish» bo'limida 17 xonali kod biriktiriladi. [VIDEO:15]
    - Soliq jarimasi: Noto'g'ri MXIK kod uchun soliq organlari jarima qo'llaydi, kodlar tekshirib borilishi lozim. [VIDEO:17]
-   - Cheklov: Zapravkalar, alkogol, tamaki va davlat xizmatlari MXIK kodi bilan naqd pulga savdo qilib bo'lmaydi, dastur yangilanishi kerak. [VIDEO:133]
+6. QAT'IY QOIDA — HISOB RAQAMLARINI (20 XONALI SONLARNI) ASLO MATNDA YOZMANG:
+   - Hech qachon javob matnida 20 xonali bank hisob raqamini (20208... yoki 20210...) qo'lda yozib chiqmang!
+   - Hisob raqam so'ralsa yoki to'lov qilmoqchi bo'lsa, oylik to'lov uchun [VIDEO:148], yillik to'lov uchun [VIDEO:145] tegi bilan qisqa javob bering, tizim kanaldan rasmiy postlarni uzatadi.
+   - Agar kontekstda yillik litsenziyadan qarz yo'q bo'lsa va mijoz "yillikchi" yoki "yillikka qarzim bormi" deb so'rasa: "Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q (litsenziya faol)" deb ayting, to'lov videosi yoki postini chaqirmang!
 
 SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
 

@@ -280,11 +280,12 @@ def classify_payment_intent(text: str) -> Optional[str]:
     """
     t = text.lower().strip()
 
-    # Agar savol qarz/tekshirish/muddat/sana yoki davomiy qarz so'rovi ("-chi", "-kachi") bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
+    # Agar savol qarz/tekshirish/muddat/sana yoki davomiy qarz so'rovi ("-kachi", "-danchi") bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
     if any(w in t for w in [
         "qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat",
         "qachongacha", "qachon", "yillikkachi", "yilikkachi", "oylikkachi", "yillikdanchi", "oylikdanchi",
-        "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи", "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"
+        "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи",
+        "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"
     ]):
         if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "шот", "реквизит", "ҳисоб"]):
             return None
@@ -409,12 +410,13 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
     
-    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "fiskaldanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "yillikchi?", "fiskaldanchi?")
     followup_words = [
         "yillikdanchi", "yilikdanchi", "yillikkachi", "yilikkachi", "yillikgachi",
+        "yillikchi", "yilikchi", "yillik-chi", "yilik-chi",
         "fiskaldanchi", "soliqdanchi", "fiskalgachi", "soliqgachi",
         "ofddanchi", "fmodanchi",
-        "йилликданчи", "йилликкачи", "фискалданчи", "солиқданчи", "офдданчи"
+        "йилликданчи", "йилликкачи", "йилликчи", "фискалданчи", "солиқданчи", "офдданчи"
     ]
     if any(w in t for w in followup_words):
         return True
@@ -456,11 +458,12 @@ def is_monthly_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
 
-    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "marsdanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "oylikchi?", "marsdanchi?")
     followup_words = [
         "oylikdanchi", "oylikdanam", "oylikdan-chi", "oylikkachi", "oylikgachi",
+        "oylikchi", "oylik-chi",
         "marsdanchi", "abonentdanchi",
-        "ойликданчи", "ойликкачи", "ойликданам", "марсданчи", "абонентданчи"
+        "ойликданчи", "ойликкачи", "ойликчи", "ойликданам", "марсданчи", "абонентданчи"
     ]
     if any(w in t for w in followup_words):
         return True
@@ -628,17 +631,14 @@ def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str 
         res = (
             f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
             f"{code_label}\n"
-            f"📋 <b>OFD tizimi xabari:</b>\n<i>{clean_summary}</i>\n\n"
             f"💰 <b>To'lov summasi:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
-            f"💳 <b>To'lash uchun:</b> <b>«To'layman»</b> yoki <b>«Shot raqam»</b> deb yozing, to'lov rekvizitlarini yuboraman."
+            f"💳 <i>To'lov uchun rekvizitlar quyida kanaldan uzatildi (yoki «To'layman» deb yozing).</i>"
         )
     else:
         res = (
             f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
             f"{code_label}\n"
-            f"✅ <b>OFD holati:</b>\n<i>{clean_summary}</i>\n\n"
-            f"ℹ️ Kassa apparatingiz Davlat Soliq Qo'mitasi (OFD) bazasida faol holatda va yillik to'lov muddati joyida.\n\n"
-            f"📌 Agar apparat chek urmayotgan bo'lsa, internet (Wi-Fi/SIM) va soat/sanani tekshirib, apparatni o'chirib yoqing (Reboot)."
+            f"✅ <b>Holati:</b> To'langan va faol (Litsenziya muddati joyida)."
         )
 
     return adapt_to_user_script(res, script)

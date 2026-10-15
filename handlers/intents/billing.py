@@ -56,8 +56,9 @@ class BillingIntentHandler:
         chat_id = message.chat.id
         last_topic = user_memory.get_last_topic(chat_id, user_id)
 
-        # 0.9 Chala yoki noto'g'ri kiritilgan INN (masalan: "INN 12345")
-        if is_incomplete_inn_text(text):
+        # 0.9 Chala yoki noto'g'ri kiritilgan INN (masalan: "INN 12345" yoki faqat 1..8 xonali raqam "123")
+        is_short_digits = text.isdigit() and 1 <= len(text) <= 8 and not extract_fiscal_module(text)
+        if is_incomplete_inn_text(text) or is_short_digits:
             incomplete_msg = (
                 "⚠️ <b>Kiritilgan СТИР (INN) raqami to'liq emas.</b>\n\n"
                 "Korxona INN raqami <b>9 xonali</b> (yoki JSHSHIR 14 xonali) bo'lishi kerak.\n"
@@ -262,6 +263,40 @@ class BillingIntentHandler:
                 return True
 
             elif is_ann_pay:
+                ann_st = user_memory.get_annual_status(chat_id, user_id)
+                is_explicit_acc_ask = any(w in lower_text for w in [
+                    "shot", "rekvizit", "hisob", "xisob", "kartasi", "karta", "to'lash uchun", "tolash uchun",
+                    "to'lashga", "tolashga", "шот", "реквизит", "ҳисоб", "счёт", "счет"
+                ])
+                # Agar mijoz shunchaki "yillikchi" yoki "yillik" deb so'ragan bo'lsa va xotirada yillikdan qarz yo'qligi ma'lum bo'lsa:
+                if ann_st and not ann_st.get("has_debt") and not is_explicit_acc_ask:
+                    clear_msg = "🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol)"
+                    clear_msg = adapt_to_user_script(clear_msg, user_script)
+                    try:
+                        await message.reply(clear_msg, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(clear_msg)
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, clear_msg)
+                    user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+                    return True
+
+                if ann_st and ann_st.get("has_debt") and not is_explicit_acc_ask:
+                    target_fm = user_memory.get_last_fm(chat_id, user_id)
+                    fm_line = f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n" if target_fm else ""
+                    debt_msg = (
+                        f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
+                        f"{fm_line}"
+                        f"💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
+                        f"💳 <i>To'lov rekvizitlari quyida kanaldan uzatildi:</i>"
+                    )
+                    debt_msg = adapt_to_user_script(debt_msg, user_script)
+                    try:
+                        await message.reply(debt_msg, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(debt_msg)
+                    user_memory.add_assistant_message(chat_id, user_id, debt_msg)
+
                 try:
                     await bot.copy_message(
                         chat_id=message.chat.id,
@@ -288,29 +323,88 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
                 return True
 
-        # 3. Yillik qarz tekshiruvi ("yillik qarzim bormi", "ofd tekshir", "yillikdanchi")
+        # 3. Yillik qarz tekshiruvi ("yillik qarzim bormi", "ofd tekshir", "yillikdanchi", "yillikchi")
         if is_annual_check_intent(text):
+            ann_st = user_memory.get_annual_status(chat_id, user_id)
             target_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
+
+            # Agar xotirada yillikdan qarz yo'qligi allaqachon ma'lum bo'lsa va yangi FM kiritilmagan bo'lsa:
+            if ann_st and not ann_st.get("has_debt") and not found_fm:
+                clear_msg = "🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol)"
+                clear_msg = adapt_to_user_script(clear_msg, user_script)
+                try:
+                    await message.reply(clear_msg, parse_mode="HTML")
+                except Exception:
+                    await message.reply(clear_msg)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, clear_msg)
+                user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+                return True
+
             if target_fm:
                 ofd_reply = await ofd_bridge.query_fiscal_module(bot, target_fm)
-                ofd_text = format_ofd_annual_status(target_fm, ofd_reply, user_script)
-                try:
-                    await message.reply(ofd_text, parse_mode="HTML")
-                except Exception:
-                    await message.reply(ofd_text)
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, ofd_text)
-                if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+                has_ann_debt = False
+                if ofd_reply:
+                    lower_ofd = ofd_reply.lower()
+                    has_no_debt = any(w in lower_ofd for w in ["qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"])
+                    if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan"]):
+                        has_ann_debt = True
+
+                user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details="Qarzdorlik" if has_ann_debt else "Faol")
+
+                if has_ann_debt:
+                    ofd_text = (
+                        f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
+                        f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
+                        f"💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
+                        f"💳 <i>To'lov rekvizitlari quyida kanaldan uzatildi:</i>"
+                    )
+                    ofd_text = adapt_to_user_script(ofd_text, user_script)
+                    try:
+                        await message.reply(ofd_text, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(ofd_text)
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, ofd_text)
                     user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
-                elif ofd_reply and "faol" in ofd_reply.lower():
+
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
+                            reply_to_message_id=message.message_id
+                        )
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+                        )
+                    except Exception as e:
+                        logger.warning(f"Post 34 nusxalashda xatolik: {e}")
+                    return True
+                else:
+                    # QARZ YO'Q! Hisob raqam uzatilmaydi!
+                    ofd_text = (
+                        f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
+                        f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
+                        f"✅ <b>Holati:</b> To'langan va faol (Litsenziya muddati joyida)."
+                    )
+                    ofd_text = adapt_to_user_script(ofd_text, user_script)
+                    try:
+                        await message.reply(ofd_text, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(ofd_text)
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, ofd_text)
                     user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
-                return True
+                    return True
             else:
                 # OFD tizimi faqat Fiskal modul (LG/YG/UZ) bilan ishlaydi, INN bilan emas
                 fm_prompt = (
                     "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
                     "OFD tizimi faqat <b>Fiskal modul seriya raqami</b> orqali tekshiriladi (STIR/INN bilan tekshirib bo'lmaydi).\n\n"
-                    "Iltimos, kassa chekining eng pastki qismidagi (yoki apparat orqasidagi) "
+                    "Iltimos, kassa chekining eng pastki qismidagi "
                     "<b>Fiskal modul seriya raqamini (masalan: <code>LG...</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring."
                 )
                 fm_prompt = adapt_to_user_script(fm_prompt, user_script)
