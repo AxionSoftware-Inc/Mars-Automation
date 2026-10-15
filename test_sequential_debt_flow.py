@@ -136,18 +136,12 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("QARZDORLIK MAVJUD", reply5)
         self.assertIn("440 000 so'm", reply5)
 
-        # 6-qadam: to'layman
+        # 6-qadam: to'layman -> Post 34 va Video 145 kanaldan uzatiladi
         msg6 = create_mock_message("to'layman", chat_id, user_id)
         await handle_user_chat(msg6, bot)
-        reply6 = msg6.reply.call_args[0][0]
-        self.assertIn("20210000100431200010", reply6)
-        self.assertIn("Yangi Texnologiyalar", reply6)
-        # Click yillik video 145 nusxalanganini tekshirish
-        bot.copy_message.assert_called_with(
-            chat_id=chat_id,
-            from_chat_id=-1001641871516,
-            message_id=145
-        )
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids)   # Yangi Texnologiyalar post 34
+        self.assertIn(145, copied_ids)  # Click yillik video 145
 
     def test_04_reverse_order_remembered_inn(self):
         """Oldin INN ma'lum bo'lsa, 'oylikdanchi' deb so'raganda qayta INN so'ramay darhol tekshirishi kerak"""

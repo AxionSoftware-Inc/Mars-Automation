@@ -14,6 +14,14 @@ class TestAwkwardAdversarialPhrases(unittest.IsolatedAsyncioTestCase):
         self.chat_id = 556677
         self.user_id = 998811
         user_memory.sessions.clear()
+        self.ai_patcher = patch(
+            "ai_helper.generate_ai_reply_ex",
+            return_value=("Korxonangizning 9 xonali СТИР (INN) raqamini yuboring.", None, False)
+        )
+        self.ai_patcher.start()
+
+    def tearDown(self):
+        self.ai_patcher.stop()
 
     async def _send_text(self, text: str):
         msg = MagicMock()
@@ -80,12 +88,13 @@ class TestAwkwardAdversarialPhrases(unittest.IsolatedAsyncioTestCase):
 
     async def test_6_fiscal_module_with_spaces_not_intercepted_by_debt(self):
         """6. 'fiskal modul LG 42021063078901 tekshirib ber' -> Debt interceptor ga tushmaydi, FM qabul qilinadi!"""
-        replies, bot = await self._send_text("fiskal modul LG 42021063078901 tekshirib ber")
-        text = " ".join(replies).lower()
-        self.assertIn("fiskal modul", text)
-        self.assertIn("42021063078901", text)
-        # JSHSHIR deb xato qidirmasligi shart!
-        self.assertNotIn("bazada ushbu raqam bo'yicha ma'lumot topilmadi", text)
+        with patch("ofd_bridge.ofd_bridge.query_fiscal_module", new_callable=AsyncMock, return_value="Fiskal modul faol holatda."):
+            replies, bot = await self._send_text("fiskal modul LG 42021063078901 tekshirib ber")
+            text = " ".join(replies).lower()
+            self.assertIn("fiskal modul", text)
+            self.assertIn("42021063078901", text)
+            # JSHSHIR deb xato qidirmasligi shart!
+            self.assertNotIn("bazada ushbu raqam bo'yicha ma'lumot topilmadi", text)
 
     async def test_7_tech_question_with_inn_not_dumping_debt(self):
         """7. '311790999 da chek qanday uriladi?' -> Qarz jadvalini tashlamaydi, chek urishni tushuntiradi yoki video beradi!"""

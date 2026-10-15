@@ -132,12 +132,9 @@ class TestAnnualOFDFlow(unittest.TestCase):
         msg3.reply = AsyncMock()
 
         await handle_user_chat(msg3, bot)
-        self.assertTrue(msg3.reply.called)
-        reply3_text = msg3.reply.call_args[0][0]
-        self.assertIn("20210000100431200010", reply3_text)
-        self.assertIn("Yangi Texnologiyalar", reply3_text)
-        self.assertTrue(bot.copy_message.called)
-        self.assertEqual(bot.copy_message.call_args[1]["message_id"], 145)
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids)   # Post 34
+        self.assertIn(145, copied_ids)  # Video 145
 
     def test_04_full_chat_flow(self):
         asyncio.run(self._async_test_full_chat_flow())

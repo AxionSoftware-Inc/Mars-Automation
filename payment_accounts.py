@@ -233,9 +233,9 @@ def classify_payment_intent(text: str) -> Optional[str]:
     """
     t = text.lower().strip()
 
-    # Agar savol qarz/tekshirish bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
-    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
-        if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "шот", "реквизит"]):
+    # Agar savol qarz/tekshirish/muddat/sana bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
+    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat", "qachongacha", "қачонгача", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"]):
+        if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "шот", "реквизит", "ҳисоб"]):
             return None
 
     # Yillik to'lov alomatlari (Lotin va Kirill)
@@ -337,6 +337,11 @@ def classify_receipt_target(recipient_account: str, amount: float, raw_text: str
 def is_annual_check_intent(text: str) -> bool:
     """Foydalanuvchi yillik to'lov yoki fiskal modul (OFD/Soliq) qarzdorligini tekshirishni so'rayaptimi?"""
     t = text.lower().strip()
+
+    # Agar aniq hisob raqam / shot so'ralayotgan bo'lsa va tekshirish/qarz so'zi bo'lmasa -> bu to'lov kartasi so'rovi!
+    if any(w in t for w in ["shot", "shotini", "rekvizit", "hisob raqam", "xisob", "шот", "реквизит", "ҳисоб"]):
+        if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
+            return False
     
     # Tezkor davomiy iboralar ("yillikdanchi?", "fiskalchi?", "yillikchi?")
     followup_words = [
@@ -370,6 +375,7 @@ def is_annual_check_intent(text: str) -> bool:
     has_action = any(w in t for w in [
         "tekshir", "kurib", "ko'rib", "korib", "qarz", "bormi", "muddat", "holat",
         "to'lov", "tolov", "tulov", "qayta", "qancha", "xabar", "ma'lumot", "malumot",
+        "tugaydi", "tugash", "tugagan",
         "провер", "текшир", "қарз", "карз", "борми", "муддат", "ҳолат", "холат", "тўлов", "толов"
     ])
     return has_target and has_action
@@ -378,6 +384,11 @@ def is_annual_check_intent(text: str) -> bool:
 def is_monthly_check_intent(text: str) -> bool:
     """Foydalanuvchi oylik abonent to'lovi (Mars) qarzdorligini tekshirishni so'rayaptimi?"""
     t = text.lower().strip()
+
+    # Agar aniq hisob raqam / shot so'ralayotgan bo'lsa va tekshirish/qarz so'zi bo'lmasa -> bu to'lov kartasi so'rovi!
+    if any(w in t for w in ["shot", "shotini", "rekvizit", "hisob raqam", "xisob", "шот", "реквизит", "ҳисоб"]):
+        if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
+            return False
 
     # Tezkor davomiy iboralar ("oylikdanchi?", "oylikchi?", "marsdanchi?")
     followup_words = [

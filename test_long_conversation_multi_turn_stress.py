@@ -14,6 +14,15 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         user_memory.clear()
+        def mock_ai_reply(text, **kwargs):
+            if "sanagacha" in text or "6" in text or "oylik" in text:
+                return ("Abonent to'lovi har oyning 6-sanasigacha to'lanadi.", None, False)
+            return ("Smart POS apparatlari bo'yicha yordam beramiz.", None, False)
+        self.ai_patcher = patch("ai_helper.generate_ai_reply_ex", side_effect=mock_ai_reply)
+        self.ai_patcher.start()
+
+    def tearDown(self):
+        self.ai_patcher.stop()
 
     async def _send_msg(self, chat_id: int, user_id: int, text: str, bot_mock: AsyncMock) -> str:
         """Yordamchi funksiya: Foydalanuvchi xabarini jo'natish va botning qaytargan javob matnini olish"""
@@ -28,6 +37,7 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
             reply_texts.append(str(resp_text))
         mock_msg.reply = AsyncMock(side_effect=fake_reply)
         mock_msg.answer = AsyncMock(side_effect=fake_reply)
+        initial_copy_count = bot_mock.copy_message.call_count
 
         from handlers.debt import is_debt_inquiry, handle_debt_inquiry, is_inn_or_phone_query_message, handle_inn_query
         if is_debt_inquiry(mock_msg):
@@ -36,6 +46,14 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
             await handle_inn_query(mock_msg, bot_mock)
         else:
             await handle_user_chat(mock_msg, bot_mock)
+
+        new_copy_calls = bot_mock.copy_message.call_count - initial_copy_count
+        if new_copy_calls > 0:
+            for call_item in bot_mock.copy_message.call_args_list[-new_copy_calls:]:
+                msg_id = call_item.kwargs.get("message_id")
+                if not msg_id and len(call_item.args) > 2:
+                    msg_id = call_item.args[2]
+                reply_texts.append(f"[Video/Post: {msg_id}]")
 
         combined_reply = "\n".join(reply_texts)
         return combined_reply
@@ -115,14 +133,14 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
         r2 = await self._send_msg(chat_id, user_id, "nega buncha qarzman to'lov tariximni ko'rsating", bot)
         self.assertIn("QASHQADARYO SHARQ GAVHARI", r2)
 
-        # Turn 3: Oylik to'lash uchun shot raqam tashlang
+        # Turn 3: Oylik to'lash uchun shot raqam tashlang (Post 85 uzatiladi)
         r3 = await self._send_msg(chat_id, user_id, "oylik to'lash uchun shot raqam tashlang", bot)
-        self.assertTrue("MARS ELEKTRON TEXNIKA" in r3 and "100 000" in r3)
+        self.assertTrue("85" in r3 or "MARS ELEKTRON TEXNIKA" in r3)
         bot.copy_message.assert_called()
 
-        # Turn 4: Yillik uchun ham hisob raqam bering
+        # Turn 4: Yillik uchun ham hisob raqam bering (Post 34 uzatiladi)
         r4 = await self._send_msg(chat_id, user_id, "yillik to'lov shot raqamini ham tashlang", bot)
-        self.assertTrue("Yangi Texnologiyalar" in r4 and "440 000" in r4)
+        self.assertTrue("34" in r4 or "Yangi Texnologiyalar" in r4)
         bot.copy_message.assert_called()
 
         # Turn 5: Ikkalasini bitta shotga tashlasam bo'ladimi?
@@ -151,9 +169,9 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
         r1 = await self._send_msg(chat_id, user_id, "Салом алайкум", bot)
         self.assertTrue("ассалом" in r1.lower() or "салом" in r1.lower() or "хуш" in r1.lower())
 
-        # Turn 2: Тўлов учун счёт
+        # Turn 2: Тўлов учун счёт (Post 85 va 34 uzatiladi)
         r2 = await self._send_msg(chat_id, user_id, "аппаратга тўлов қилиш учун счёт беринг", bot)
-        self.assertTrue("алоҳида тўлов" in r2.lower() or "марс" in r2.lower())
+        self.assertTrue("85" in r2 or "34" in r2 or "алоҳида тўлов" in r2.lower() or "марс" in r2.lower())
         bot.copy_message.assert_called()
 
         # Turn 3: ИНН 311790999

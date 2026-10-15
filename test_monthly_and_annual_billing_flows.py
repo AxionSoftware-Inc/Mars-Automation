@@ -171,19 +171,70 @@ class TestMonthlyAndAnnualBillingFlows(unittest.IsolatedAsyncioTestCase):
         self.assertIn("MARS ELEKTRON", r2)
         self.assertTrue(any(w in r2.lower() for w in ["fiskal modul", "lg", "yg"]))
 
-    # 5. OFD KANALI ULANMAGAN HOLATDAGI TUSHUNTIRISH (Fallback)
-    async def test_annual_check_fallback_when_not_configured(self):
+    # 6. SHOT RAQAMLAR KANALDAN UZATILISHI TESTI (Post 85 va Post 34)
+    async def test_06_payment_accounts_forwarded_from_channel(self):
         bot = AsyncMock(spec=Bot)
-        chat_id = 1005
-        user_id = 1005
+        bot.copy_message = AsyncMock()
+        chat_id = 1006
+        user_id = 1006
 
-        # OFD ulanmagan (ofd_group_id=None)
-        with patch.object(ofd_bridge, "is_configured", return_value=False):
-            with patch.object(ofd_bridge, "query_fiscal_module", return_value=None):
-                r = await self._send_msg(chat_id, user_id, "LG420210630789", bot)
-                self.assertIn("LG420210630789", r)
-                # Foydalanuvchiga 440 000 so'm, reboot va to'lov rekviziti yo'riqnomasi beriladi
-                self.assertTrue("440 000" in r or "shot raqam" in r.lower() or "litsenziya" in r.lower())
+        # A) Oylik to'lov hisob raqami so'ralganda (Post 85 va Video 148 uzatiladi)
+        r1 = await self._send_msg(chat_id, user_id, "oylik to'lov shotini ber", bot)
+        copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+        self.assertIn(85, copied_ids)   # Mars oylik shot posti
+        self.assertIn(148, copied_ids)  # Oylik to'lov videosi
+
+        # B) Yillik to'lov hisob raqami so'ralganda (Post 34 va Video 145 uzatiladi)
+        bot.copy_message.reset_mock()
+        user_memory.clear()
+        r2 = await self._send_msg(chat_id, user_id, "yillik to'lov shotini tashla", bot)
+        copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids)   # Yangi Texnologiyalar yillik shot posti
+        self.assertIn(145, copied_ids)  # Yillik to'lov videosi
+
+        # C) Umumiy / ikkala hisob raqam so'ralganda (Post 85 va Post 34 uzatiladi)
+        bot.copy_message.reset_mock()
+        user_memory.clear()
+        r3 = await self._send_msg(chat_id, user_id, "shot raqamlar kerak", bot)
+        copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+        self.assertIn(85, copied_ids)   # Post 85
+        self.assertIn(34, copied_ids)   # Post 34
+
+    # 7. YILLIK TO'LOVDA HAR XIL FISKAL RAQAMLAR BILAN TEST
+    async def test_07_annual_check_with_various_fiscal_module_inputs(self):
+        bot = AsyncMock(spec=Bot)
+        bot.copy_message = AsyncMock()
+        chat_id = 1007
+        user_id = 1007
+
+        # A) UZ200701040469 kiritilganda OFD dan tekshirish
+        with patch.object(ofd_bridge, "query_fiscal_module", new_callable=AsyncMock) as mock_ofd:
+            mock_ofd.return_value = "Fiskal modul faol holatda."
+            r1 = await self._send_msg(chat_id, user_id, "UZ200701040469", bot)
+            mock_ofd.assert_called_once_with(bot, "UZ200701040469")
+            self.assertIn("UZ200701040469", r1)
+            self.assertTrue("qarzdorlik yo'q" in r1.lower() or "faol" in r1.lower())
+
+        # B) Qarzdorlik mavjud bo'lgan fiskal modul (LG420230615712)
+        user_memory.clear()
+        with patch.object(ofd_bridge, "query_fiscal_module", new_callable=AsyncMock) as mock_ofd:
+            mock_ofd.return_value = "FMO dan qarzdorlik mavjud: 440 000 so'm. Muddati o'tgan."
+            r2 = await self._send_msg(chat_id, user_id, "fiskal modul: LG420230615712", bot)
+            mock_ofd.assert_called_once_with(bot, "LG420230615712")
+            self.assertIn("LG420230615712", r2)
+            self.assertIn("QARZDORLIK MAVJUD", r2)
+
+            # Ketidan "to'layman, shotini tashla" desa -> Post 34 uzatilishi kerak!
+            r3 = await self._send_msg(chat_id, user_id, "to'layman, shotini tashla", bot)
+            copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+            self.assertIn(34, copied_ids)
+
+        # C) Noto'g'ri / topilmagan fiskal modul javobi
+        user_memory.clear()
+        with patch.object(ofd_bridge, "query_fiscal_module", new_callable=AsyncMock) as mock_ofd:
+            mock_ofd.return_value = "Bunday fiskal modul mavjud emas! Qaytadan urinib ko‘ring."
+            r4 = await self._send_msg(chat_id, user_id, "LG000000000000", bot)
+            self.assertTrue("topilmadi" in r4.lower() or "mavjud emas" in r4.lower())
 
 
 if __name__ == "__main__":

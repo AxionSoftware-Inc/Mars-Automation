@@ -231,12 +231,6 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, "34-post kanaldan uzatilishi kerak")
         self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, "145-video kanaldan uzatilishi kerak")
 
-        # Qo'shimcha tushuntirish yozuvi
-        self.assertTrue(len(msg.replies) > 0)
-        note = msg.replies[0]
-        self.assertIn("Yangi Texnologiyalar", note)
-        self.assertIn("440 000 so'm", note)
-
     async def test_chat_handler_oylik_shot_query(self):
         bot = create_mock_bot()
         user = MockUser(22222, "Olim")
@@ -249,12 +243,6 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(MARS_POST_ID, copied_ids, "85-post kanaldan uzatilishi kerak")
         self.assertIn(MARS_VIDEO_ID, copied_ids, "148-video kanaldan uzatilishi kerak")
-
-        # Qo'shimcha tushuntirish yozuvi
-        self.assertTrue(len(msg.replies) > 0)
-        note = msg.replies[0]
-        self.assertIn("MARS ELEKTRON TEXNIKA", note)
-        self.assertIn("100 000 so'm", note)
 
     async def test_chat_handler_mxik_query(self):
         bot = create_mock_bot()

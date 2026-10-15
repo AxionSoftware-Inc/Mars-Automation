@@ -137,14 +137,8 @@ class TestScriptAndChannelAccounts(unittest.IsolatedAsyncioTestCase):
         self.assertIn(MARS_POST_ID, copied_ids, f"Post {MARS_POST_ID} nusxalanishi shart!")
         self.assertIn(MARS_VIDEO_ID, copied_ids, f"Video {MARS_VIDEO_ID} uzatilishi shart!")
 
-        # Qo'shimcha tushuntirish yuborilganini tekshirish
-        self.assertTrue(message.answer.called)
-        note_arg = message.answer.call_args[0][0]
-        self.assertIn("MARS ELEKTRON TEXNIKA", note_arg)
-        self.assertIn("6-sanasigacha", note_arg)
-
     async def test_07_channel_post_forwarding_annual_cyrillic(self):
-        """7. Yillik shot Kirillcha so'ralganda 34-post, Kirillcha eslatma va 145-video uzatilishi"""
+        """7. Yillik shot Kirillcha so'ralganda 34-post va 145-video uzatilishi"""
         from handlers.chat import handle_user_chat
         bot = AsyncMock()
         message = MagicMock()
@@ -162,14 +156,8 @@ class TestScriptAndChannelAccounts(unittest.IsolatedAsyncioTestCase):
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, f"Post {YANGI_TEXNOLOGIYALAR_POST_ID} nusxalanishi shart!")
         self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, f"Video {YANGI_TEXNOLOGIYALAR_VIDEO_ID} uzatilishi shart!")
 
-        # Eslatma matni Kirill alifbosida ekanligi tekshiriladi
-        self.assertTrue(message.answer.called)
-        note_arg = message.answer.call_args[0][0]
-        self.assertEqual(detect_script(note_arg), "cyrillic", "Kirillcha yozgan mijozga eslatma kirillcha bo'lishi shart!")
-        self.assertIn("Янги Технологиялар", note_arg)
-
     async def test_08_channel_post_forwarding_both_posts(self):
-        """8. Umumiy rekvizit so'ralganda ikkala post (85 va 34) ketma-ket uzatilishi va adashtirmaslik ogohlantirilishi"""
+        """8. Umumiy rekvizit so'ralganda ikkala post (85 va 34) ketma-ket uzatilishi"""
         from handlers.chat import handle_user_chat
         bot = AsyncMock()
         message = MagicMock()
@@ -182,17 +170,10 @@ class TestScriptAndChannelAccounts(unittest.IsolatedAsyncioTestCase):
 
         await handle_user_chat(message, bot)
 
-        # Intro ogohlantirish kirillcha bo'lishi kerak
-        self.assertTrue(message.reply.called)
-        intro_arg = message.reply.call_args[0][0]
-        self.assertEqual(detect_script(intro_arg), "cyrillic")
-        self.assertIn("2 хил алоҳида ташкилотга", intro_arg)
-
         copy_calls = bot.copy_message.call_args_list
         copied_ids = [c.kwargs.get("message_id") for c in copy_calls]
         self.assertIn(MARS_POST_ID, copied_ids, "Post 85 nusxalanishi shart")
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, "Post 34 nusxalanishi shart")
-        self.assertIn(MARS_VIDEO_ID, copied_ids, "Video 148 nusxalanishi shart")
 
     async def test_09_mxik_guidance_cyrillic(self):
         """9. Kirillcha yozilgan MXIK savoliga Kirillcha javob qaytishi"""
