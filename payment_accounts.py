@@ -152,17 +152,12 @@ def get_both_posts_intro(script: str = "latin") -> str:
 
 
 def get_fiscal_module_request_prompt(script: str = "latin") -> str:
-    """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va namuna post haqida ko'rsatma"""
+    """Yillik to'lovni tekshirish uchun Fiskal modul so'rash"""
     from translit_manager import adapt_to_user_script
     text = (
         "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
-        "⚠️ <b>MUHIM QOIDA:</b> Yillik Soliq (OFD) to'lovini <b>СТИР (INN) raqami bilan tekshirib bo'lmaydi!</b>\n"
-        "Chunki Davlat Soliq tizimida bitta korxonaning bir nechta apparati bo'lishi mumkin va yillik litsenziya faqat apparatning o'ziga xos <b>Fiskal modul seriya raqami</b> orqali tekshiriladi.\n\n"
-        "Iltimos, aynan o'sha muammoli apparatingizdan chiqarilgan kassa chekining eng pastki qismidagi "
-        "<b>Fiskal modul seriya raqamini (masalan: <code>LG420210630789</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring.\n\n"
-        "📸 <i>Kassa chekidan namuna rasmi quyidagi postda ko'rsatilgan.</i>\n\n"
-        "💡 <b>Agar chekdan raqamni topolmasangiz:</b>\n"
-        "Muammoli apparatingiz chekining eng pastki qismini <b>tiniq rasmga olib shu yerga tashlang</b> — botimiz Fiskal modul raqamini o'zi avtomatik o'qib oladi va tekshirib beradi!"
+        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (masalan: <code>LG420210630789</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring.\n\n"
+        "💡 <i>Chekdan topolmasangiz, chekning pastki qismini rasmga olib tashlang (namuna quyidagi postda).</i>"
     )
     return adapt_to_user_script(text, script)
 

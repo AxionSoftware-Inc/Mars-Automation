@@ -135,10 +135,8 @@ class BillingIntentHandler:
                 await process_and_send_debt_result(message, bot, remembered_id)
                 if is_both and not remembered_fm:
                     fm_ask = (
-                        "🏛 <b>Yillik Soliq (OFD) qarzdorligini ham tekshirish uchun:</b>\n\n"
-                        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.\n\n"
-                        "📸 <i>Kassa chekidan namuna quyidagi postda ko'rsatilgan.</i>\n"
-                        "💡 <b>Agar topolmasangiz:</b> Chekning eng pastki qismini <b>tiniq rasmga olib shu yerga tashlang</b> — botimiz o'zi o'qib oladi!"
+                        "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun:</b>\n\n"
+                        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG...)</b> yuboring yoki chekni rasmga olib tashlang."
                     )
                     fm_ask = adapt_to_user_script(fm_ask, user_script)
                     try:
@@ -175,12 +173,9 @@ class BillingIntentHandler:
                 return True
             else:
                 both_ask = (
-                    "🔍 <b>Smart POS kassa apparatlarida 2 xil to'lov tekshiriladi:</b>\n\n"
-                    "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
-                    "Tekshirish uchun korxonangiz <b>СТИР (INN)</b> raqamini yuboring;\n\n"
-                    "2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi (440 000 so'm/yil):</b>\n"
-                    "Tekshirish uchun kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG...)</b> yuboring.\n\n"
-                    "<i>Qaysi birini tekshirmoqchi bo'lsangiz, raqamini yuboring.</i>"
+                    "🔍 <b>To'lovni tekshirish:</b>\n\n"
+                    "🔹 <b>Oylik abonent to'lovi:</b> Korxona <b>СТИР (INN)</b> raqamini yuboring;\n"
+                    "🔹 <b>Yillik Soliq (OFD) to'lovi:</b> Kassa chekidagi <b>Fiskal modul raqamini (LG..., YG...)</b> yuboring yoki chekni rasmga olib tashlang."
                 )
                 both_ask = adapt_to_user_script(both_ask, user_script)
                 try:
@@ -502,10 +497,8 @@ class BillingIntentHandler:
                 return True
             else:
                 ask_inn = (
-                    "🏢 <b>«Mars» oylik abonent to'lovidan qarzdorlikni tekshirish:</b>\n\n"
-                    "⚠️ <b>MUHIM QOIDA:</b> Oylik to'lovni <b>Fiskal modul raqami bilan tekshirib bo'lmaydi!</b>\n"
-                    "«Mars» servis bazasida oylik abonent to'lovi faqat <b>korxonangizning 9 xonali СТИР (INN) yoki 14 xonali JSHSHIR raqami</b> orqali tekshiriladi.\n\n"
-                    "Iltimos, korxonangiz <b>СТИР (INN) raqamini</b> yuboring (masalan: <code>302568138</code>)."
+                    "🏢 <b>«Mars» oylik abonent to'lovini tekshirish:</b>\n\n"
+                    "Korxonangizning 9 xonali <b>СТИР (INN)</b> yoki 14 xonali JSHSHIR raqamini yuboring (masalan: <code>302568138</code>)."
                 )
                 ask_inn = adapt_to_user_script(ask_inn, user_script)
                 try:
