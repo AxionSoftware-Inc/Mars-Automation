@@ -335,15 +335,21 @@ def classify_payment_intent(text: str) -> Optional[str]:
     general_payment_words = [
         "shot raqam", "shot raqamlar", "hisob raqam", "hisob raqamlar",
         "rekvizit", "rekvizitlar", "/tolov", "to'lov qilish tartibi",
-        "qayerga to'layman", "qayerga tolayman", "qayerga to'lash kerak",
+        "qayerga to'layman", "qayerga tolayman", "qayerga to'lash kerak", "qayerga tolash kerak",
+        "qayerga to'lashim kerak", "qayerga tolashim kerak", "qayerga to'lashim kk", "qayerga tolashim kk",
+        "qayerga to'lay", "qayerga tolay", "qayerga to'lash", "qayerga tolash",
+        "qayerga to'lasam bo'ladi", "qayerga tolasam boladi", "qayerga tolanadi", "qayerga to'lanadi",
+        "qayerga o'tkazaman", "qayerga otkazaman", "qayerga tashlayman", "qayerga tashlay",
+        "qaerga to'layman", "qaerga tolayman", "qaerga tolash kerak", "qaerga to'lash kerak",
         "bank rekvizitlari", "to'lov hisobi", "shotini ber", "shot bering",
         "shot tashlang", "shot tashvorin", "to'lov uchun shot", "tolov uchun shot",
         "hisob raqam bering", "hisob bering", "schet bering", "schet tashlang",
         "шот рақам", "шот рақамлар", "ҳисоб рақам", "хисоб ракам",
         "ҳисоб рақамлар", "хисоб ракамлар", "реквизит", "реквизитlar", "реквизитлар",
         "тўлов қилиш тартиби", "толов килиш тартиби", "қаерга тўлайман", "каерга толайман",
-        "қаерга тўлаш керак", "каерга толаш керак", "банк реквизитлари",
-        "тўлов ҳисоби", "толов хисоби", "шотини бер",
+        "қаерга тўлаш керак", "каерга толаш керак", "қаерга тўлашим керак", "каерга толашим керак",
+        "қаерга тўлай", "каерга толай", "қаерга тўлаш", "каерга толаш",
+        "банк реквизитлари", "тўлов ҳисоби", "толов хисоби", "шотини бер",
         "счёт беринг", "счет беринг", "счёт ташланг", "счет ташланг",
         "шот беринг", "шот ташланг", "тўлов учун счёт", "толов учун счет",
         "тўлов учун ҳисоб", "толов учун хисоб", "тўлов учун шот", "толов учун шот"
@@ -505,6 +511,49 @@ def is_both_check_intent(text: str) -> bool:
     return any(p in t for p in phrases)
 
 
+def is_general_debt_check_intent(text: str) -> bool:
+    """
+    Foydalanuvchi umumiy yoki aniqlashtirilmagan qarz haqida so'rayaptimi?
+    (Masalan: 'qarzm bormi', 'qancha qarzim bor', 'qarzim qancha', 'qarzdorligim bormi', 'qancha tolay', 'qarz bormi')
+    """
+    t = text.lower().strip()
+    # Hisob raqam so'rovi bo'lsa va tekshir/qancha so'zi bo'lmasa -> bu to'lov intenti
+    if any(w in t for w in ["shot", "rekvizit", "hisob raqam", "xisob raqam", "shotini", "kartasi", "шот", "реквизит"]):
+        if not any(w in t for w in ["qarz", "qarzdor", "qancha", "bormi", "текшир", "қарз"]):
+            return False
+
+    phrases = [
+        "qarzm bormi", "qarzim bormi", "qarzdorligim bormi", "qarzdorlik bormi", "qarz bormi",
+        "qancha qarzim bor", "qancha qarzm bor", "qancha qarzman", "qancha qarz",
+        "qarzim qancha", "qarzm qancha", "qancha tolay", "qancha to'lay", "qancha to'lashim kerak",
+        "qancha tolashim kerak", "qancha to'lashim kk", "qancha tolashim kk",
+        "qancha to'layman", "qancha tolayman", "qarzni tekshir",
+        "qarz tekshir", "qarzimni tekshir", "qarzdorlikni tekshir", "qarzim bormi yoqmi",
+        "qarzim bormi yo'qmi", "qarz bormi yoqmi", "qarz bormi yo'qmi", "qarz holati",
+        "qaysi inn boyicha qarz bor", "qaysi inn bo'yicha qarz bor", "qaysi inn",
+        "қарзм борми", "қарзим борми", "қарздорлигим борми", "қарздорлик борми", "қарз борми",
+        "қанча қарзим бор", "қанча қарзм бор", "қанча қарзман", "қанча қарз",
+        "қарзим қанча", "қарзм қанча", "қанча тўлай", "қанча толай", "қанча тўлашим керак",
+        "қарзни текшир", "қарз текшир", "қарзимни текшир"
+    ]
+    if any(p in t for p in phrases):
+        return True
+
+    # Standalone yoki qisqa so'zlar
+    if t in ("qarz", "qarzim", "qarzm", "qarzdorlik", "qarzimchi", "qarzchi", "qarzmi", "qarzimmi", "қарз", "қарзим", "қарздорлик"):
+        return True
+
+    has_debt_word = any(w in t for w in ["qarz", "qarzdor", "qarzm", "қарз", "қарздор"])
+    has_question_word = any(w in t for w in [
+        "bormi", "qancha", "qanaqa", "holat", "tekshir", "ko'r", "kor", "ayt", "nechi", "necha",
+        "борми", "қанча", "қанақа", "ҳолат", "холат", "текшир", "кўр", "айт", "?"
+    ])
+    if has_debt_word and has_question_word:
+        return True
+
+    return False
+
+
 def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     """Foydalanuvchi yillik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
     t = text.lower().strip()
@@ -552,15 +601,16 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
 
     # 1. Agar foydalanuvchi yaqinda oylik qarz tekshirgan bo'lsa va endi to'lashini aytsa (kontekst ustun)
 
-    if last_topic in ("monthly_debt_exists", "debt_checked", "awaiting_inn_for_monthly_debt"):
+    if last_topic in ("monthly_debt_exists", "debt_checked", "awaiting_inn_for_monthly_debt", "fiscal_receipt_checked", "general_debt_inquiry"):
         has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
         if not has_annual:
             general_pay_phrases = [
                 "to'layman", "tolayman", "to'lashim kerak", "tolashim kerak", "to'lay", "tolay",
                 "shot raqam tashla", "shot tashla", "shot raqam", "shotini ber", "shot ber", "shotini tashla",
                 "rekvizit tashla", "rekvizit ber", "qayerga to'layman", "qayerga tolayman",
-                "qayerga to'lash", "hisob raqam tashla", "qanday to'layman", "qanday tolayman",
-                "тўлайман", "толайман", "шот ташла", "шот беринг"
+                "qayerga to'lashim kerak", "qayerga tolashim kerak", "qayerga to'lash kerak", "qayerga tolash kerak",
+                "qayerga to'lash", "qayerga tolash", "hisob raqam tashla", "qanday to'layman", "qanday tolayman",
+                "тўлайман", "толайман", "шот ташла", "шот беринг", "қаерга тўлашим керак", "каерга толашим керак"
             ]
             if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman"]):
                 return True

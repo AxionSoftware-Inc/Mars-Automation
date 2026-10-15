@@ -81,7 +81,7 @@ class TestFullSuiteNewScenarios(unittest.IsolatedAsyncioTestCase):
             bot.copy_message.assert_not_called()
             reply3 = msg3.reply.call_args[0][0]
             print(f"🤖 Bot: {reply3}")
-            self.assertIn("qarzingiz yo'q", reply3)
+            self.assertTrue("qarzdorlik yo'q" in reply3.lower() or "qarzingiz yo'q" in reply3.lower())
 
         # -------------------------------------------------------------
         # 4-QADAM: Mijoz oylik hisob raqamini so'raydi: "oylikchi"

@@ -214,6 +214,73 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
             copied_ids2 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
             self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids2)
 
+    async def test_multi_inn_alternating_questions_and_payment(self):
+        """
+        Foydalanuvchi bildirgan kasha stsenariy:
+        1. 1-INN yuborildi (qarz 0)
+        2. 2-INN yuborildi (qarz bor)
+        3. 'oylikdan qarzim bormi' -> qarz borligi chiqishi shart (0 emas)
+        4. 'qarzim qancha' -> qarz borligi chiqishi shart (0 emas)
+        5. 'qayerga tolashim kerak' -> Post 85 / 148 uzatilishi shart, o'zi doston yozmasligi kerak
+        6. 'qarzdorligim bormi' -> qarz borligi chiqishi shart (0 emas)
+        7. 'oylikdan qancha qarzman' -> qarz borligi chiqishi shart (0 emas)
+        8. 'qaysi inn boyicha qarz bor' -> ikkala INN holatini aniq ajratib berishi kerak
+        """
+        bot = AsyncMock()
+        bot.copy_message = AsyncMock()
+        bot.send_message = AsyncMock()
+
+        inn_zero = "302568138"
+        inn_with_debt = "206011507"
+
+        # 1. 1-INN (qarz 0)
+        m1 = await self._send_msg(bot, inn_zero)
+        r1 = m1.reply.call_args[0][0]
+        self.assertIn("0 so'm", r1)
+
+        # 2. 2-INN (qarz bor)
+        m2 = await self._send_msg(bot, inn_with_debt)
+        r2 = m2.reply.call_args[0][0]
+        self.assertIn("qarzdorlik", r2.lower())
+        self.assertNotIn("qarzdorlik yo'q", r2.lower())
+
+        # 3. 'oylikdan qarzim bormi'
+        m3 = await self._send_msg(bot, "oylikdan qarzim bormi")
+        r3 = m3.reply.call_args[0][0]
+        self.assertIn("qarzdorlik", r3.lower())
+        self.assertNotIn("qarzdorlik yo'q", r3.lower())
+
+        # 4. 'qarzim qancha'
+        m4 = await self._send_msg(bot, "qarzim qancha")
+        r4 = m4.reply.call_args[0][0]
+        self.assertIn("qarzdorlik", r4.lower())
+        self.assertNotIn("qarzdorlik yo'q", r4.lower())
+
+        # 5. 'qayerga tolashim kerak'
+        bot.copy_message.reset_mock()
+        m5 = await self._send_msg(bot, "qayerga tolashim kerak")
+        self.assertEqual(bot.copy_message.call_count, 2, "Qayerga tolashim kerak so'roviga kanal postlari (85 va 148) uzatilishi shart!")
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(MARS_POST_ID, copied_ids)
+
+        # 6. 'qarzdorligim bormi'
+        m6 = await self._send_msg(bot, "qarzdorligim bormi")
+        r6 = m6.reply.call_args[0][0]
+        self.assertIn("qarzdorlik", r6.lower())
+        self.assertNotIn("qarzdorlik yo'q", r6.lower())
+
+        # 7. 'oylikdan qancha qarzman'
+        m7 = await self._send_msg(bot, "oylikdan qancha qarzman")
+        r7 = m7.reply.call_args[0][0]
+        self.assertIn("qarzdorlik", r7.lower())
+        self.assertNotIn("qarzdorlik yo'q", r7.lower())
+
+        # 8. 'qaysi inn boyicha qarz bor'
+        m8 = await self._send_msg(bot, "qaysi inn boyicha qarz bor")
+        r8 = m8.reply.call_args[0][0]
+        self.assertIn(inn_zero, r8)
+        self.assertIn(inn_with_debt, r8)
+
 
 if __name__ == "__main__":
     unittest.main()

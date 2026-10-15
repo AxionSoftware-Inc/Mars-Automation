@@ -9,6 +9,7 @@ from ofd_bridge import ofd_bridge
 from payment_accounts import (
     classify_payment_intent,
     is_both_check_intent,
+    is_general_debt_check_intent,
     is_annual_check_intent,
     is_monthly_check_intent,
     is_annual_pay_intent,
@@ -84,13 +85,40 @@ class BillingIntentHandler:
         if found_fm:
             user_memory.set_last_fm(chat_id, user_id, found_fm)
 
+        # 1.5 Tekshirilgan korxonalar bo'yicha qaysi birida qarz borligi so'ralsa
+        if any(w in lower_text for w in [
+            "qaysi inn boyicha", "qaysi inn bo'yicha", "qaysi inn", "qaysi birida", "qaysi korxona",
+            "кайси инн буйича", "кайси инн бўйича", "кайси инн", "кайси бирида"
+        ]):
+            inns = user_memory.get_checked_inns(chat_id, user_id)
+            if inns:
+                lines = ["📋 <b>Tekshirilgan korxonalar qarzdorlik holati:</b>\n"]
+                for idx, (inn_k, info) in enumerate(inns.items(), 1):
+                    d = info.get("debt", 0.0)
+                    name = info.get("org_name") or "Noma'lum korxona"
+                    if d > 0:
+                        lines.append(f"{idx}️⃣ 🏢 <b>{name}</b> (СТИР: <code>{inn_k}</code>)\n🔴 <b>Qarzdorlik:</b> {d:,.0f} so'm".replace(",", " "))
+                    else:
+                        lines.append(f"{idx}️⃣ 🏢 <b>{name}</b> (СТИР: <code>{inn_k}</code>)\n🟢 <b>Qarzdorlik yo'q (0 so'm)</b>")
+                lines.append("\n💡 <i>To'lov rekvizitlarini olish uchun «Oylik shot» deb yozing.</i>")
+                summary_msg = adapt_to_user_script("\n\n".join(lines), user_script)
+                try:
+                    await message.reply(summary_msg, parse_mode="HTML")
+                except Exception:
+                    await message.reply(summary_msg)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, summary_msg)
+                return True
+
         # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
         is_both = is_both_check_intent(text) or (bool(found_fm) and bool(found_inn)) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
-        if is_both:
+        is_general_debt = is_general_debt_check_intent(text)
+
+        if is_both or (is_general_debt and not is_annual_check_intent(text) and not is_monthly_check_intent(text)):
             remembered_id = found_inn or user_memory.get_last_id(chat_id, user_id)
             remembered_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
 
-            if remembered_id and remembered_fm:
+            if is_both and remembered_id and remembered_fm:
                 from handlers.debt import process_and_send_debt_result
                 await process_and_send_debt_result(message, bot, remembered_id)
                 ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
@@ -100,19 +128,20 @@ class BillingIntentHandler:
                 except Exception:
                     await message.reply(ofd_text)
                 return True
-            elif remembered_id and not remembered_fm:
+            elif remembered_id:
                 from handlers.debt import process_and_send_debt_result
                 await process_and_send_debt_result(message, bot, remembered_id)
-                fm_ask = (
-                    "🏛 <b>Yillik Soliq (OFD) qarzdorligini ham tekshirish uchun:</b>\n\n"
-                    "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring."
-                )
-                fm_ask = adapt_to_user_script(fm_ask, user_script)
-                try:
-                    await message.answer(fm_ask, parse_mode="HTML")
-                except Exception:
-                    await message.answer(fm_ask)
-                user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
+                if is_both and not remembered_fm:
+                    fm_ask = (
+                        "🏛 <b>Yillik Soliq (OFD) qarzdorligini ham tekshirish uchun:</b>\n\n"
+                        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring."
+                    )
+                    fm_ask = adapt_to_user_script(fm_ask, user_script)
+                    try:
+                        await message.answer(fm_ask, parse_mode="HTML")
+                    except Exception:
+                        await message.answer(fm_ask)
+                    user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
                 return True
             elif remembered_fm and not remembered_id:
                 ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)

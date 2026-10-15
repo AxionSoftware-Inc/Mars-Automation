@@ -89,24 +89,65 @@ class UserMemoryManager:
     def set_last_id(self, chat_id: int, user_id: int, identifier: str, org_name: str = "", debt: Optional[float] = None, device_models: str = ""):
         """Foydalanuvchi qidirgan oxirgi INN/JSHSHIR va korxona ma'lumotlarini eslab qolish"""
         session = self._get_or_create_session(chat_id, user_id)
-        session["last_id"] = str(identifier).strip()
+        new_id = str(identifier).strip()
+        is_new_identifier = (session.get("last_id") != new_id)
+
+        session["last_id"] = new_id
+
+        if is_new_identifier:
+            # Yangi INN kiritilganda eski korxona va eski qarz ma'lumotlarini tozalash!
+            session["org_name"] = None
+            session["device_models"] = None
+            session["debt_info"] = None
+
         if org_name:
             session["org_name"] = str(org_name).strip()
         if device_models:
             session["device_models"] = str(device_models).strip()
 
-        # Agar yangi qarz berilmagan bo'lsa, xotiradagi mavjud qarzni saqlab qolish
+        # Agar baza orqali tekshirish imkoni bo'lsa va org_name/debt to'liq berilmagan bo'lsa avto-lookup
+        if (not session.get("org_name") or debt is None) and (len(new_id) in (9, 14) and new_id.isdigit()):
+            try:
+                from excel_manager import excel_manager
+                d_res = excel_manager.check_debt(new_id)
+                if d_res and d_res.get("record"):
+                    rec = d_res["record"]
+                    if not session.get("org_name"):
+                        session["org_name"] = rec.get("org_name", "")
+                    if debt is None:
+                        debt = float(rec.get("debt_amount", 0.0) or 0.0)
+                    if not session.get("device_models"):
+                        search_res = excel_manager.search(new_id)
+                        session["device_models"] = excel_manager.get_device_model_summary(search_res)
+            except Exception as e:
+                logger.warning(f"set_last_id avto-lookup xatolik: {e}")
+
+        # Agar bu o'sha INN bo'lsa va debt None bo'lsa, mavjudini saqlash
         existing_debt = 0.0
-        if session.get("debt_info") and "debt" in session["debt_info"]:
+        if not is_new_identifier and session.get("debt_info") and "debt" in session["debt_info"]:
             existing_debt = session["debt_info"]["debt"]
         final_debt = debt if debt is not None else existing_debt
 
         session["debt_info"] = {
-            "identifier": str(identifier).strip(),
-            "org_name": session.get("org_name") or org_name,
+            "identifier": new_id,
+            "org_name": session.get("org_name") or "",
             "debt": final_debt,
-            "device_models": session.get("device_models") or device_models
+            "device_models": session.get("device_models") or ""
         }
+
+        # Barcha tekshirilgan INNlar tarixini xotirada saqlash
+        if "checked_inns" not in session:
+            session["checked_inns"] = {}
+        session["checked_inns"][new_id] = {
+            "identifier": new_id,
+            "org_name": session.get("org_name") or "",
+            "debt": final_debt
+        }
+
+    def get_checked_inns(self, chat_id: int, user_id: int) -> Dict[str, Dict[str, Any]]:
+        """Sessiyada tekshirilgan barcha INNlar va ularning qarz ma'lumotlarini olish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("checked_inns", {})
 
     def set_annual_status(self, chat_id: int, user_id: int, has_debt: bool, details: str = ""):
         """Yillik Davlat Soliq (OFD) to'lovi holatini xotiraga saqlash"""
