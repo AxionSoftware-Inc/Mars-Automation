@@ -37,25 +37,22 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
 
     def test_01_intent_classification_sequential_words(self):
         """Davomiy va ketma-ket savollar aniq intentlarga tushishi shart"""
-        # Yillik tekshiruvlar
+        # Yillik tekshiruvlar (qarzdorlik bo'yicha)
         self.assertTrue(is_annual_check_intent("yilikdan qarzim bormi"))
         self.assertTrue(is_annual_check_intent("yillikdan qarzim bormi"))
         self.assertTrue(is_annual_check_intent("yillikdanchi"))
-        self.assertTrue(is_annual_check_intent("yillikchi"))
         self.assertTrue(is_annual_check_intent("fiskaldanchi"))
         self.assertTrue(is_annual_check_intent("soliqdanchi"))
         self.assertTrue(is_annual_check_intent("йилликданчи"))
         self.assertTrue(is_annual_check_intent("фискалданчи"))
 
-        # Oylik tekshiruvlar
+        # Oylik tekshiruvlar (qarzdorlik bo'yicha)
         self.assertTrue(is_monthly_check_intent("oylikdanchi"))
-        self.assertTrue(is_monthly_check_intent("oylikchi"))
         self.assertTrue(is_monthly_check_intent("oylikdan qarzim bormi"))
         self.assertTrue(is_monthly_check_intent("oylik qarzim bormi"))
         self.assertTrue(is_monthly_check_intent("marsdan qarzim bormi"))
         self.assertTrue(is_monthly_check_intent("oylik qarzdorlik bormi"))
         self.assertTrue(is_monthly_check_intent("ойликданчи"))
-        self.assertTrue(is_monthly_check_intent("ойликчи"))
         self.assertTrue(is_monthly_check_intent("марсдан қарзим борми"))
 
         # Ikkala to'lov tekshiruvi
@@ -63,6 +60,14 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_both_check_intent("umumiy qarzim bormi"))
         self.assertTrue(is_both_check_intent("jami qarzim bormi"))
         self.assertTrue(is_both_check_intent("иккаласиданчи"))
+
+        # To'lov intenti: 'oylikchi', 'yillikchi', 'oylik', 'yillik' to'g'ridan-to'g'ri hisob raqam postlari hisoblanadi
+        self.assertEqual(classify_payment_intent("oylikchi"), "monthly")
+        self.assertEqual(classify_payment_intent("yillikchi"), "annual")
+        self.assertEqual(classify_payment_intent("oylik"), "monthly")
+        self.assertEqual(classify_payment_intent("yillik"), "annual")
+        self.assertEqual(classify_payment_intent("ойликчи"), "monthly")
+        self.assertEqual(classify_payment_intent("йилликчи"), "annual")
 
         # To'lov intenti qarz so'rovlarini o'zlashtirib olmasligi kerak
         self.assertIsNone(classify_payment_intent("oylikdanchi"))
@@ -143,15 +148,56 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn(34, copied_ids)   # Yangi Texnologiyalar post 34
         self.assertIn(145, copied_ids)  # Click yillik video 145
 
-    def test_04_reverse_order_remembered_inn(self):
-        """Oldin INN ma'lum bo'lsa, 'oylikdanchi' deb so'raganda qayta INN so'ramay darhol tekshirishi kerak"""
-        user_memory.set_last_id(778899, 112233, "302568138", org_name="MARS ELEKTRON TEXNIKA", debt=0.0)
-        user_memory.set_last_topic(778899, 112233, "awaiting_fiscal_module")
+    async def test_05_repeated_oylikchi_yillikchi_forwarding(self):
+        """
+        Foydalanuvchi qayta-qayta 'oylikchi', 'yillikchi', 'oylikchi' deb so'raganda
+        uzun matn yozmasdan, kanaldan to'g'ridan-to'g'ri hisob raqam postlarini uzatishi shart.
+        """
+        bot = MagicMock()
+        bot.copy_message = AsyncMock()
 
-        # Endi foydalanuvchi "oylikdanchi" desa
-        self.assertTrue(is_monthly_check_intent("oylikdanchi"))
-        rem_inn = user_memory.get_last_id(778899, 112233)
-        self.assertEqual(rem_inn, "302568138")
+        chat_id = 998811
+        user_id = 445566
+
+        # 1-savol: oylikchi -> Post 85 va 148 uzatiladi
+        msg1 = create_mock_message("oylikchi", chat_id, user_id)
+        await handle_user_chat(msg1, bot)
+        copied_ids_1 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(85, copied_ids_1)
+        self.assertIn(148, copied_ids_1)
+        self.assertEqual(msg1.reply.call_count, 0)  # Hech qanday uzun matn yozilmadi!
+
+        bot.copy_message.reset_mock()
+
+        # 2-savol: yillikchi -> Post 34 va 145 uzatiladi
+        msg2 = create_mock_message("yillikchi", chat_id, user_id)
+        await handle_user_chat(msg2, bot)
+        copied_ids_2 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids_2)
+        self.assertIn(145, copied_ids_2)
+        self.assertEqual(msg2.reply.call_count, 0)
+
+        bot.copy_message.reset_mock()
+
+        # 3-savol: yana oylikchi -> yana Post 85 va 148 uzatiladi
+        msg3 = create_mock_message("oylikchi", chat_id, user_id)
+        await handle_user_chat(msg3, bot)
+        copied_ids_3 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(85, copied_ids_3)
+        self.assertIn(148, copied_ids_3)
+        self.assertEqual(msg3.reply.call_count, 0)
+
+        bot.copy_message.reset_mock()
+
+        # 4-savol: yana yillikchi -> yana Post 34 va 145 uzatiladi
+        msg4 = create_mock_message("yillikchi", chat_id, user_id)
+        await handle_user_chat(msg4, bot)
+        copied_ids_4 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids_4)
+        self.assertIn(145, copied_ids_4)
+        self.assertEqual(msg4.reply.call_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+

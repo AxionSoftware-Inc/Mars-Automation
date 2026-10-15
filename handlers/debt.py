@@ -80,15 +80,9 @@ def format_debt_response(results: list) -> str:
         text += f"🔹 <b>Shu oy ({current_month_name}) ishlashi uchun:</b> <code>{total_debt:,.0f}</code> so'm\n"
         if remaining_months > 0:
             text += f"🔹 <b>Yil oxirigacha (Dekabrgacha) ishlashi uchun:</b> <code>{pay_year_end:,.0f}</code> so'm\n"
-        text += "\n"
         text += (
-            "💳 <b>To'lov uchun bank rekvizitlari:</b>\n"
-            "🏢 <b>Kompaniya:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
-            "🏦 <b>Hisob raqam (X/R):</b> <code>20208000800208044003</code>\n"
-            "🏛 <b>Bank:</b> «Ipak Yo'li» AITB Shahrisabz filiali\n"
-            "🔢 <b>MFO:</b> <code>01048</code> | <b>INN:</b> <code>302568138</code>\n"
-            "📝 <b>To'lov maqsadi:</b> Abonent to'lov (korxona nomingiz yoki INN ko'rsatilsin)\n\n"
-            "👇 <i>Quyida Click orqali to'lash bo'yicha video-qo'llanma yuborildi:</i>"
+            "💳 <b>To'lov uchun rasmiy hisob raqam va video-qo'llanma quyida kanaldan uzatildi:</b>\n"
+            "👇 <i>To'lov qilgach kvitansiyani shu yerga yuborishingiz mumkin.</i>"
         )
     elif total_debt < 0:
         text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
@@ -217,15 +211,25 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_memory.add_assistant_message(chat_id, user_id, resp)
 
     if total_debt > 0:
+        from payment_accounts import MARS_POST_ID, MARS_VIDEO_ID
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=148,
+                message_id=MARS_POST_ID,
                 reply_to_message_id=message.message_id
             )
         except Exception as e:
-            logger.error(f"To'lov videosini yuborishda xatolik: {e}")
+            logger.error(f"Oylik hisob raqam postini (85) nusxalashda xatolik: {e}")
+
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=MARS_VIDEO_ID
+            )
+        except Exception as e:
+            logger.error(f"To'lov videosini (148) nusxalashda xatolik: {e}")
 
 
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI

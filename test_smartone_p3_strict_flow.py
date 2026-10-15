@@ -69,7 +69,7 @@ class TestStrictDiagnosticFlow(unittest.TestCase):
         self.assertEqual(decision.video_id, 148)
         self.assertGreater(decision.debt_amount, 0)
         self.assertIn("JAMI QARZDORLIK", decision.reply_text)
-        self.assertIn("20208000800208044003", decision.reply_text)
+        self.assertIn("kanaldan uzatildi", decision.reply_text)
 
     def test_smartone_photo_with_zero_debt_asks_fiscal_module(self):
         """Smart One apparatida Mars qarzi 0 bo'lsa, Step 2: Fiskal modul so'raydi!"""

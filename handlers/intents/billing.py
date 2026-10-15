@@ -165,6 +165,129 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
             return True
 
+        # 2.2 Maxsus holat: Ikkala to'lovni bitta hisob raqamga to'lash mumkinmi deb so'ralsa
+        single_account_query = any(w in lower_text for w in [
+            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "birga to'la", "birga tola",
+            "bitta qilib to'la", "bitta qilib tola", "qo'shib to'la", "qoshib tola", "bitta schet",
+            "битта ҳисоб", "битта хисоб", "битта шот", "бирга тўла", "бирга тола", "битта счёт"
+        ])
+        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam"]):
+            single_warn = (
+                "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
+                "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
+                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
+                "Kassa apparatiga servis xizmati ko'rsatish uchun <b>«Mars Elektron Texnika» MChJ</b> hisob raqamiga to'lanadi.\n\n"
+                "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n"
+                "Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun to'g'ridan-to'g'ri Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> hisob raqamiga to'lanadi.\n\n"
+                "⚠️ <b>Agar ikkalasini bitta hisob raqamga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi!</b> Har birini o'zining hisob raqamiga alohida to'lashingiz shart.\n\n"
+                "👇 <i>Quyida har ikkala tashkilotning alohida to'lov rekvizitlari yuborildi:</i>"
+            )
+            single_warn = adapt_to_user_script(single_warn, user_script)
+            try:
+                await message.reply(single_warn, parse_mode="HTML")
+            except Exception:
+                await message.reply(single_warn)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, single_warn)
+
+            try:
+                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
+                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
+            except Exception:
+                pass
+            user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+            return True
+
+        # 2.3 Hisob raqamlar postini kanaldan uzatish / to'lov intentlari ("oylikchi", "yillikchi", "to'layman", "shot tashla")
+        payment_intent = classify_payment_intent(text)
+        is_ann_pay = is_annual_pay_intent(text, last_topic) or payment_intent == "annual"
+        is_mon_pay = is_monthly_pay_intent(text, last_topic) or payment_intent == "monthly"
+        is_explicit_both = any(w in lower_text for w in ["ikkala", "har ikkala", "ikkisidan", "иккала", "ҳар иккала"])
+        is_both_pay = (payment_intent == "both" and not is_ann_pay and not is_mon_pay) or is_explicit_both
+
+        if (is_ann_pay or is_mon_pay or is_both_pay) and not found_fm and not found_inn:
+            if is_both_pay:
+                # Kanaldan ikkala hisob raqam postini to'g'ridan-to'g'ri uzatish
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=MARS_POST_ID,
+                        reply_to_message_id=message.message_id
+                    )
+                except Exception as e:
+                    logger.warning(f"Post 85 nusxalashda xatolik: {e}")
+                    await message.reply(adapt_to_user_script(get_monthly_payment_card(), user_script), parse_mode="HTML")
+
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID
+                    )
+                except Exception as e:
+                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
+                    await message.answer(adapt_to_user_script(get_annual_payment_card(), user_script), parse_mode="HTML")
+
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, "[Ikkala shot posti (85 va 34) kanaldan uzatildi]")
+                user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+                return True
+
+            elif is_mon_pay:
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=MARS_POST_ID,
+                        reply_to_message_id=message.message_id
+                    )
+                except Exception as e:
+                    logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
+                    monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
+                    await message.reply(monthly_card, parse_mode="HTML")
+
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=MARS_VIDEO_ID
+                    )
+                except Exception as e:
+                    logger.warning(f"Video 148 nusxalashda xatolik: {e}")
+
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
+                user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")
+                return True
+
+            elif is_ann_pay:
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
+                        reply_to_message_id=message.message_id
+                    )
+                except Exception as e:
+                    logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
+                    annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
+                    await message.reply(annual_card, parse_mode="HTML")
+
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+                    )
+                except Exception as e:
+                    logger.warning(f"Video 145 nusxalashda xatolik: {e}")
+
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot posti (34) kanaldan uzatildi]")
+                user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
+                return True
+
         # 3. Yillik qarz tekshiruvi ("yillik qarzim bormi", "ofd tekshir", "yillikdanchi")
         if is_annual_check_intent(text):
             target_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
@@ -223,62 +346,6 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "awaiting_inn_for_monthly_debt")
                 return True
 
-        # 5. Yillik to'lov kartasi / to'lash intenti ("yillik to'layman", "yillik shot tashla")
-        if is_annual_pay_intent(text, last_topic):
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
-                annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
-                await message.reply(annual_card, parse_mode="HTML")
-
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
-                )
-            except Exception as e:
-                logger.warning(f"Video 145 nusxalashda xatolik: {e}")
-
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot posti (34) kanaldan uzatildi]")
-            user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
-            return True
-
-        # 6. Oylik to'lov kartasi / to'lash intenti ("oylik to'layman", "oylik shot tashla")
-        if is_monthly_pay_intent(text, last_topic):
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=MARS_POST_ID,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
-                monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
-                await message.reply(monthly_card, parse_mode="HTML")
-
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=MARS_VIDEO_ID
-                )
-            except Exception as e:
-                logger.warning(f"Video 148 nusxalashda xatolik: {e}")
-
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
-            user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")
-            return True
-
         # 7. Matnda INN aniqlanganda (texnik savol bo'lmasa -> qarz natijasini chiqarish)
         found_inn = extract_clean_inn(text)
         if found_inn:
@@ -288,123 +355,6 @@ class BillingIntentHandler:
                 await process_and_send_debt_result(message, bot, found_inn)
                 return True
 
-        # 7.5 Maxsus holat: Ikkala to'lovni bitta hisob raqamga to'lash mumkinmi deb so'ralsa
-        single_account_query = any(w in lower_text for w in [
-            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "birga to'la", "birga tola",
-            "bitta qilib to'la", "bitta qilib tola", "qo'shib to'la", "qoshib tola", "bitta schet",
-            "битта ҳисоб", "битта хисоб", "битта шот", "бирга тўла", "бирга тола", "битта счёт"
-        ])
-        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam"]):
-            single_warn = (
-                "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
-                "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
-                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
-                "Kassa apparatiga servis xizmati ko'rsatish uchun <b>«Mars Elektron Texnika» MChJ</b> hisob raqamiga to'lanadi.\n\n"
-                "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n"
-                "Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun to'g'ridan-to'g'ri Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> hisob raqamiga to'lanadi.\n\n"
-                "⚠️ <b>Agar ikkalasini bitta hisob raqamga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi!</b> Har birini o'zining hisob raqamiga alohida to'lashingiz shart.\n\n"
-                "👇 <i>Quyida har ikkala tashkilotning alohida to'lov rekvizitlari yuborildi:</i>"
-            )
-            single_warn = adapt_to_user_script(single_warn, user_script)
-            try:
-                await message.reply(single_warn, parse_mode="HTML")
-            except Exception:
-                await message.reply(single_warn)
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, single_warn)
-
-            try:
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-            except Exception:
-                pass
-            user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
-            return True
-
-        # 8. Umumiy to'lov rekvizitlari va hisob raqamlar so'ralganda
-        payment_intent = classify_payment_intent(text)
-        if payment_intent and not found_fm and not found_inn:
-            if payment_intent == "monthly":
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
-                    reply_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
-                    await message.reply(reply_card, parse_mode="HTML")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Oylik to'lov videosini yuborishda xatolik: {e}")
-
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
-                user_memory.set_last_topic(chat_id, user_id, "payment_info_monthly")
-                return True
-
-            elif payment_intent == "annual":
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
-                    reply_card = adapt_to_user_script(get_annual_payment_card(), user_script)
-                    await message.reply(reply_card, parse_mode="HTML")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Yillik to'lov videosini yuborishda xatolik: {e}")
-
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot posti (34) kanaldan uzatildi]")
-                user_memory.set_last_topic(chat_id, user_id, "payment_info_annual")
-                return True
-
-            else:  # both / general
-                # Hech qanday matn yozmasdan, kanaldan ikkala hisob raqam postini to'g'ridan-to'g'ri uzatish
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 85 nusxalashda xatolik: {e}")
-                    await message.reply(adapt_to_user_script(get_monthly_payment_card(), user_script), parse_mode="HTML")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
-                    await message.answer(adapt_to_user_script(get_annual_payment_card(), user_script), parse_mode="HTML")
-
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, "[Ikkala shot posti (85 va 34) kanaldan uzatildi]")
-                user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
-                return True
 
         # 9. Click orqali to'lov tartibi so'ralganda
         if any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS):

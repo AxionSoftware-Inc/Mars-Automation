@@ -242,25 +242,29 @@ def classify_payment_intent(text: str) -> Optional[str]:
     is_annual = any(w in t for w in [
         "yillik shot", "yillik hisob", "yillik rekvizit", "fiskal modul", "fiskal modul shot",
         "fiskal modul hisob", "fiskal modul to'lov", "fiskal modul tolov", "fiskal modul tulov",
-        "yillik to'lov", "yillik tolov", "yillik tulov",
+        "yillik to'lov", "yillik tolov", "yillik tulov", "yillik to'lash", "yillik tolash",
+        "yillikchi", "yilikchi", "fiskalchi", "soliqchi", "ofdchi", "fmochi",
         "yangi texnologiyalar", "yillik qancha", "440000", "440 000",
         "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
         "фискал модул", "фискал модуль", "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
         "фискал модул тўлов", "фискал модул толов", "фискал модул тулов",
         "йиллик тўлов", "йиллик толов", "йиллик тулов", "янги технологиялар",
+        "йилликчи", "йиликчи", "фискалчи", "солиқчи", "соликчи", "офдчи",
         "йиллик қанча", "йиллик канча"
-    ])
+    ]) or t in ("yillik", "yillik?", "yilik", "fiskal", "ofd", "йиллик", "йиллик?", "фискал", "офд")
 
     # Oylik to'lov alomatlari (Lotin va Kirill)
     is_monthly = any(w in t for w in [
         "oylik shot", "oylik hisob", "oylik rekvizit", "mars hisob", "mars shot",
         "abonent to'lov", "abonent tolov", "abonent tulov", "marsga to'lov",
         "oylik to'lov", "oylik tolov", "oylik tulov", "100000", "100 000",
+        "oylikchi", "marschi", "abonentchi", "oylik to'lash", "oylik tolash",
         "ойлик шот", "ойлик ҳисоб", "ойлик хисоб", "ойлик реквизит",
         "марс ҳисоб", "марс хисоб", "марс шот", "абонент тўлов",
         "абонент толов", "абонент тулов", "марсга тўлов", "марсга толов",
-        "ойлик тўлов", "ойлик толов", "ойлик тулов"
-    ])
+        "ойлик тўлов", "ойлик толов", "ойлик тулов",
+        "ойликчи", "марсчи", "абонентчи"
+    ]) or t in ("oylik", "oylik?", "mars", "abonent", "ойлик", "ойлик?", "марс", "абонент")
 
     has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
     has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
@@ -344,14 +348,14 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
     
-    # Tezkor davomiy iboralar ("yillikdanchi?", "fiskalchi?", "yillikchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "fiskaldanchi?")
     followup_words = [
-        "yillikdanchi", "yillikchi", "yilikdanchi", "yilikchi",
-        "fiskaldanchi", "fiskalchi", "soliqdanchi", "soliqchi",
-        "ofddanchi", "ofdchi", "fmodanchi", "fmochi",
-        "йилликданчи", "йилликчи", "фискалданчи", "фискалчи", "солиқданчи", "солиқчи", "офдданчи"
+        "yillikdanchi", "yilikdanchi",
+        "fiskaldanchi", "soliqdanchi",
+        "ofddanchi", "fmodanchi",
+        "йилликданчи", "фискалданчи", "солиқданчи", "офдданчи"
     ]
-    if any(w in t for w in followup_words) or t in ("yillik", "fiskal", "ofd", "йиллик", "фискал", "офд"):
+    if any(w in t for w in followup_words):
         return True
 
     phrases = [
@@ -391,13 +395,13 @@ def is_monthly_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
 
-    # Tezkor davomiy iboralar ("oylikdanchi?", "oylikchi?", "marsdanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "marsdanchi?")
     followup_words = [
-        "oylikdanchi", "oylikchi", "oylikdanam", "oylikdan-chi", "oylikchi-chi",
-        "marsdanchi", "marschi", "abonentdanchi", "abonentchi",
-        "ойликданчи", "ойликчи", "ойликданам", "марсданчи", "абонентданчи"
+        "oylikdanchi", "oylikdanam", "oylikdan-chi",
+        "marsdanchi", "abonentdanchi",
+        "ойликданчи", "ойликданам", "марсданчи", "абонентданчи"
     ]
-    if any(w in t for w in followup_words) or t in ("oylik", "oylik?", "mars", "mars?", "ойлик", "ойлик?"):
+    if any(w in t for w in followup_words):
         return True
 
     phrases = [
