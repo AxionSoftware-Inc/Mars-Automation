@@ -280,8 +280,12 @@ def classify_payment_intent(text: str) -> Optional[str]:
     """
     t = text.lower().strip()
 
-    # Agar savol qarz/tekshirish/muddat/sana bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
-    if any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat", "qachongacha", "qachon", "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"]):
+    # Agar savol qarz/tekshirish/muddat/sana yoki davomiy qarz so'rovi ("-chi", "-kachi") bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
+    if any(w in t for w in [
+        "qarz", "tekshir", "bormi", "qarzdorlik", "holat", "sanagacha", "qaysi sana", "muddat",
+        "qachongacha", "qachon", "yillikkachi", "yilikkachi", "oylikkachi", "yillikdanchi", "oylikdanchi",
+        "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи", "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"
+    ]):
         if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "шот", "реквизит", "ҳисоб"]):
             return None
 
@@ -405,12 +409,12 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
     
-    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "fiskaldanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "fiskaldanchi?")
     followup_words = [
-        "yillikdanchi", "yilikdanchi",
-        "fiskaldanchi", "soliqdanchi",
+        "yillikdanchi", "yilikdanchi", "yillikkachi", "yilikkachi", "yillikgachi",
+        "fiskaldanchi", "soliqdanchi", "fiskalgachi", "soliqgachi",
         "ofddanchi", "fmodanchi",
-        "йилликданчи", "фискалданчи", "солиқданчи", "офдданчи"
+        "йилликданчи", "йилликкачи", "фискалданчи", "солиқданчи", "офдданчи"
     ]
     if any(w in t for w in followup_words):
         return True
@@ -452,11 +456,11 @@ def is_monthly_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
 
-    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "marsdanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "marsdanchi?")
     followup_words = [
-        "oylikdanchi", "oylikdanam", "oylikdan-chi",
+        "oylikdanchi", "oylikdanam", "oylikdan-chi", "oylikkachi", "oylikgachi",
         "marsdanchi", "abonentdanchi",
-        "ойликданчи", "ойликданам", "марсданчи", "абонентданчи"
+        "ойликданчи", "ойликкачи", "ойликданам", "марсданчи", "абонентданчи"
     ]
     if any(w in t for w in followup_words):
         return True

@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("GEMINI_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "google/gemini-3.5-flash-lite"
+DEFAULT_MODEL = "google/gemini-2.5-flash"
 
 class OpenRouterClient:
     """
-    OpenRouter orqali Gemini 3.5 Flash Lite modeliga so'rov yuborish mijozi.
+    OpenRouter orqali Gemini 2.5 Flash modeliga so'rov yuborish mijozi.
     Matn va rasm (multimodal) so'rovlarini to'liq qo'llab-quvvatlaydi.
     """
     def __init__(self, api_key: Optional[str] = None, model: str = DEFAULT_MODEL):

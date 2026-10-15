@@ -95,6 +95,14 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
       - "nega ishlamayapti?", "qarzim bormi?", "qachon yoqiladi?":
         -> "Korxonangiz xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan), shuning uchun abonent to'lovidan qarzdorlik hisoblanmaydi (0 so'm). Qayta faollashtirish uchun adminga murojaat qilishingiz mumkin."
 
+   E) OYLIK VA YILLIK QARZNI MUTLAQO ANIQ VA ZID KELMASDAN AYTISH:
+      - Agar mijoz "oylikchi?", "oylikdan qancha?", "qancha tolay?", "oylik qarzim qancha?" desa:
+        Kontekstdagi «Mars» oylik abonent qarzdorligi miqdoriga qat'iy qarang! Agar kontekstda qarz bo'lsa (masalan 2 100 000 so'm), AYNAN o'sha summani ayting: "Oylik abonent to'lovidan [summa] so'm qarzdorlik mavjud." HECH QACHON "qarzingiz yo'q" deb o'zingizga zid gapirmang!
+      - Agar mijoz "yillikkachi?", "yillikchi?", "yillik qarzim bormi?" desa:
+        Kontekstdagi Davlat Soliq (OFD) yillik to'lovi holatiga qarang:
+        -> Agar yillikdan qarzdorlik yo'q (faol) bo'lsa: "Davlat Soliq (OFD) yillik to'lovidan qarzingiz yo'q, litsenziyangiz faol." deb ayting.
+        -> Agar yillikdan qarz bo'lsa: "Davlat Soliq (OFD) yillik litsenziyasi uchun 440 000 so'm to'lov muddati tugagan. [VIDEO:145]" deb ayting.
+
 2. AGAR KONTEKSTDA INN UMUMAN BO'LMASA (noma'lum yoki yangi mijoz):
    - Agar mijoz "qarzim bormi?", "qachon qo'shiladi?", "qachon yoqiladi?", "ishlamayapti", "blok bo'ldi", "to'xtab qoldi" desa:
      -> "Qaysi korxona yoki apparat haqida so'rayotganingizni bilishimiz uchun korxonangizning INN (9 xonali) yoki JSHSHIR (14 xonali) raqamini yuboring." deb lo'nda so'rang.

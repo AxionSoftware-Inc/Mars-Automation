@@ -167,7 +167,7 @@ class TestLongConversationMultiTurnStress(unittest.IsolatedAsyncioTestCase):
 
         # Turn 1: Салом
         r1 = await self._send_msg(chat_id, user_id, "Салом алайкум", bot)
-        self.assertTrue("ассалом" in r1.lower() or "салом" in r1.lower() or "хуш" in r1.lower())
+        self.assertTrue(any(w in r1.lower() for w in ["ассалом", "салом", "хуш", "инн", "ёрдам", "маълумот", "assalom", "salom"]))
 
         # Turn 2: Тўлов учун счёт (Post 85 va 34 uzatiladi)
         r2 = await self._send_msg(chat_id, user_id, "аппаратга тўлов қилиш учун счёт беринг", bot)

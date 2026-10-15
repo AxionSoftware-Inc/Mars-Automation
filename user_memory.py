@@ -86,7 +86,7 @@ class UserMemoryManager:
         if len(session["history"]) > self.max_turns * 2:
             session["history"] = session["history"][-(self.max_turns * 2):]
 
-    def set_last_id(self, chat_id: int, user_id: int, identifier: str, org_name: str = "", debt: float = 0.0, device_models: str = ""):
+    def set_last_id(self, chat_id: int, user_id: int, identifier: str, org_name: str = "", debt: Optional[float] = None, device_models: str = ""):
         """Foydalanuvchi qidirgan oxirgi INN/JSHSHIR va korxona ma'lumotlarini eslab qolish"""
         session = self._get_or_create_session(chat_id, user_id)
         session["last_id"] = str(identifier).strip()
@@ -94,12 +94,32 @@ class UserMemoryManager:
             session["org_name"] = str(org_name).strip()
         if device_models:
             session["device_models"] = str(device_models).strip()
+
+        # Agar yangi qarz berilmagan bo'lsa, xotiradagi mavjud qarzni saqlab qolish
+        existing_debt = 0.0
+        if session.get("debt_info") and "debt" in session["debt_info"]:
+            existing_debt = session["debt_info"]["debt"]
+        final_debt = debt if debt is not None else existing_debt
+
         session["debt_info"] = {
             "identifier": str(identifier).strip(),
             "org_name": session.get("org_name") or org_name,
-            "debt": debt,
+            "debt": final_debt,
             "device_models": session.get("device_models") or device_models
         }
+
+    def set_annual_status(self, chat_id: int, user_id: int, has_debt: bool, details: str = ""):
+        """Yillik Davlat Soliq (OFD) to'lovi holatini xotiraga saqlash"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["annual_status"] = {
+            "has_debt": has_debt,
+            "details": details
+        }
+
+    def get_annual_status(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """Yillik Davlat Soliq (OFD) to'lovi holatini olish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("annual_status")
 
     def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
         """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
@@ -176,11 +196,19 @@ class UserMemoryManager:
         if debt_info:
             d_val = debt_info.get("debt", 0.0)
             if d_val > 0:
-                parts.append(f"• Joriy qarzdorlik: {d_val:,.0f} so'm mavjud (oylik to'lov to'lanmagan).")
+                parts.append(f"• «Mars» oylik abonent to'lovidan joriy qarzdorlik: {d_val:,.0f} so'm mavjud.")
             elif d_val < 0:
-                parts.append(f"• Joriy qarzdorlik: Qarzdorlik YO'Q (ortiqcha to'lov: {abs(d_val):,.0f} so'm).")
+                parts.append(f"• «Mars» oylik abonent to'lovi: Qarzdorlik YO'Q (ortiqcha to'lov: {abs(d_val):,.0f} so'm).")
             else:
-                parts.append("• Joriy qarzdorlik: 0 so'm (Qarzdorlik yo'q).")
+                parts.append("• «Mars» oylik abonent to'lovidan joriy qarzdorlik: 0 so'm (Qarzdorlik yo'q).")
+
+        ann_st = self.get_annual_status(chat_id, user_id)
+        if ann_st:
+            if ann_st.get("has_debt"):
+                parts.append("• Davlat Soliq (OFD) yillik to'lovi: QARZDORLIK MAVJUD (440 000 so'm, Yangi Texnologiyalar DUK).")
+            else:
+                det = ann_st.get("details", "")
+                parts.append(f"• Davlat Soliq (OFD) yillik to'lovi: QARZDORLIK YO'Q (Litsenziya faol{', ' + det if det else ''}).")
 
         if last_receipt:
             amt = last_receipt.get("amount", 0.0)

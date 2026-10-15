@@ -20,7 +20,8 @@ OPERATOR_KEYWORDS = [
     "ochirib yoqdim ishlamadi", "usta yuboring", "usta jonating", "usta jo'nating",
     "admin bilan gaplashaman", "admin bilan gaplashmoqchiman", "ustaxonaga", "qilolmadim",
     "usta raqam", "usta raqami", "usta nomer", "usta nomeri", "admin raqam", "admin raqami", "admin nomer", "admin nomeri",
-    "уста рақам", "уста рақами", "уста номер", "уста номери", "админ рақам", "админ номер"
+    "telefon nomer", "telefon nomeri", "telefon nomerini", "nomerini tashlang", "raqamini tashlang", "telefonini tashlang",
+    "уста рақам", "уста рақами", "уста номер", "уста номери", "админ рақам", "админ номер", "телефон номер"
 ]
 
 

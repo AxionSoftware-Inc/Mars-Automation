@@ -1,0 +1,157 @@
+import unittest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from aiogram import types
+from handlers.chat import handle_user_chat
+from handlers.media import _process_fiscal_receipt_content
+from core.models import ReceiptFacts, FiscalChekFacts
+from user_memory import user_memory
+from excel_manager import excel_manager
+from payment_accounts import (
+    MARS_POST_ID,
+    MARS_VIDEO_ID,
+    classify_payment_intent,
+    is_annual_check_intent
+)
+
+
+class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
+    """
+    Foydalanuvchi bildirgan real stsenariy testi:
+    1. Chek tashlandi -> Oylikda 2 100 000 so'm qarz, Yillikda qarz yo'q (faol).
+    2. 'qancha tolay' -> Oylik qarz 2 100 000 so'm ekani aytiladi.
+    3. 'yillikkachi' -> Yillikdan qarz yo'q (faol) ekani aytiladi (shot tashlanmaydi yoki qarz yo'qligi tushuntiriladi).
+    4. 'oylikchi' -> Aslo 'qarz yo'q 0' deyilmaydi! 2 100 000 qarz saqlanib qoladi va rekvizitlar uzatiladi.
+    """
+
+    def setUp(self):
+        user_memory.clear()
+        self.chat_id = 991122
+        self.user_id = 991122
+
+    async def _send_msg(self, bot, text: str) -> MagicMock:
+        msg = MagicMock(spec=types.Message)
+        msg.text = text
+        msg.chat = MagicMock(id=self.chat_id)
+        msg.from_user = MagicMock(id=self.user_id, full_name="Sardor", username="sardor_pos")
+        self._counter = getattr(self, "_counter", 100) + 1
+        msg.message_id = self._counter
+        msg.reply = AsyncMock()
+        msg.answer = AsyncMock()
+
+        await handle_user_chat(msg, bot)
+        return msg
+
+    async def test_reported_turn_by_turn(self):
+        bot = AsyncMock()
+        bot.copy_message = AsyncMock()
+        bot.send_message = AsyncMock()
+
+        print("\n" + "=" * 60)
+        print("🎯 REAL STSENARIY TESTI: CHEK -> QANCHA TO'LAY -> YILLIKKACHI -> OYLIKCHI")
+        print("=" * 60)
+
+        # 0. Test uchun bazaga 2 100 000 qarzli korxona kiritish yoki mavjudidan foydalanish
+        test_inn = "206011507"
+        # Baza tekshiruvi
+        rec = excel_manager.search(test_inn)
+        self.assertTrue(len(rec) > 0, "Test INN bazada topilmadi")
+        print(f"Baza tekshirildi: INN={test_inn}, Qarz={sum(r.get('debt', 0.0) for r in rec):,.0f} so'm")
+
+        # 1-QADAM: Kassa cheki tahlili
+        print("\n🔹 [Turn 1: Chek yuborildi]")
+        receipt_facts = ReceiptFacts(
+            payer_inn=test_inn,
+            fiscal_module="LG420210630789",
+            is_fiscal_chek=True,
+            fiscal_facts=FiscalChekFacts(
+                inn=test_inn,
+                fiscal_module="LG420210630789",
+                org_name="QASHQADARYO SHARQ GAVHARI MCHJ",
+                total_amount=50000.0
+            )
+        )
+
+        msg_chek = MagicMock(spec=types.Message)
+        msg_chek.chat = MagicMock(id=self.chat_id)
+        msg_chek.from_user = MagicMock(id=self.user_id, full_name="Sardor", username="sardor_pos")
+        msg_chek.message_id = 101
+        msg_chek.reply = AsyncMock()
+
+        with patch("ofd_bridge.ofd_bridge.query_fiscal_module", return_value="Fiskal modul: LG420210630789\nHolati: To'langan va faol\nMuddati: 2026-12-31 gacha"):
+            await _process_fiscal_receipt_content(
+                message=msg_chek,
+                bot=bot,
+                receipt_facts=receipt_facts,
+                user_script="latin",
+                caption="",
+                file_id="photo_123"
+            )
+
+        chek_reply = msg_chek.reply.call_args[0][0]
+        print(f"🤖 Bot (Chek javobi): {chek_reply[:140]}...")
+        self.assertIn("Qarzdorlik mavjud", chek_reply)
+        self.assertIn("OFD", chek_reply)
+
+        # Xotira tekshiruvi: Qarz 0 bo'lib qolmagan, aynan bazadagi qarz yozilgan!
+        debt_in_mem = user_memory.get_debt_info(self.chat_id, self.user_id)
+        self.assertIsNotNone(debt_in_mem)
+        self.assertGreater(debt_in_mem["debt"], 0, "Qarz xotirada 0 bo'lib qolmasligi shart!")
+        print(f"✅ Xotiradagi qarz saqlandi: {debt_in_mem['debt']:,.0f} so'm")
+
+        # Yillik holat xotirasi tekshiruvi
+        ann_status = user_memory.get_annual_status(self.chat_id, self.user_id)
+        self.assertIsNotNone(ann_status)
+        self.assertFalse(ann_status["has_debt"])
+        print(f"✅ Xotiradagi yillik holat saqlandi: has_debt={ann_status['has_debt']}")
+
+        # 2-QADAM: "qancha tolay"
+        print("\n🔹 [Turn 2] Mijoz: 'qancha tolay'")
+        context_str = user_memory.get_context_summary(self.chat_id, self.user_id)
+        self.assertIn("«Mars» oylik abonent to'lovidan joriy qarzdorlik", context_str)
+        self.assertIn("Davlat Soliq (OFD) yillik to'lovi: QARZDORLIK YO'Q", context_str)
+
+        msg2 = await self._send_msg(bot, "qancha tolay")
+        reply2 = msg2.reply.call_args[0][0]
+        print(f"🤖 Bot: {reply2}")
+        # Bot qarz borligini aytishi kerak, 0 so'm deb aldamasligi shart
+        self.assertNotIn("qarzingiz yo'q (0 so'm)", reply2.lower())
+        self.assertIn("qarz", reply2.lower())
+
+        # 3-QADAM: "yillikkachi"
+        print("\n🔹 [Turn 3] Mijoz: 'yillikkachi'")
+        # "yillikkachi" intentini tekshirish
+        self.assertTrue(is_annual_check_intent("yillikkachi"))
+        self.assertIsNone(classify_payment_intent("yillikkachi"))
+
+        with patch("ofd_bridge.ofd_bridge.query_fiscal_module", return_value="Fiskal modul: LG420210630789\nHolati: To'langan va faol\nMuddati: 2026-12-31 gacha"):
+            msg3 = await self._send_msg(bot, "yillikkachi")
+            reply3 = msg3.reply.call_args[0][0]
+            print(f"🤖 Bot: {reply3[:140]}...")
+            # Yillikdan qarz yo'qligini aytishi kerak!
+            self.assertIn("QARZDORLIK YO'Q", reply3.upper())
+
+        # 4-QADAM: "oylikchi"
+        print("\n🔹 [Turn 4] Mijoz: 'oylikchi'")
+        bot.copy_message.reset_mock()
+        await self._send_msg(bot, "oylikchi")
+        
+        # Oylik hisob raqami va videosi kanaldan uzatiladi
+        self.assertEqual(bot.copy_message.call_count, 2)
+        copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        print(f"🤖 Bot kanaldan uzatdi: {copied_ids}")
+        self.assertIn(MARS_POST_ID, copied_ids)
+        self.assertIn(MARS_VIDEO_ID, copied_ids)
+
+        # Eng muhimi: Qarz hali ham xotirada 2 100 000 bo'lib turibdi, 0 ga aylanmagan!
+        debt_after_oylikchi = user_memory.get_debt_info(self.chat_id, self.user_id)
+        self.assertGreater(debt_after_oylikchi["debt"], 0, "Oylikchi so'rovidan keyin ham qarz saqlanishi shart!")
+        print(f"✅ Xotiradagi qarz o'zgarmadi: {debt_after_oylikchi['debt']:,.0f} so'm")
+
+        print("\n" + "=" * 60)
+        print("✅ REAL STSENARIY TESTI 100% MUVAFFAQIYATLI O'TDI!")
+        print("=" * 60 + "\n")
+
+
+if __name__ == "__main__":
+    unittest.main()

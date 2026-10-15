@@ -272,17 +272,12 @@ async def _process_fiscal_receipt_content(
             await message.reply(fail_msg)
         return
 
-    # Xotiraga saqlash
-    if inn:
-        user_memory.set_last_id(chat_id, user_id, inn)
-    if fm:
-        user_memory.set_last_fm(chat_id, user_id, fm)
-    user_memory.set_last_photo(chat_id, user_id, file_id)
-    user_memory.set_last_topic(chat_id, user_id, "fiscal_receipt_checked")
-
     # 1. «Mars» oylik abonent to'lovi holati (100 000 so'm/oy)
     monthly_status_lines = []
     has_monthly_debt = False
+    debt_amount = 0.0
+    model_summary = ""
+
     if inn:
         debt_res = excel_manager.check_debt(inn)
         record = debt_res.get("record") if debt_res else None
@@ -310,6 +305,9 @@ async def _process_fiscal_receipt_content(
             monthly_status_lines.append(
                 f"ℹ️ СТИР: <code>{inn}</code> bo'yicha «Mars» ma'lumotlar bazasida yozuv topilmadi."
             )
+        results = excel_manager.search(inn)
+        if results:
+            model_summary = excel_manager.get_device_model_summary(results)
     else:
         monthly_status_lines.append(
             "⚠️ <i>Chekdan СТИР (INN) aniqlanmadi. 9 xonali INN raqamingizni yuborsangiz, oylik to'lovni tekshirib beramiz.</i>"
@@ -318,6 +316,7 @@ async def _process_fiscal_receipt_content(
     # 2. Davlat Soliq (OFD) yillik litsenziyasi holati (440 000 so'm/yil)
     annual_status_lines = []
     has_annual_debt = False
+    ofd_details = "To'langan va faol"
     if fm:
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, fm)
         if ofd_reply:
@@ -325,6 +324,9 @@ async def _process_fiscal_receipt_content(
             annual_status_lines.append(ofd_fmt)
             if any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
                 has_annual_debt = True
+                ofd_details = "Qarzdorlik mavjud"
+            else:
+                ofd_details = "Faol"
         else:
             annual_status_lines.append(
                 f"📟 <b>Fiskal modul:</b> <code>{fm}</code>\n"
@@ -335,6 +337,15 @@ async def _process_fiscal_receipt_content(
             "🏛 <i>Yillik Soliq (OFD) to'lovini tekshirish uchun kassa chekining pastki qismidagi "
             "<b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.</i>"
         )
+
+    # Xotiraga to'liq saqlash (qarz, apparat modeli va yillik holat bilan)
+    if inn:
+        user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=debt_amount, device_models=model_summary)
+    if fm:
+        user_memory.set_last_fm(chat_id, user_id, fm)
+    user_memory.set_annual_status(chat_id, user_id, has_debt=has_annual_debt, details=ofd_details)
+    user_memory.set_last_photo(chat_id, user_id, file_id)
+    user_memory.set_last_topic(chat_id, user_id, "fiscal_receipt_checked")
 
     # Xabarni chiroyli yig'ish
     header_parts = ["🧾 <b>KASSA CHEKI MA'LUMOTLARI:</b>\n"]

@@ -98,13 +98,14 @@ class TestAwkwardAdversarialPhrases(unittest.IsolatedAsyncioTestCase):
 
     async def test_7_tech_question_with_inn_not_dumping_debt(self):
         """7. '311790999 da chek qanday uriladi?' -> Qarz jadvalini tashlamaydi, chek urishni tushuntiradi yoki video beradi!"""
-        replies, bot = await self._send_text("311790999 da chek qanday uriladi?")
-        text = " ".join(replies).lower()
-        # Qarz jadvali tashlanmasligi shart!
-        self.assertNotIn("jami qarzdorlik", text)
-        self.assertNotIn("20208000800208044003", text)
-        # Savolga javob berilgan (video yoki matn)
-        self.assertTrue(bot.copy_message.called or "chek" in text)
+        with patch("ai_helper.generate_ai_reply_ex", return_value=("Chek urish uchun menyudan Savdo bo'limiga kiring.", 2, False)):
+            replies, bot = await self._send_text("311790999 da chek qanday uriladi?")
+            text = " ".join(replies).lower()
+            # Qarz jadvali tashlanmasligi shart!
+            self.assertNotIn("jami qarzdorlik", text)
+            self.assertNotIn("20208000800208044003", text)
+            # Savolga javob berilgan (video yoki matn)
+            self.assertTrue(bot.copy_message.called or "chek" in text)
 
     async def test_8_typo_ochib_qoldi(self):
         """8. 'salom kassa ochib qoldi ishlamayapti' (o'chib qoldi) -> INN so'rashi kerak"""
