@@ -26,7 +26,8 @@ ASOSIY BILIMLAR VA QOIDALAR:
    - Boshqa hech qanday apparat modeli mavjud emas! Pax, Sunmi, UzSmart, A930 yoki boshqa nomlarni to'qish, taxmin qilish yoki tilga olish QAT'IYAN TAQIQLANADI!
 
    - QAT'IY ANTI-HALLUCINATION QOIDASI (BILMAGAN NARSANGIZNI ASLO GAPIRMANG):
-     * O'zingiz aniq bilmagan, tushunmagan yoki kontekstda berilmagan ma'lumotlar haqida HECH QACHON taxmin qilib gapirmang! Har qanday sohada va har qanday mavzuda bu taqiqlanadi!
+     * O'zingiz aniq bilmagan, tushunmagan yoki kontekstda berilmagan ma'lumotlar haqida HECH QACHON taxmin qilib gapirmang! Har qanday sohada va har qanday mavzuda bu qat'iyan taqiqlanadi!
+     * MXIK KODLAR: Hech qachon o'zingizdan 17 xonali MXIK kod to'qimang! Agar biror tovarning (non, sut, sigaret, kiyim va h.k.) kodi so'ralsa, uni to'g'ridan-to'g'ri rasmiy tasnif.soliq.uz portalidan qidirib olishni ayting va [VIDEO:28] tegini qo'ying!
      * Agar mijoz apparat modelini so'rasa:
        -> Agar kontekstda mijozning apparat modeli ko'rsatilgan bo'lsa (P3 Humo yoki Smart One), aynan o'sha modelni ayting.
        -> Agar mijozning INN raqami hali ma'lum bo'lmasa, "Kassa apparatingiz modelini aniqlashimiz uchun korxonangiz INN raqamini yuboring" deb so'rang. Hech qachon o'zingizdan nom to'qimang!
@@ -130,7 +131,15 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
 
 ADMIN_QUESTION_TAG = "[ADMINGA_SAVOL]"
 # Zaxira: AI teg qo'yishni unutsa ham, "bilmayman" iboralari bo'lsa adminga yuboriladi
-_UNKNOWN_PHRASES = ("menda aniq ma'lumot yo'q", "menda aniq malumot yoq", "менда аниқ маълумот йўқ")
+_UNKNOWN_PHRASES = (
+    "menda aniq ma'lumot yo'q", "menda aniq malumot yoq", "aniq ma'lumot yo'q", "aniq malumot yoq",
+    "ma'lumotga ega emasman", "malumotga ega emasman", "aniq bilmayman", "aniq ayta olmayman",
+    "mutaxassisimizga yubordim", "mutaxassisimizga jonatdim", "mutaxassisimizga jo'natdim",
+    "adminga yubordim", "adminga jonatdim", "adminga jo'natdim", "mas'ul mutaxassis", "masul mutaxassis",
+    "admin bilan bog'laning", "operator bilan bog'laning", "mutaxassis bilan bog'laning",
+    "менда аниқ маълумот йўқ", "аниқ маълумот йўқ", "маълумотга эга эмасман", "аниқ билмайман",
+    "аниқ айта олмайман", "мутахассисимизга юбордим", "админга юбордим", "масъул мутахассис", "админ билан боғланинг"
+)
 
 
 def generate_ai_reply_ex(

@@ -157,42 +157,55 @@ def get_both_posts_intro(script: str = "latin") -> str:
 def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
     """
     MXIK (IKPU / Tasnif / Soliq) bo'yicha professional tushuntirish va tegishli video.
+    Hech qachon o'zidan 17 xonali kod to'qimaydi, doim tasnif.soliq.uz ga yo'naltiradi.
     Qaytaradi: (tushuntirish_matni, video_post_id)
     """
     q = query.lower()
 
-    # 1. Agar qidirish yoki tasnif sayti so'ralgan bo'lsa (Post 28)
+    # 1. Kassa apparatiga ma'lumotlar va tovarlar bazasini yuklash (Post 138)
     if any(w in q for w in [
-        "tasnif", "qidirish", "sayt", "topish", "qayerdan",
-        "тасниф", "қидириш", "кидириш", "сайт", "топиш", "қаердан", "каердан"
+        "baza yuklash", "baza yuklasa", "baza kiritish", "excel", "exceldan",
+        "tovarlar bazasi", "tovar bazasi", "baza", "база", "база юклаш", "эксель", "эксел"
     ]):
         text = (
-            "🔍 <b>MXIK kodlarni Tasnif.soliq.uz saytidan qidirish:</b>\n\n"
-            "Davlat Soliq Qo'mitasining rasmiy <b>tasnif.soliq.uz</b> portali orqali har qanday tovar yoki xizmatning 17 xonali MXIK (IKPU) kodini tezkor topishingiz mumkin.\n\n"
+            "📥 <b>Kassa apparatiga tovarlar bazasini yuklash:</b>\n\n"
+            "Kassa apparatiga barcha tovar va xizmatlar ro'yxatini (nomi, narxi, MXIK kodi va shtrix-kodi bilan) "
+            "Excel fayli orqali bir vaqtning o'zida ommaviy yuklash mumkin.\n\n"
             "📌 <b>Tartibi:</b>\n"
-            "1. <a href='https://tasnif.soliq.uz'>tasnif.soliq.uz</a> saytiga kiring;\n"
-            "2. Qidiruv qatoriga tovar nomini yozing (masalan: <i>Non</i>, <i>Sut</i>, <i>Xizmat</i>);\n"
-            "3. Korxonangiz faoliyatiga mos 17 xonali MXIK kodni nusxalab oling;\n"
-            "4. Kassa apparatiga tovar qo'shishda ushbu kodni kiriting."
+            "1. Shaxsiy kabinet yoki kassa dasturidan namunaviy Excel faylni yuklab oling;\n"
+            "2. Tovarlaringiz nomi, narxi va rasmiy MXIK kodlarini jadvalga kiriting;\n"
+            "3. Tayyor faylni kassa apparatiga yuklang."
         )
-        return text, 28
+        return text, 138
 
-    # 2. Agar tekshirish yoki soliq jarimasi so'ralgan bo'lsa (Post 17)
+    # 2. Tovarni otkaz (bekor) qilish va qaytadan to'g'rilab urish (Post 53)
     if any(w in q for w in [
-        "tekshirish", "jarima", "soliq jarima", "xato kod", "to'g'rilash", "togrilash",
-        "текшириш", "жарима", "солиқ жарима", "солик жарима", "хато код", "тўғрилаш", "тогрилаш"
+        "otkaz", "bekor qilish", "bekor qilsa", "bekor", "qaytadan urish", "qaytadan to'g'rilab",
+        "chekni bekor", "tovarni bekor", "отказ", "бекор", "бекор қилиш", "қайтадан уриш"
     ]):
         text = (
-            "⚠️ <b>Tovarlardagi MXIK kodni tekshirish va soliq jarimalari:</b>\n\n"
-            "Soliq qonunchiligiga (VMQ-943) ko'ra, chekda noto'g'ri yoki faoliyatingizga mos kelmaydigan MXIK kodi ko'rsatilsa, soliq organlari tomonidan <b>jarima</b> qo'llaniladi.\n\n"
-            "📌 <b>Nimalarga e'tibor berish lozim:</b>\n"
-            "🔹 Tovarlaringiz MXIK kodi to'g'ri tanlanganini tekshiring;\n"
-            "🔹 O'lchov birligi (dona, kg, litr) mos kelishini nazorat qiling;\n"
-            "🔹 Xato kiritilgan tovarlarni kassa dasturidan to'g'irlab qo'ying."
+            "🔄 <b>Tovarni otkaz (bekor) qilish va qaytadan to'g'rilab urish:</b>\n\n"
+            "Chek urish jarayonida xato tovar yoki noto'g'ri narx tanlangan bo'lsa, uni chek yakunlanishidan oldin bekor qilish mumkin.\n\n"
+            "📌 <b>Tartibi:</b>\n"
+            "1. Savatchadagi xato tovar ustiga bosing va <b>«Otkaz» (Bekor qilish)</b> tugmasini tanlang;\n"
+            "2. Agar chek to'liq urib bo'lingan bo'lsa, qaytarish (vozvrat) chekini chiqaring;\n"
+            "3. To'g'ri tovar va narxni kiritib chekni qaytadan uring."
         )
-        return text, 17
+        return text, 53
 
-    # 3. Naqdga savdo qilib bo'lmaydigan tovarlar (Post 133)
+    # 3. Fiskal chekda QQS stavkasi va MXIK talablari (Post 89)
+    if any(w in q for w in [
+        "qqs", "nds", "soliq stavka", "qqs stavka", "12%", "stavka", "ққс", "ндс", "ставка"
+    ]):
+        text = (
+            "📊 <b>Fiskal chekda QQS stavkasi va MXIK talablari:</b>\n\n"
+            "Vazirlar Mahkamasining 943-sonli qaroriga muvofiq, QQS to'lovchi tadbirkorlar chekda 12% QQS stavkasi va tovarning to'g'ri MXIK kodini ko'rsatishlari shart.\n\n"
+            "📌 <b>QQS sozlamasi:</b>\n"
+            "Kassa dasturida tovar qo'shish vaqtida soliq stavkasini korxonangiz soliq rejimiga qarab (12% yoki 0% QQSiz) to'g'ri belgilang."
+        )
+        return text, 89
+
+    # 4. Naqdga savdo qilib bo'lmaydigan tovarlar (Post 133)
     if any(w in q for w in [
         "zapravka", "alkogol", "tamaki", "naqd", "naqt", "bloklab urish",
         "заправка", "алкогол", "тамаки", "нақд", "накт"
@@ -205,7 +218,41 @@ def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
         )
         return text, 133
 
-    # 4. Asosiy: Tovar qo'shish va MXIK kod kiritish (Post 15)
+    # 5. Tekshirish yoki soliq jarimasi (Post 17)
+    if any(w in q for w in [
+        "tekshirish", "jarima", "soliq jarima", "xato kod", "to'g'rilash", "togrilash",
+        "tekshir", "текшириш", "жарима", "солиқ жарима", "солик жарима", "хато код", "тўғрилаш", "тогрилаш"
+    ]):
+        text = (
+            "⚠️ <b>Tovarlardagi MXIK kodni tekshirish va soliq jarimalari:</b>\n\n"
+            "Soliq qonunchiligiga (VMQ-943) ko'ra, chekda noto'g'ri yoki faoliyatingizga mos kelmaydigan MXIK kodi ko'rsatilsa, soliq organlari tomonidan <b>jarima</b> qo'llaniladi.\n\n"
+            "📌 <b>Nimalarga e'tibor berish lozim:</b>\n"
+            "🔹 Tovarlaringiz MXIK kodi to'g'ri tanlanganini tekshiring;\n"
+            "🔹 O'lchov birligi (dona, kg, litr) mos kelishini nazorat qiling;\n"
+            "🔹 Xato kiritilgan tovarlarni kassa dasturidan to'g'irlab qo'ying."
+        )
+        return text, 17
+
+    # 6. Tasnif sayti, soliq saytidan kod qidirish, qayerdan olinadi yoki aniq tovar kodi so'ralsa (Post 28)
+    if any(w in q for w in [
+        "tasnif", "soliq sayt", "soliqdan", "sayt", "qidirish", "topish", "qayerdan", "qayerdan olaman",
+        "qanday olinadi", "soliq portali", "kodini", "kodi qanaqa", "kodi nima", "kod bering", "kod tashlang",
+        "тасниф", "солиқ сайт", "солик сайт", "сайт", "қидириш", "кидириш", "топиш", "қаердан", "каердан",
+        "қандай олинади", "коди қанақа", "коди нима"
+    ]):
+        text = (
+            "🔍 <b>MXIK kodlarni Tasnif.soliq.uz saytidan qidirish:</b>\n\n"
+            "Davlat Soliq Qo'mitasining rasmiy <b>tasnif.soliq.uz</b> portali orqali har qanday tovar yoki xizmatning 17 xonali MXIK (IKPU) kodini aniq topishingiz mumkin.\n\n"
+            "⚠️ <b>Muhim:</b> Soliq jarimalariga tushmaslik uchun mahsulot va xizmatlarning rasmiy kodlarini faqat Soliq qo'mitasining <b>tasnif.soliq.uz</b> portalidan oling.\n\n"
+            "📌 <b>Tartibi:</b>\n"
+            "1. <a href='https://tasnif.soliq.uz'>tasnif.soliq.uz</a> saytiga kiring;\n"
+            "2. Qidiruv qatoriga tovaringiz nomini yozing (masalan: <i>Non</i>, <i>Kiyim</i>, <i>Xizmat</i>);\n"
+            "3. Korxonangiz faoliyatiga mos 17 xonali MXIK kodni nusxalab oling;\n"
+            "4. Kassa apparatiga tovar qo'shishda ushbu kodni kiriting."
+        )
+        return text, 28
+
+    # 7. Asosiy: Tovar qo'shish va MXIK kod kiritish tartibi (Post 15)
     text = (
         "📦 <b>Tovarlarni qo'shish va MXIK kod kiritish tartibi:</b>\n\n"
         "<b>MXIK (ИКПУ)</b> — bu Mahsulot va xizmatlarning yagona identifikatsiya kodi bo'lib, har bir fiskal chekda aks ettirilishi shart (Davlat Soliq Qo'mitasi talabi).\n\n"
@@ -303,14 +350,22 @@ def classify_payment_intent(text: str) -> Optional[str]:
 
 
 def is_mxik_intent(text: str) -> bool:
-    """Matn MXIK / IKPU / Tasnif / Tovar qo'shish mavzusiga tegishlimi?"""
+    """Matn MXIK / IKPU / Tasnif / Tovar qo'shish / Soliq kodi mavzusiga tegishlimi?"""
     t = text.lower().strip()
     mxik_words = [
         "mxik", "mixk", "мхик", "михк", "ikpu", "икпу",
         "tasnif", "tasnif.soliq", "тасниф",
+        "soliq saytidan kod", "soliq saytidan", "soliqdan kod",
         "tovar qo'shish", "tovar qushish", "tovar kiritish",
         "tovarga kod", "mxik kod", "mxik nima", "mxik xatosi",
-        "mxik jarima", "mxik qayerdan"
+        "mxik jarima", "mxik qayerdan", "tovar kodi", "tovar kodlari",
+        "mahsulot kodi", "xizmat kodi", "kod qayerdan", "kodini qayerdan",
+        "tovarlar bazasi", "tovar bazasi", "baza yuklash", "bazani yuklash",
+        "exceldan tovar", "excel tovar", "otkaz qilish", "chekni bekor",
+        "tovarni bekor", "qqs stavka", "soliq stavka",
+        "солиқ сайтидан", "солиқ сайтидан код", "товар қўшиш", "товар киритиш",
+        "товар коди", "товар кодлари", "код қаердан", "кодини қаердан",
+        "база юклаш", "товарлар базаси", "бекор қилиш", "отказ қилиш"
     ]
     return any(w in t for w in mxik_words)
 
