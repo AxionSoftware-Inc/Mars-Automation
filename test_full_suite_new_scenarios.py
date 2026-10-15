@@ -206,6 +206,9 @@ class TestFullSuiteNewScenarios(unittest.IsolatedAsyncioTestCase):
         reply14 = msg14.reply.call_args[0][0]
         print(f"🤖 Bot: {reply14[:120]}...")
         self.assertIn("Fiskal modul", reply14)
+        self.assertIn("rasmga olib", reply14.lower())
+        bot.copy_message.assert_called_once()
+        self.assertEqual(bot.copy_message.call_args[1]["message_id"], 149)
 
         # -------------------------------------------------------------
         # 15-QADAM: Noma'lum / begona savol (Anti-Hallucination & Eskalatsiya)

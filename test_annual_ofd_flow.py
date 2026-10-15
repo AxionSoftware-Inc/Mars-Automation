@@ -103,6 +103,10 @@ class TestAnnualOFDFlow(unittest.TestCase):
         self.assertTrue(msg1.reply.called)
         reply1_text = msg1.reply.call_args[0][0]
         self.assertIn("Fiskal modul seriya raqamini", reply1_text)
+        self.assertIn("rasmga olib", reply1_text.lower())
+        # Post 149 (namuna rasm) uzatilishi shart
+        copied_ids_step1 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(149, copied_ids_step1)
 
         # 2-Qadam: Mijoz o'z fiskal modulini kiritdi
         msg2 = MagicMock()
@@ -138,6 +142,36 @@ class TestAnnualOFDFlow(unittest.TestCase):
 
     def test_04_full_chat_flow(self):
         asyncio.run(self._async_test_full_chat_flow())
+
+    def test_05_fiscal_module_location_inquiry_sends_post_149(self):
+        """Foydalanuvchi 'fiskal modul qayerda yozilgan' deb so'raganda Post 149 uzatilishi va rasmga olish so'ralishi kerak"""
+        async def _run():
+            bot = MagicMock()
+            bot.copy_message = AsyncMock()
+
+            chat_id = 998866
+            user_id = 998866
+            user_memory.clear_context(chat_id, user_id)
+
+            msg = MagicMock()
+            msg.text = "fiskal modul qayerda yozilgan"
+            msg.chat.id = chat_id
+            msg.chat.type = "supergroup"
+            msg.from_user.id = user_id
+            msg.from_user.username = "test_user2"
+            msg.from_user.full_name = "Test User 2"
+            msg.reply = AsyncMock()
+
+            await handle_user_chat(msg, bot)
+            self.assertTrue(msg.reply.called)
+            reply = msg.reply.call_args[0][0]
+            self.assertIn("Fiskal modul seriya raqami", reply)
+            self.assertIn("rasmga olib", reply.lower())
+            
+            copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+            self.assertIn(149, copied_ids, "Post 149 kanaldan uzatilishi shart!")
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":

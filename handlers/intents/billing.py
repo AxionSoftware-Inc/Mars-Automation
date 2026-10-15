@@ -20,10 +20,12 @@ from payment_accounts import (
     get_monthly_post_note,
     get_annual_post_note,
     get_both_posts_intro,
+    get_fiscal_module_request_prompt,
     MARS_POST_ID,
     MARS_VIDEO_ID,
     YANGI_TEXNOLOGIYALAR_POST_ID,
-    YANGI_TEXNOLOGIYALAR_VIDEO_ID
+    YANGI_TEXNOLOGIYALAR_VIDEO_ID,
+    FISKAL_MODUL_SAMPLE_POST_ID
 )
 
 logger = logging.getLogger(__name__)
@@ -134,13 +136,23 @@ class BillingIntentHandler:
                 if is_both and not remembered_fm:
                     fm_ask = (
                         "🏛 <b>Yillik Soliq (OFD) qarzdorligini ham tekshirish uchun:</b>\n\n"
-                        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring."
+                        "Kassa chekining eng pastki qismidagi <b>Fiskal modul seriya raqamini (LG..., YG..., UZ...)</b> yuboring.\n\n"
+                        "📸 <i>Kassa chekidan namuna quyidagi postda ko'rsatilgan.</i>\n"
+                        "💡 <b>Agar topolmasangiz:</b> Chekning eng pastki qismini <b>tiniq rasmga olib shu yerga tashlang</b> — botimiz o'zi o'qib oladi!"
                     )
                     fm_ask = adapt_to_user_script(fm_ask, user_script)
                     try:
                         await message.answer(fm_ask, parse_mode="HTML")
                     except Exception:
                         await message.answer(fm_ask)
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=FISKAL_MODUL_SAMPLE_POST_ID
+                        )
+                    except Exception as e:
+                        logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
                     user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
                 return True
             elif remembered_fm and not remembered_id:
@@ -226,6 +238,36 @@ class BillingIntentHandler:
             except Exception:
                 pass
             user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+            return True
+
+        # 2.2 Fiskal modul qayerdaligi / chekdan topish haqidagi savollar
+        fm_where_phrases = [
+            "fiskal modul qayerda", "fiskal modul qayerdan", "fiskal modul qayerda yozilgan",
+            "fiskal modul qayerda boladi", "fiskal modul qayerda bo'ladi", "modul raqami qayerda",
+            "fiskal modulni qanday topaman", "fiskal modul topish", "modul topish",
+            "fiskal modul nima", "fiskal modul raqami nima", "fiskal modul haqida",
+            "fiskal modulni bilish", "fiskal modul qayeri", "fiskal modul qayerida",
+            "фискал модул қаерда", "фискал модул каерда", "фискал модул қаердан", "модул рақами қаерда",
+            "фискал модул нима"
+        ]
+        if any(p in lower_text for p in fm_where_phrases):
+            fm_guide = get_fiscal_module_request_prompt(user_script)
+            try:
+                await message.reply(fm_guide, parse_mode="HTML")
+            except Exception:
+                await message.reply(fm_guide)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=FISKAL_MODUL_SAMPLE_POST_ID,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, fm_guide)
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
             return True
 
         # 2.3 Hisob raqamlar postini kanaldan uzatish / to'lov intentlari ("oylikchi", "yillikchi", "to'layman", "shot tashla")
@@ -430,17 +472,22 @@ class BillingIntentHandler:
                     return True
             else:
                 # OFD tizimi faqat Fiskal modul (LG/YG/UZ) bilan ishlaydi, INN bilan emas
-                fm_prompt = (
-                    "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
-                    "OFD tizimi faqat <b>Fiskal modul seriya raqami</b> orqali tekshiriladi (STIR/INN bilan tekshirib bo'lmaydi).\n\n"
-                    "Iltimos, kassa chekining eng pastki qismidagi "
-                    "<b>Fiskal modul seriya raqamini (masalan: <code>LG...</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring."
-                )
-                fm_prompt = adapt_to_user_script(fm_prompt, user_script)
+                fm_prompt = get_fiscal_module_request_prompt(user_script)
                 try:
                     await message.reply(fm_prompt, parse_mode="HTML")
                 except Exception:
                     await message.reply(fm_prompt)
+
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=FISKAL_MODUL_SAMPLE_POST_ID,
+                        reply_to_message_id=message.message_id
+                    )
+                except Exception as e:
+                    logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, fm_prompt)
                 user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")

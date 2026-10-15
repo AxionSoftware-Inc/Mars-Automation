@@ -31,6 +31,7 @@ YANGI_TEXNOLOGIYALAR_ANNUAL_FEE = 440000.0  # 1 yillik fiskal modul to'lovi (so'
 YANGI_TEXNOLOGIYALAR_PHONE = "+998 71 202-32-32"
 YANGI_TEXNOLOGIYALAR_VIDEO_ID = 145         # Click orqali yillik to'lash videosi
 YANGI_TEXNOLOGIYALAR_POST_ID = 34           # Rekvizit matni
+FISKAL_MODUL_SAMPLE_POST_ID = 149          # Chekdan Fiskal modul va INN topish namunasi (rasmli post)
 
 
 # Kalit so'zlar
@@ -146,6 +147,21 @@ def get_both_posts_intro(script: str = "latin") -> str:
         "1️⃣ <b>Oylik abonent to'lovi (100 000 so'm)</b> — «MARS ELEKTRON TEXNIKA» MCHJ ga\n"
         "2️⃣ <b>Yillik fiskal modul to'lovi (440 000 so'm)</b> — «Yangi Texnologiyalar» DUK ga\n\n"
         "👇 <i>Quyida rasmiy kanaldan ikkala hisob raqamning matnli postlari va video-qo'llanmalari uzatilmoqda:</i>"
+    )
+    return adapt_to_user_script(text, script)
+
+
+def get_fiscal_module_request_prompt(script: str = "latin") -> str:
+    """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va namuna post haqida ko'rsatma"""
+    from translit_manager import adapt_to_user_script
+    text = (
+        "🏛 <b>Davlat Soliq (OFD) yillik to'lovini tekshirish:</b>\n\n"
+        "OFD tizimi faqat <b>Fiskal modul seriya raqami</b> orqali tekshiriladi (STIR/INN bilan tekshirib bo'lmaydi).\n\n"
+        "Iltimos, aynan o'sha muammoli apparatingizdan chiqarilgan kassa chekining eng pastki qismidagi "
+        "<b>Fiskal modul seriya raqamini (masalan: <code>LG420210630789</code>, <code>YG...</code>, <code>UZ...</code>)</b> yuboring.\n\n"
+        "📸 <i>Kassa chekidan namuna rasmi quyidagi postda ko'rsatilgan.</i>\n\n"
+        "💡 <b>Agar chekdan raqamni topolmasangiz:</b>\n"
+        "Muammoli apparatingiz chekining eng pastki qismini <b>tiniq rasmga olib shu yerga tashlang</b> — botimiz Fiskal modul raqamini o'zi avtomatik o'qib oladi va tekshirib beradi!"
     )
     return adapt_to_user_script(text, script)
 
@@ -288,6 +304,11 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "қачонгача", "қачон", "муддат", "қайси сана", "санагача", "қарз", "борми", "текшир"
     ]):
         if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "шот", "реквизит", "ҳисоб"]):
+            return None
+
+    # Agar savol qayerdaligi, topish, qayerda yozilgani haqida bo'lsa va to'lov/shot so'ralmagan bo'lsa -> rekvizit intenti emas!
+    if any(w in t for w in ["qayerda", "qayerdan", "yozilgan", "topish", "topaman", "topsa", "nima", "haqida", "қаерда", "каерда", "қаердан", "ёзилган"]):
+        if not any(w in t for w in ["to'la", "tola", "to'lash", "tolash", "shot", "rekvizit", "xisob", "hisob", "тўла", "тола", "шот"]):
             return None
 
     # Yillik to'lov alomatlari (Lotin va Kirill)

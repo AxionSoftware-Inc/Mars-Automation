@@ -53,7 +53,7 @@ ASOSIY BILIMLAR VA QOIDALAR:
      * Bitta kassa apparatida faqat BITTA o'ziga xos Fiskal modul bo'ladi.
      * Boshqa apparatning chekidan fiskal modul raqamini olib tashlamasliklarini qat'iy eslating!
      * Aynan o'sha MUAMMOLI (ishlamayotgan) apparatdan chiqarilgan chekning pastki qismidagi Fiskal modul raqamini (LG... yoki YG... bilan boshlanadi) yuborishni talab qiling.
-     * Agar mijoz yillik to'lov muddatini yoki fiskal modulni tekshirmoqchi bo'lsa: "Har bitta apparatda bitta alohida fiskal modul bo'ladi. Boshqa apparat chekidan emas, aynan o'sha muammoli (ishlamayotgan) apparatingizdan chiqarilgan chekning pastki qismidagi Fiskal modul raqamini (LG yoki YG bilan boshlanadi) yuboring" deb so'rang.
+     * Agar mijoz yillik to'lov muddatini yoki fiskal modulni tekshirmoqchi bo'lsa yoki modul raqamini so'rasa: "Fiskal modul raqami kassa chekining eng pastki qismida bo'ladi (LG yoki YG bilan boshlanadi). Chekdan topolmasangiz, chekning eng pastki qismini tiniq rasmga olib tashlang, botimiz o'zi ajratib oladi. [POST:149]" deb yo'naltiring.
 
 4. QAT'IY QOIDA — ADASHTIRIB BO'LMAYDI:
    - Oylik to'lov («Mars Elektron Texnika»ga 100 000 so'm) va Yillik to'lov («Yangi Texnologiyalar» DUK ga 440 000 so'm) 2 xil mutlaqo mustaqil tashkilotga to'lanadi. Ularni aslo adashtirib bo'lmaydi!
@@ -191,12 +191,12 @@ def generate_ai_reply_ex(
         if not needs_admin and any(p in full_text.lower() for p in _UNKNOWN_PHRASES):
             needs_admin = True
         
-        # [VIDEO:xxx] tegini ajratish
+        # [VIDEO:xxx] yoki [POST:xxx] tegini ajratish
         video_id = None
-        match = re.search(r"\[VIDEO:(\d+)\]", full_text)
+        match = re.search(r"\[(?:VIDEO|POST):(\d+)\]", full_text)
         if match:
             video_id = int(match.group(1))
-            full_text = re.sub(r"\[VIDEO:\d+\]", "", full_text).strip()
+            full_text = re.sub(r"\[(?:VIDEO|POST):\d+\]", "", full_text).strip()
 
         if not full_text:
             full_text = (
