@@ -112,6 +112,39 @@ class BillingIntentHandler:
                 user_memory.add_assistant_message(chat_id, user_id, summary_msg)
                 return True
 
+        # 1.9 Maxsus holat: Ikkala to'lovni bitta hisob raqamga to'lash mumkinmi deb so'ralsa
+        single_account_query = any(w in lower_text for w in [
+            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "birga to'la", "birga tola",
+            "bitta qilib to'la", "bitta qilib tola", "qo'shib to'la", "qoshib tola", "bitta schet",
+            "битта ҳисоб", "битта хисоб", "битта шот", "бирга тўла", "бирга тола", "битта счёт"
+        ])
+        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam"]):
+            single_warn = (
+                "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
+                "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
+                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
+                "Kassa apparatiga servis xizmati ko'rsatish uchun <b>«Mars Elektron Texnika» MChJ</b> hisob raqamiga to'lanadi.\n\n"
+                "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n"
+                "Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun to'g'ridan-to'g'ri Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> hisob raqamiga to'lanadi.\n\n"
+                "⚠️ <b>Agar ikkalasini bitta hisob raqamga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi!</b> Har birini o'zining hisob raqamiga alohida to'lashingiz shart.\n\n"
+                "👇 <i>Quyida har ikkala tashkilotning alohida to'lov rekvizitlari yuborildi:</i>"
+            )
+            single_warn = adapt_to_user_script(single_warn, user_script)
+            try:
+                await message.reply(single_warn, parse_mode="HTML")
+            except Exception:
+                await message.reply(single_warn)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, single_warn)
+
+            try:
+                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
+                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
+            except Exception:
+                pass
+            user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+            return True
+
         # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
         is_both = is_both_check_intent(text) or (bool(found_fm) and bool(found_inn)) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
         is_general_debt = is_general_debt_check_intent(text)
@@ -200,39 +233,6 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
             elif ofd_reply and "faol" in ofd_reply.lower():
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
-            return True
-
-        # 2.2 Maxsus holat: Ikkala to'lovni bitta hisob raqamga to'lash mumkinmi deb so'ralsa
-        single_account_query = any(w in lower_text for w in [
-            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "birga to'la", "birga tola",
-            "bitta qilib to'la", "bitta qilib tola", "qo'shib to'la", "qoshib tola", "bitta schet",
-            "битта ҳисоб", "битта хисоб", "битта шот", "бирга тўла", "бирга тола", "битта счёт"
-        ])
-        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam"]):
-            single_warn = (
-                "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
-                "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
-                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
-                "Kassa apparatiga servis xizmati ko'rsatish uchun <b>«Mars Elektron Texnika» MChJ</b> hisob raqamiga to'lanadi.\n\n"
-                "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n"
-                "Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun to'g'ridan-to'g'ri Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> hisob raqamiga to'lanadi.\n\n"
-                "⚠️ <b>Agar ikkalasini bitta hisob raqamga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi!</b> Har birini o'zining hisob raqamiga alohida to'lashingiz shart.\n\n"
-                "👇 <i>Quyida har ikkala tashkilotning alohida to'lov rekvizitlari yuborildi:</i>"
-            )
-            single_warn = adapt_to_user_script(single_warn, user_script)
-            try:
-                await message.reply(single_warn, parse_mode="HTML")
-            except Exception:
-                await message.reply(single_warn)
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, single_warn)
-
-            try:
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-            except Exception:
-                pass
-            user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
             return True
 
         # 2.2 Fiskal modul qayerdaligi / chekdan topish haqidagi savollar

@@ -23,20 +23,14 @@ def quick_deploy():
         'handlers/intents/operator.py'
     ]
 
+    sftp = ssh.open_sftp()
     for f in files_to_sync:
         local_p = os.path.join(os.path.dirname(__file__), f)
         remote_p = f"{remote_dir}/{f}"
         print(f"Uploading {f} -> {remote_p}...")
-        with open(local_p, 'rb') as fp:
-            data = fp.read()
-        stdin, stdout, stderr = ssh.exec_command(f"cat > '{remote_p}'")
-        stdin.write(data)
-        stdin.channel.shutdown_write()
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode()
-            raise RuntimeError(f"Failed to upload {f}: {err}")
-        print(f"Uploaded {f} ({len(data)} bytes) OK")
+        sftp.put(local_p, remote_p)
+        print(f"Uploaded {f} OK")
+    sftp.close()
 
     print("Restarting mars-bot.service...")
     _, stdout, stderr = ssh.exec_command("systemctl restart mars-bot.service")
