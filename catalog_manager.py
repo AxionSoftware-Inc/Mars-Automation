@@ -84,7 +84,7 @@ class CatalogManager:
 
         # Agar savol qarz, oylik/yillik holat yoki hisob haqida bo'lsa va video so'ralmagan bo'lsa -> video bermaslik
         if any(w in t for w in ["oylik", "yillik", "fiskal", "qarz", "qarzdorlik", "tekshir"]):
-            if not any(w in t for w in ["video", "rolik", "kursat", "ko'rsat", "qollanma", "qo'llanma"]):
+            if not any(w in t for w in ["video", "rolik", "kursat", "ko'rsat", "qollanma", "qo'llanma", "topish", "qayerda", "qayerdan"]):
                 return None
 
         # Eng yuqori moslikdagi postni topish

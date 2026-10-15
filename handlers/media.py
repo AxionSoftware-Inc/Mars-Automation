@@ -25,6 +25,7 @@ router = Router(name="media_router")
 
 DESTINATION_CHANNEL_ID = -1003784534841  # marsfayllar
 SOURCE_CHANNEL_ID = -1001641871516       # @POS_Terminal_UzSmart_Bank
+EXCEL_CHANNEL_ID = int(os.getenv("EXCEL_CHANNEL_ID", "-1001795471853"))  # Абонент тулови🏦💸💰
 
 RECEIPT_KEYWORDS = [
     "to'lov", "tolov", "chek", "kvitansiya", "click", "payme", "oplata",
@@ -73,7 +74,7 @@ async def handle_document(message: types.Message, bot: Bot):
     # A) EXCEL BAZA FAYLI
     if file_name.endswith(".xlsx") or file_name.endswith(".xls"):
         # XAVFSIZLIK: Faqat rasmiy kanal yoki vakolatli adminlar (@Yashnarbek_butaev) bazani yangilashi mumkin!
-        is_channel = (message.chat.id == DESTINATION_CHANNEL_ID or message.chat.type == ChatType.CHANNEL)
+        is_channel = (message.chat.id in (DESTINATION_CHANNEL_ID, EXCEL_CHANNEL_ID) or message.chat.type == ChatType.CHANNEL)
         username = message.from_user.username if message.from_user else None
         is_authorized_admin = admin_manager.is_admin(user_id, username)
 

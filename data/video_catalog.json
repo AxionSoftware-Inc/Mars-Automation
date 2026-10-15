@@ -416,5 +416,20 @@
       "click shot",
       "rekvizit orqali"
     ]
+  },
+  {
+    "id": 149,
+    "title": "Chekdan INN, JSHSHIR va Fiskal modul raqamini topish",
+    "description": "Fiskal chekdan tashkilot INNsi, JSHSHIR yoki Fiskal modul seriya raqamini aniqlash bo'yicha qo'llanma",
+    "keywords": [
+      "inn topish",
+      "jshshir topish",
+      "fiskal modul topish",
+      "chekdan inn",
+      "chekdan fiskal",
+      "modul raqami qayerda",
+      "inn qayerda yozilgan",
+      "fiskal modul qayerda"
+    ]
   }
 ]

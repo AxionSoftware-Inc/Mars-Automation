@@ -38,7 +38,10 @@ def deploy():
         'data/video_catalog.json',
         'data/screen_errors.json',
         'data/admin_config.json',
+        'data/bot_state.json',
+        'data/latest.xlsx',
         'data/ofd_user.session',
+
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',

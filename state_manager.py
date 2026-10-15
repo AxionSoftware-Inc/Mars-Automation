@@ -32,3 +32,13 @@ def set_last_file_message_id(msg_id: int):
     state = load_state()
     state["last_channel_file_msg_id"] = msg_id
     save_state(state)
+
+def get_last_excel_channel_msg_id() -> Optional[int]:
+    state = load_state()
+    return state.get("last_excel_channel_msg_id")
+
+def set_last_excel_channel_msg_id(msg_id: int):
+    state = load_state()
+    state["last_excel_channel_msg_id"] = msg_id
+    save_state(state)
+

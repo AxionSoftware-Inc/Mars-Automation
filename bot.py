@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from handlers import main_router
+from ofd_bridge import ofd_bridge
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -20,9 +21,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 dp = Dispatcher()
 dp.include_router(main_router)
 
-# HAR KUNI ERTALAB SOAT 9:00 DA AVTOMATIK YANGILANISH REJASI
+# HAR KUNI ERTALAB SOAT 9:00 DA VA HAR 30 DAQIQADA AVTOMATIK YANGILANISH REJASI
 async def daily_channel_file_maintenance(bot: Bot):
-    logger.info("Har kungi soat 09:00 rejasi: yangi kunlik baza holati nazorat qilindi.")
+    logger.info("⏰ Kunlik baza tekshiruvi: Kanaldan yangi Excel fayl qidirilmoqda...")
+    try:
+        updated = await ofd_bridge.sync_excel_from_channel()
+        if updated:
+            logger.info("✅ Yangi kunlik Excel baza avtomatik yangilandi!")
+    except Exception as e:
+        logger.error(f"Rejali baza yangilashda xatolik: {e}")
 
 async def main():
     if not BOT_TOKEN:
@@ -33,15 +40,27 @@ async def main():
 
     # Scheduler rejalashtiruvchi
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
+    # Har kuni soat 9:00 da
     scheduler.add_job(
         daily_channel_file_maintenance,
         CronTrigger(hour=9, minute=0, timezone="Asia/Tashkent"),
         args=[bot]
     )
+    # Ish vaqtida har 30 daqiqada yangi fayl chiqqanligini tekshirish
+    scheduler.add_job(
+        daily_channel_file_maintenance,
+        CronTrigger(minute="*/30", timezone="Asia/Tashkent"),
+        args=[bot]
+    )
     scheduler.start()
 
     logger.info("Mars Smart POS boti modulli arxitektura bilan ishga tushirildi...")
+    
+    # Ishga tushganda fon rejimida oxirgi Excel faylni tekshirish
+    asyncio.create_task(daily_channel_file_maintenance(bot))
+
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
+

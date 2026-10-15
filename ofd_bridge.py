@@ -439,7 +439,83 @@ class OFDBridgeManager:
         """Eski kod bilan moslik uchun alias"""
         return await self.query_fiscal_module(bot, inn, timeout=timeout)
 
+    async def sync_excel_from_channel(self, channel_id: int = -1001795471853) -> bool:
+        """
+        Telethon user-akkaunt orqali Excel bazasi yuboriladigan kanaldan (masalan: Абонент тулови🏦💸💰 -1001795471853)
+        eng so'nggi .xlsx faylni avtomatik yuklab olib, excel_manager bazasini yangilash.
+        """
+        if not self.has_user_session():
+            logger.warning("sync_excel_from_channel: User session topilmadi.")
+            return False
+
+        target_channel = int(os.getenv("EXCEL_CHANNEL_ID", str(channel_id)))
+        client = None
+        try:
+            from telethon import TelegramClient
+            from excel_manager import excel_manager
+            from state_manager import get_last_excel_channel_msg_id, set_last_excel_channel_msg_id
+
+            session_prefix = os.path.join(DATA_DIR, "ofd_user")
+            client = TelegramClient(session_prefix, API_ID, API_HASH)
+            await client.connect()
+            if not await client.is_user_authorized():
+                logger.warning("sync_excel_from_channel: Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
+                return False
+
+            last_synced_id = get_last_excel_channel_msg_id()
+            found_msg = None
+
+            async for message in client.iter_messages(target_channel, limit=20):
+                if message.file and getattr(message.file, "name", None):
+                    fn = message.file.name.lower()
+                    if fn.endswith(".xlsx") or fn.endswith(".xls"):
+                        found_msg = message
+                        break
+
+            if not found_msg:
+                logger.info(f"sync_excel_from_channel: Kanaldan ({target_channel}) Excel fayl topilmadi.")
+                return False
+
+            if last_synced_id and found_msg.id <= last_synced_id:
+                logger.info(f"sync_excel_from_channel: Yangi Excel fayl yo'q (oxirgi yuklangan msg_id={last_synced_id}).")
+                return False
+
+            temp_path = os.path.join(DATA_DIR, f"auto_sync_{found_msg.file.name}")
+            logger.info(f"📥 sync_excel_from_channel: Yangi Excel fayl yuklab olinmoqda (msg_id={found_msg.id}, name={found_msg.file.name})...")
+            await client.download_media(found_msg, file=temp_path)
+
+            if os.path.exists(temp_path):
+                success = excel_manager.update_file(temp_path)
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+
+                if success:
+                    set_last_excel_channel_msg_id(found_msg.id)
+                    logger.info(
+                        f"✅ sync_excel_from_channel: Baza muvaffaqiyatli yangilandi! "
+                        f"MsgID={found_msg.id}, Yozuvlar={excel_manager.records_count}"
+                    )
+                    return True
+                else:
+                    logger.error("❌ sync_excel_from_channel: excel_manager faylni qabul qilmadi.")
+                    return False
+
+        except Exception as e:
+            logger.error(f"❌ sync_excel_from_channel xatoligi: {e}", exc_info=True)
+            return False
+        finally:
+            if client:
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+
+        return False
+
 
 ofd_bridge = OFDBridgeManager()
+
 
 
