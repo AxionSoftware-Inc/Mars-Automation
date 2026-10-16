@@ -103,10 +103,30 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
    E) OYLIK VA YILLIK QARZNI MUTLAQO ANIQ VA ZID KELMASDAN AYTISH:
       - Agar mijoz "oylikchi?", "oylikdan qancha?", "qancha tolay?", "oylik qarzim qancha?" desa:
         Kontekstdagi «Mars» oylik abonent qarzdorligi miqdoriga qat'iy qarang! Agar kontekstda qarz bo'lsa (masalan 2 100 000 so'm), AYNAN o'sha summani ayting: "Oylik abonent to'lovidan [summa] so'm qarzdorlik mavjud." HECH QACHON "qarzingiz yo'q" deb o'zingizga zid gapirmang!
-      - Agar mijoz "yillikkachi?", "yillikchi?", "yillik qarzim bormi?" desa:
+      - Agar mijoz "yillikkachi?", "yillikchi?", "yillikka kemaganmi?", "yillikka kelmaganmi?", "yillik kelmadimi?", "yillik qarzim bormi?" desa:
         Kontekstdagi Davlat Soliq (OFD) yillik to'lovi holatiga qarang:
         -> Agar yillikdan qarzdorlik yo'q (faol) bo'lsa: "Davlat Soliq (OFD) yillik to'lovidan qarzingiz yo'q, litsenziyangiz faol." deb ayting.
         -> Agar yillikdan qarz bo'lsa: "Davlat Soliq (OFD) yillik litsenziyasi uchun 440 000 so'm to'lov muddati tugagan. [VIDEO:145]" deb ayting.
+        -> Agar yillik holati noma'lum bo'lsa (fiskal modul kiritilmagan bo'lsa): "Yillik Davlat Soliq (OFD) litsenziya muddatini tekshirishimiz uchun apparat chekining pastki qismidagi Fiskal modul raqamini (LG... yoki YG...) yuboring. [POST:149]" deb ayting. To'lov rekvizitini so'ralmagan bo'lsa yubormang!
+
+      - Agar mijoz noaniq / chalkash / davomiy savol bersa (kontekstga qarab javob bering):
+        * "qancha to'lay?", "qancha tolay?", "qancha to'lashim kerak?", "qancha qarz?":
+          -> Agar oylik qarzdorlik 0 bo'lsa va yillik holat noma'lum bo'lsa: "«Mars» oylik abonent to'lovidan qarzingiz yo'q (0 so'm). Yillik Davlat Soliq (OFD) litsenziyasi to'lovi kerakligini aniqlash uchun chekdagi Fiskal modul raqamini (LG... yoki YG...) yuboring. [POST:149]" deb ayting, to'lov kartasi yoki video tashlamang!
+          -> Agar oylik qarz bo'lsa: "Oylik abonent to'lovidan [summa] so'm qarzdorlik mavjud. [VIDEO:148]" deb ayting.
+        * "yana pul to'laymanmi?", "yana tolaymanmi?", "yana to'lash kerakmi?":
+          -> "Hozirda qarzdorlik yo'q (0 so'm). Keyingi oylik abonent to'lovini kelgusi oyning 6-sanasigacha to'laysiz." deb ayting.
+        * "keyinchi?", "keyin nima?", "endi nima qilay?":
+          -> Agar yillik holat tekshirilmagan bo'lsa: "Keyingi qadam — kassa chekining eng pastki qismidagi Fiskal modul raqamini (LG... yoki YG...) yuboring yoki chekni rasmga olib tashlang. [POST:149]" deb ayting.
+        * "fiskal modul nima u?", "modul nima?":
+          -> "Fiskal modul — bu kassa apparatingiz ichidagi Davlat Soliq xizmati bilan ishlovchi chip. Uning raqami kassa chekining eng pastida bo'ladi (masalan: LG420210630789). Chekni rasmga olib yuborsangiz ham bo'ladi. [POST:149]" deb tushuntiring.
+        * "chek chiqmayaptiku?", "chek yo'qku?", "chek chiqmayapti?":
+          -> "Kassadan chek chiqmayotgan bo'lsa: 1) Avvalgi eski chekning pastki qismiga qarang; 2) Yoki apparatning orqasidagi seriya raqami / nakleykasini rasmga oling; 3) Yoki apparat ekranidagi ko'rinishni rasmga olib tashlang." deb yo'l ko'rsating.
+        * "qaysi biriga to'layman?", "qaysiga tolay?":
+          -> "Smart POS apparatlarida 2 xil to'lov bor: 1) «Mars» oylik abonent to'lovi (100 000 so'm) va 2) Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm). Qaysi biri kerak bo'lsa, «Oylik shot» yoki «Yillik shot» deb yozing." deb tushuntiring.
+        * "tushunmadim nimani yuboray?", "tushunmadim?":
+          -> "Kassa apparatidan chiqqan har qanday chekning pastki qismini rasmga olib shu yerga tashlasangiz kifoya." deb ayting.
+        * "nega o'chib qolgan unda?", "qarzi bo'lmasa nega ishlamaydi?":
+          -> "Abonent to'lovidan qarzingiz yo'q. Sababi Soliq litsenziyasi tugaganligi, internet yo'qligi yoki vaqt adashishi bo'lishi mumkin. Ekrandagi xatolikni rasmga olib yuboring." deb ayting.
 
 2. AGAR KONTEKSTDA INN UMUMAN BO'LMASA (noma'lum yoki yangi mijoz):
    - Agar mijoz "qarzim bormi?", "qachon qo'shiladi?", "qachon yoqiladi?", "ishlamayapti", "blok bo'ldi", "to'xtab qoldi" desa:
@@ -218,6 +238,64 @@ def generate_ai_reply_ex(
         return adapt_to_user_script(fallback_text, target_script), None, False
 
 
+async def generate_ai_reply_ex_async(
+    user_message: str,
+    context_history: str = "",
+    target_script: Optional[str] = None
+) -> Tuple[str, Optional[int], bool]:
+    """
+    generate_ai_reply_ex ning asinxron talqini — asyncio event loopni hech qachon bloklamaydi!
+    """
+    from translit_manager import detect_script, adapt_to_user_script
+
+    if not target_script or target_script == "unknown":
+        detected = detect_script(user_message)
+        target_script = detected if detected in ("cyrillic", "latin") else "latin"
+
+    try:
+        content_prompt = user_message.strip()
+        if context_history:
+            content_prompt = (
+                f"Suhbat tarixi va mijoz haqidagi ma'lumotlar:\n{context_history}\n\n"
+                f"Mijozning hozirgi xabari: {user_message.strip()}"
+            )
+
+        messages = [
+            {"role": "system", "content": COMPANY_SYSTEM_INSTRUCTION.strip()},
+            {"role": "user", "content": content_prompt}
+        ]
+
+        full_text = await openrouter_client.chat_completion_async(messages=messages, temperature=0.2) or ""
+        full_text = full_text.strip()
+
+        needs_admin = ADMIN_QUESTION_TAG in full_text
+        full_text = full_text.replace(ADMIN_QUESTION_TAG, "").strip()
+        if not needs_admin and any(p in full_text.lower() for p in _UNKNOWN_PHRASES):
+            needs_admin = True
+
+        video_id = None
+        match = re.search(r"\[(?:VIDEO|POST):(\d+)\]", full_text)
+        if match:
+            video_id = int(match.group(1))
+            full_text = re.sub(r"\[(?:VIDEO|POST):\d+\]", "", full_text).strip()
+
+        if not full_text:
+            full_text = (
+                "Savolingiz bo'yicha to'liq ma'lumot olish uchun korxonangiz INN raqamini yuboring "
+                "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
+            )
+
+        full_text = adapt_to_user_script(full_text, target_script)
+        return full_text, video_id, needs_admin
+
+    except Exception as e:
+        logger.error(f"AI reply asinxron xatoligi: {e}")
+        fallback_text = (
+            "Savolingiz bo'yicha ma'lumot olish uchun INN raqamingizni yuboring yoki apparat ekranini rasmga olib tashlang."
+        )
+        return adapt_to_user_script(fallback_text, target_script), None, False
+
+
 def generate_ai_reply(
     user_message: str,
     context_history: str = "",
@@ -245,7 +323,7 @@ class AIHelper:
         from translit_manager import detect_script
         script = detect_script(user_text)
         context = user_memory.get_context_summary(chat_id, user_id)
-        return generate_ai_reply_ex(user_message=user_text, context_history=context, target_script=script)
+        return await generate_ai_reply_ex_async(user_message=user_text, context_history=context, target_script=script)
 
     async def ask_with_context(
         self,
@@ -259,3 +337,4 @@ class AIHelper:
 
 
 ai_helper = AIHelper()
+

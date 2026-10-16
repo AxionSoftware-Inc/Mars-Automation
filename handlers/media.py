@@ -2,6 +2,7 @@ import os
 import io
 import re
 import time
+import asyncio
 import logging
 from typing import Dict, Optional
 from aiogram import Router, types, Bot, F
@@ -10,7 +11,7 @@ from aiogram.enums import ChatType
 from excel_manager import excel_manager, DATA_DIR
 from image_analyzer import analyze_media_image, extract_device_facts
 from receipt_analyzer import extract_receipt_facts
-from admin_manager import admin_manager
+from admin_manager import admin_manager, get_admin_contact_keyboard
 from core import core_engine, ActionType
 from core.models import extract_clean_inn, extract_fiscal_module, ReceiptFacts, FiscalChekFacts
 from user_memory import user_memory
@@ -92,7 +93,7 @@ async def handle_document(message: types.Message, bot: Bot):
             temp_file = os.path.join(DATA_DIR, f"temp_{doc.file_name}")
             await bot.download(doc, destination=temp_file)
             
-            success = excel_manager.update_file(temp_file)
+            success = await asyncio.to_thread(excel_manager.update_file, temp_file)
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
@@ -356,10 +357,39 @@ async def _process_fiscal_receipt_content(
 
     final_text = adapt_to_user_script("\n".join(lines), user_script)
 
-    try:
-        await message.reply(final_text, parse_mode="HTML")
-    except Exception:
-        await message.reply(final_text)
+    is_issue = user_memory.is_issue_mode(chat_id, user_id)
+    if not has_monthly_debt and not has_annual_debt and fm and is_issue:
+        final_text += adapt_to_user_script(
+            "\n\n🟢 <b>To'lovlar bo'yicha qarzdorlik yo'q!</b>\n"
+            "Kassa cheki va apparat ma'lumotlari zudlik bilan Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
+            "Quyidagi tugmalar orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:",
+            user_script
+        )
+        kb = get_admin_contact_keyboard()
+        try:
+            await message.reply(final_text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            await message.reply(final_text, reply_markup=kb)
+
+        init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat ishlamayapti"
+        await admin_manager.notify_debt_free_device_issue(
+            bot=bot,
+            user=message.from_user,
+            chat_id=chat_id,
+            org_name=org_name,
+            inn=inn or "",
+            issue_summary=f"Mijoz kassa chekini yubordi. Dastlabki murojaat: {init_q}. Izoh: {caption}",
+            user_comment=caption,
+            photo_file_id=file_id,
+            fiscal_module=fm
+        )
+        user_memory.clear_issue_mode(chat_id, user_id)
+        user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
+    else:
+        try:
+            await message.reply(final_text, parse_mode="HTML")
+        except Exception:
+            await message.reply(final_text)
 
     # Qarz bo'lsa hisob raqamni matnda yozmasdan, kanaldan rasmiy post uzatiladi
     if has_monthly_debt:
@@ -489,27 +519,87 @@ async def _process_image_content(
         if decision.action == ActionType.IGNORE:
             return
 
+        is_issue = user_memory.is_issue_mode(chat_id, user_id)
+        last_topic = user_memory.get_last_topic(chat_id, user_id)
+        is_awaiting_photo = last_topic in ("awaiting_screen_photo", "issue_escalated_to_admin")
+        is_escalation_target = (decision.should_notify_admin and decision.admin_alert_type == "tech_issue") or is_issue or is_awaiting_photo
+
+        inn_to_use = decision.detected_inn or user_memory.get_last_id(chat_id, user_id) or ""
+        org_to_use = decision.org_name or user_memory.get_org_name(chat_id, user_id) or ""
+        alert_text = decision.admin_alert_text or (device_facts.screen_text_summary if device_facts else "") or "Ekrandagi nosozlik"
+        
+        ann_st = user_memory.get_annual_status(chat_id, user_id)
+        has_ann_debt = ann_st.get("has_debt", False) if ann_st else False
+        total_debt = decision.debt_amount if decision.debt_amount is not None else (user_memory.get_debt_info(chat_id, user_id) or {}).get("debt", 0.0)
+
+        # AGAR OYLIK VA YILLIK QARZDORLIK BO'LMASA -> USERGA "ILTIMOS KUTING MA'LUMOTLAR ADMINGA YUBORILDI" DEYISH:
+        if total_debt <= 0 and not has_ann_debt and (is_escalation_target or inn_to_use):
+            target_fm = user_memory.get_last_fm(chat_id, user_id)
+            await admin_manager.notify_debt_free_device_issue(
+                bot=bot,
+                user=message.from_user,
+                chat_id=chat_id,
+                org_name=org_to_use,
+                inn=inn_to_use,
+                issue_summary=alert_text,
+                user_comment=caption,
+                photo_file_id=file_id,
+                fiscal_module=target_fm
+            )
+            fm_text = f"\n🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>" if target_fm else ""
+            esc_ack = (
+                "👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz mas'ul adminga yuborildi!</b>\n\n"
+                f"🏢 <b>Korxona:</b> {org_to_use}\n"
+                f"🆔 <b>INN:</b> <code>{inn_to_use}</code>"
+                f"{fm_text}\n"
+                "📸 Kassa apparati ekranidagi xatolik rasmi va texnik holati bo'yicha ma'lumotlar Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n\n"
+                "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanib, apparatni sozlab beradi.\n"
+                "Quyidagi tugmalar orqali ham to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+            )
+            esc_ack = adapt_to_user_script(esc_ack, user_script)
+            kb = get_admin_contact_keyboard()
+            try:
+                await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
+            except Exception:
+                await message.reply(esc_ack, reply_markup=kb)
+
+            user_memory.mark_escalated_to_admin(chat_id, user_id, reason="Ekran rasmi qabul qilindi va adminga yuborildi")
+            user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
+            user_memory.add_assistant_message(chat_id, user_id, esc_ack)
+            return
+
         if decision.reply_text:
             reply_text = adapt_to_user_script(decision.reply_text, user_script)
+            kb = get_admin_contact_keyboard() if is_escalation_target else None
             try:
-                await message.reply(reply_text, parse_mode="HTML")
+                if kb:
+                    await message.reply(reply_text, parse_mode="HTML", reply_markup=kb)
+                else:
+                    await message.reply(reply_text, parse_mode="HTML")
             except Exception:
-                await message.reply(reply_text)
+                if kb:
+                    await message.reply(reply_text, reply_markup=kb)
+                else:
+                    await message.reply(reply_text)
 
             user_memory.add_user_message(chat_id, user_id, f"[Ekran rasmi] {caption}".strip())
             user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
-        if decision.should_notify_admin and decision.admin_alert_type == "tech_issue":
+        if is_escalation_target:
             await admin_manager.notify_technical_issue(
                 bot=bot,
                 user=message.from_user,
                 chat_id=chat_id,
-                org_name=decision.org_name or "",
-                inn=decision.detected_inn or "",
-                issue_summary=decision.admin_alert_text or "Texnik nosozlik",
+                org_name=org_to_use,
+                inn=inn_to_use,
+                issue_summary=alert_text,
                 user_comment=caption,
                 photo_file_id=file_id
             )
+
+            if is_issue:
+                user_memory.clear_issue_mode(chat_id, user_id)
+                user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
 
         if decision.video_id:
             try:
@@ -525,6 +615,35 @@ async def _process_image_content(
 
     # 3. BEGONA TASVIR YOKI XATOLIK BO'LGANDA XAVFSIZLIK CHIQISHI
     else:
+        is_issue = user_memory.is_issue_mode(chat_id, user_id)
+        if is_issue:
+            inn_to_use = user_memory.get_last_id(chat_id, user_id) or ""
+            org_to_use = user_memory.get_org_name(chat_id, user_id) or ""
+            init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat nosozligi rasmi"
+            await admin_manager.notify_user_query_escalation(
+                bot=bot,
+                user=message.from_user,
+                chat_id=chat_id,
+                query_text=f"Mijoz apparat rasmini yubordi. Dastlabki murojaat: {init_q}. Izoh: {caption}",
+                reason="Apparat nosozligi rasmi yuborildi",
+                inn=inn_to_use,
+                org_name=org_to_use,
+                photo_file_id=file_id
+            )
+            user_memory.clear_issue_mode(chat_id, user_id)
+            user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
+            ack_msg = (
+                "📸 <b>Tasvir qabul qilindi va mutaxassislarimizga uzatildi.</b>\n\n"
+                "👨‍💻 Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimiz (@quvonchbek_admin, @Yashnarbek_butaev) apparatingiz holatini tekshirib, tez orada yordam berishadi.\n"
+                "Quyidagi tugmalar orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:"
+            )
+            kb = get_admin_contact_keyboard()
+            try:
+                await message.reply(adapt_to_user_script(ack_msg, user_script), parse_mode="HTML", reply_markup=kb)
+            except Exception:
+                await message.reply(ack_msg, reply_markup=kb)
+            return
+
         if device_facts and device_facts.extraction_error:
             logger.warning(f"Tasvir sensori xatoligi: {device_facts.extraction_error}")
             if caption or message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
@@ -601,3 +720,27 @@ async def handle_photo(message: types.Message, bot: Bot):
                 )
             except Exception:
                 pass
+
+
+# 4. OVOZLI XABARLAR (VOICE / AUDIO / VIDEO NOTE) HANDLERI
+@router.message(F.voice | F.audio | F.video_note)
+async def handle_audio_message(message: types.Message):
+    """
+    Foydalanuvchi audio (ovozli xabar yoki audio fayl) yuborganida:
+    "Iltimos, matn bilan yozing" deb so'rash.
+    """
+    chat_id = message.chat.id
+    user_id = message.from_user.id if message.from_user else 0
+    user_script = user_memory.get_preferred_script(chat_id, user_id)
+
+    reply_text = "✍️ <b>Iltimos, murojaatingizni matn ko'rinishida yozib yuboring.</b>"
+    reply_text = adapt_to_user_script(reply_text, user_script)
+
+    try:
+        await message.reply(reply_text, parse_mode="HTML")
+    except Exception:
+        await message.reply(reply_text)
+
+    user_memory.add_user_message(chat_id, user_id, "[Audio/Ovozli xabar yuborildi]")
+    user_memory.add_assistant_message(chat_id, user_id, reply_text)
+

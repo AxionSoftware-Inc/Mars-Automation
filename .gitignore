@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+data/user_sessions.json
+data/pending_receipts.json

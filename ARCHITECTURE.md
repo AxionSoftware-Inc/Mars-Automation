@@ -34,88 +34,58 @@ flowchart TD
 
     Bot --> Handlers
 
-    subgraph Sensors ["2. Sensorlar (Faktlarni Ajratuvchi)"]
-        VisionSensor["extract_device_facts (image_analyzer.py)"]
-        TextSensor["Regex / NLP Intent (chat.py, debt.py)"]
-    end
-
-    MediaH --> VisionSensor
-    DebtH --> TextSensor
-    ChatH --> TextSensor
-
-    subgraph Core ["3. MARKAZIY YADRO (core/engine.py)"]
+    subgraph Pipeline ["2. YAGONA TEZKOR PIPELINE"]
         direction TB
-        S0["0-bosqich: Fail-Safe Himoya (Zanjir uzilishi nazorati)"]
-        S1["1-bosqich: Guardrail (Kassa apparati bo'lmagan rasmlarni filtrlash)"]
-        S2["2-bosqich: Pre-Condition (Soat va tarmoq qatori ko'rinishi)"]
-        S3["3-bosqich: Ekran Tashxisi (ErrorManager qoidalari)"]
-        S4["4-bosqich: Biznes Mantiq (Excel Qarz & To'lov hisob-kitobi)"]
-        S5["5-bosqich: Yakuniy Qaror Sintezi (DecisionResult)"]
+        P0["0-bosqich: RuleEngine & Custom Patches (data/custom_patches.json)"]
+        P1["1-bosqich: QARZDORLIK TEKSHIRUVI (60%+ sabab) - Avval Oylik, keyin Yillik"]
+        P2["2-bosqich: TEXNIK TASHXIS (Qarzdorlik bo'lmaganda) - 1 marta Soat/Internet/Reboot"]
+        P3["2.1-bosqich: TEZKOR ESKALATSIYA (Ko'p cho'zmasdan zudlik bilan adminga yo'naltirish)"]
+        P4["3-bosqich: MXIK / To'lov Kvitansiyalari / Gemini AI lo'nda muloqoti"]
 
-        S0 --> S1 --> S2 --> S3 --> S4 --> S5
+        P0 --> P1 --> P2 --> P3
+        P1 -.->|Qarz bor| Runner[Telegram Javobi + Video]
+        P2 -.->|Reboot taklifi| Runner
+        P3 -->|Adminga xabar + Usta kontaktlari| Runner
+        P4 --> Runner
     end
 
-    VisionSensor -->|DeviceFacts| Core
-    TextSensor -->|Query & Context| Core
-
-    subgraph Services ["4. Yordamchi Xizmatlar & Baza"]
-        EM[excel_manager.py - 7,200+ bazasi]
-        ErrM[error_manager.py - screen_errors.json]
-        CatM[catalog_manager.py - 50+ video katalog]
-        UM[user_memory.py - 1 soatlik sessiya]
-        AI[ai_helper.py / openrouter_client.py]
-    end
-
-    Core <--> EM
-    Core <--> ErrM
-    Core <--> CatM
-    Core <--> UM
-    Core <--> AI
-
-    S5 -->|DecisionResult| Runner[Telegram Ijrochisi]
-    Runner -->|Xabar + Video| User
+    ChatH --> Pipeline
+    MediaH --> Pipeline
+    DebtH --> Pipeline
 ```
 
 ---
 
 ## 3. Qaror Qabul Qilish Algoritmi (Pipeline Bosqichlari)
 
-Yadroga kelgan har bir so'rov 6 ta qat'iy bosqichdan o'tadi:
+### 0-bosqich: Modulli Rule Engine (Plug & Play)
+* **Qoida:** Telegram xabari kelishi bilan eng avval `data/custom_patches.json` va dinamik qoidalar tekshiriladi.
+* **Xatti-harakat:** Yangi kiritilgan kichik patchlar (Wi-Fi paroli, quloqchin va h.k.) asosiy biznes mantig'iga teginmasdan tezkor javob beradi.
 
-### 0-bosqich: Fail-Safe (Zanjir uzilishidan himoya)
-* **Holat:** AI API javob bermay qolsa, tarmoq uzilsa (timeout, 504), rasm buzilgan bo'lsa.
-* **Xatti-harakat:** Dastur to'xtamaydi. Agar rasm izohida INN bo'lsa, qarz bazadan tekshiriladi. Bo'lmasa:
-  > *"⚠️ Tasvirni to'liq tahlil qilib bo'lmadi. Iltimos, apparat ekranini to'liqroq rasmga oling yoki INN raqamini yozing."*
+### 1-bosqich: Qarzdorlik Tekshiruvi (Oylik -> Yillik)
+Kassa apparatlari to'xtab qolishining 60%+ sababi aynan to'lovlardagi qarzdorlik bo'ladi.
+1. **Oylik abonent to'lovi («Mars Elektron Texnika» — 100 000 so'm/oy):**
+   - Agar INN kiritilmagan bo'lsa -> INN so'raladi.
+   - Agar qarzdorlik bo'lsa -> Aniq summa (`Shu oy ishlashi uchun`, `Yil oxirigacha`), hisob raqam (Post 85) va Click video (Post 148).
+2. **Yillik fiskal modul to'lovi (Soliq / «Yangi Texnologiyalar» DUK — 440 000 so'm/yil):**
+   - Oylik to'lovdan qarz bo'lmasa -> Kassa chekining pastki qismidagi **Fiskal modul raqami (LG... yoki YG...)** so'raladi va OFD tizimidan tekshiriladi.
 
-### 1-bosqich: Guardrail (Begona rasmlar)
-* **Qoida:** Rasmda Smart POS apparati yoki kassa ekrani bormi?
-* **Xatti-harakat:** Agar kassa apparati bo'lmasa (hayvon, taom, tabiat, shaxsiy fotosurat, daftar va h.k.) va ekranda INN ham yo'q bo'lsa -> `ActionType.IGNORE` (bot mutlaqo javob bermaydi, jim turadi).
+### 2-bosqich: Texnik Tashxis va Reboot (Qarzdorlik yo'q bo'lsa)
+* Oylik va yillik to'lovlar to'langan, lekin apparat ishlamayapti:
+  - 1-urinishda: Internet (Wi-Fi/SIM), Soat (Post 141) va Kassa apparatini reboot qilish (Перезагрузка) tavsiya etiladi.
+  - P3 Humo apparatida ekrandagi xabar aniq tahlil qilinadi.
 
-### 2-bosqich: Pre-Condition (Status Bar talabi)
-* **Qoida:** Ekran tepasidagi soat va tarmoq qatori to'liq tushganmi?
-* **Xatti-harakat:** Agar status bar kesilgan bo'lsa -> `ActionType.ASK_FULL_SCREEN`:
-  > *"⚠️ Ekranning tepa qismi (soat va tarmoq qatori) ko'rinmayapti. Aniq tashxis qo'yishimiz uchun apparat ekranining yuqori qismidagi soat va internet belgisi tushgan holda qayta rasm yuboring."*
+### 2.1-bosqich: TEZKOR ESKALATSIYA (Ko'p cho'zmasdan!)
+* **QAT'IY QOIDA:** Agar 1 ta urinishdan so'ng muammo hal bo'lmasa, yoki ekrandan aniq xatolik bilib bo'lmasa, yoki mijoz *"ishlamadi", "bo'lmadi", "o'xshamadi", "usta kerak"* deb yozsa:
+  - **Bot yana bir xil gapni takrorlamaydi va vaqtni cho'zmaydi!**
+  - Darhol adminga (`@Yashnarbek_butaev` va `@quvonchbek_admin`) kassa rasmi, INN, korxona va hudud (tuman) bilan bildirishnoma boradi.
+  - Mijozga esa uning o'z hududi bo'yicha mas'ul usta kontaktlari beriladi.
 
-### 3-bosqich: Ekran Tashxisi (Error Diagnostics)
-* **Qoida:** Status bar to'liq bo'lsa, `error_manager.py` qoidalari bo'yicha tashxis qilinadi:
-  * Soat Toshkent vaqtidan 10 daqiqadan ko'pga farq qilsa -> 🎬 **Video 141** (Soatni to'g'rilash).
-  * Internet (Wi-Fi/SIM) yo'q bo'lsa -> Internetni tekshirish ko'rsatmasi.
-  * Fiskal modul xatosi -> 🎬 **Video 134 / 137**.
-  * Dastur yangilash talabi -> 🎬 **Video 125**.
-  * Lenta (qog'oz) tugagan -> Lenta solish eslatmasi.
-
-### 4-bosqich: Biznes & Excel Integratsiyasi
-* **Qoida:** Ekranda yoki matnda INN topilsa, `excel_manager.py` dan qidiriladi.
-* **Xatti-harakat:**
-  * Agar qarz bo'lsa:
-    * `Shu oy ishlashi uchun:` joriy qarz summasi.
-    * `Yil oxirigacha ishlashi uchun:` joriy qarz + qolgan oylarning to'lovi.
-    * 🎬 **Video 148** (Click orqali to'lash videosi).
-  * Agar qarz bo'lmasa:
-    * Qarzdorlik yo'qligi va ortiqcha to'lov summasi ko'rsatiladi.
-
-### 5-bosqich: Yakuniy Sintez (Synthesis)
-Ekran tashxisi va qarz hisobi bitta lo'nda javobga jamlanib, `DecisionResult` obyekti sifatida handlerga uzatiladi.
+### 3-bosqich: Kvitansiyalar, MXIK va AI Muloqoti
+* Kvitansiyalar tahlili (Click/Payme/Bank) firibgarlik va dublikatlardan himoyalangan (`transaction_tracker.py`).
+* INN kiritilmagan kvitansiyalar bot qayta ishga tushganda ham saqlanadi (`data/pending_receipts.json`).
+* AI Gemini 2.5 Flash asinxron (`httpx.AsyncClient`) ishlaydi, hech qachon botni muzlatmaydi.
+* AI anti-hallucination: faqat P3 Humo va Smart One modellarini taniydi, hisob raqamlarni matnda to'qimaydi, lo'nda (2-3 jumla) javob beradi.
 
 ---
 

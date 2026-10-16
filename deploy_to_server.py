@@ -1,4 +1,7 @@
 import os
+import io
+import time
+import tarfile
 import paramiko
 
 def deploy():
@@ -6,119 +9,96 @@ def deploy():
     username = 'root'
     password = 'LEGIONGAMING'
     remote_dir = '/root/mars-bot'
-    
-    print(f"Connecting to {hostname}...")
+
+    print(f"Connecting to {hostname} via SSH...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username=username, password=password, timeout=15, banner_timeout=30, auth_timeout=30)
-    
-    sftp = ssh.open_sftp()
-    
-    files_to_upload = [
-        '.env',
+    ssh.connect(hostname, username=username, password=password, timeout=15)
+    print("SSH Connected successfully!")
+
+    files_to_sync = [
         'requirements.txt',
+        'admin_manager.py',
         'openrouter_client.py',
         'ai_helper.py',
-        'bot.py',
-        'catalog.py',
-        'catalog_manager.py',
-        'image_analyzer.py',
-        'receipt_analyzer.py',
-        'admin_manager.py',
-        'error_manager.py',
         'user_memory.py',
-        'excel_manager.py',
-        'payment_accounts.py',
-        'translit_manager.py',
         'ofd_bridge.py',
-        'transaction_tracker.py',
-        'state_manager.py',
+        'payment_accounts.py',
         'ARCHITECTURE.md',
-        'README.md',
-        'data/video_catalog.json',
-        'data/screen_errors.json',
-        'data/admin_config.json',
-        'data/bot_state.json',
-        'data/latest.xlsx',
-        'data/ofd_user.session',
-
+        'handlers/__init__.py',
+        'handlers/chat.py',
+        'handlers/media.py',
+        'handlers/debt.py',
+        'handlers/commands.py',
+        'handlers/channel.py',
+        'handlers/admin.py',
+        'handlers/intents/__init__.py',
+        'handlers/intents/billing.py',
+        'handlers/intents/hardware.py',
+        'handlers/intents/conversation.py',
+        'handlers/intents/operator.py',
+        'handlers/intents/mxik.py',
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',
         'core/rule_engine.py',
-        'data/custom_patches.json',
-        'handlers/__init__.py',
-        'handlers/admin.py',
-        'handlers/channel.py',
-        'handlers/chat.py',
-        'handlers/commands.py',
-        'handlers/debt.py',
-        'handlers/media.py',
-        'handlers/intents/__init__.py',
-        'handlers/intents/billing.py',
-        'handlers/intents/hardware.py',
-        'handlers/intents/mxik.py',
-        'handlers/intents/operator.py',
-        'handlers/intents/conversation.py',
-        'test_4_stage_pipeline_and_fiscal_check.py',
-        'test_sequential_debt_flow.py',
-        'test_adversarial_break_round2.py',
-        'test_fiscal_chek_vs_kvitansiya.py',
-        'test_channel_excel_and_untested_edge_cases.py',
-        'test_long_conversation_multi_turn_stress.py',
-        'test_10x_ultra_complex_adversarial_stress.py',
-        'test_ofd_bridge_channel_integration.py',
-        'test_monthly_and_annual_billing_flows.py'
+        'data/custom_patches.json'
     ]
-    
-    # Ensure handlers and core directories exist on remote server
-    try:
-        sftp.mkdir(f"{remote_dir}/handlers")
-    except Exception:
-        pass
 
-    try:
-        sftp.mkdir(f"{remote_dir}/handlers/intents")
-    except Exception:
-        pass
+    print("Building compressed tar archive in memory...")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for rel_path in files_to_sync:
+            local_p = os.path.join(os.path.dirname(__file__), rel_path)
+            if os.path.exists(local_p):
+                tar.add(local_p, arcname=rel_path)
+                print(f"  + Added: {rel_path}")
+            else:
+                print(f"  ! Skipped missing: {rel_path}")
 
-    try:
-        sftp.mkdir(f"{remote_dir}/core")
-    except Exception:
-        pass
+    tar_bytes = buf.getvalue()
+    print(f"Archive size: {len(tar_bytes)} bytes. Uploading via SFTP to server...")
 
-    try:
-        sftp.mkdir(f"{remote_dir}/data")
-    except Exception:
-        pass
-
-    for filename in files_to_upload:
-        local_path = os.path.join(os.path.dirname(__file__), filename)
-        remote_path = f"{remote_dir}/{filename}"
-        print(f"Uploading {filename} -> {remote_path}...")
-        sftp.put(local_path, remote_path)
-        print(f"Uploaded {filename} successfully.")
-        
+    sftp = ssh.open_sftp()
+    remote_tar = '/tmp/deploy_mars.tar.gz'
+    sftp.putfo(io.BytesIO(tar_bytes), remote_tar)
     sftp.close()
+    print("Archive uploaded to /tmp/deploy_mars.tar.gz")
 
-    print("\nEnsuring dependencies (pypdf) on remote server...")
-    stdin, stdout, stderr = ssh.exec_command(f"{remote_dir}/venv/bin/pip install pypdf")
-    stdout.channel.recv_exit_status()
-    
+    # Remote papkalarni yaratish va tar ochish
+    ssh.exec_command(f"mkdir -p {remote_dir}/handlers/intents {remote_dir}/core {remote_dir}/data")
+    _, stdout, stderr = ssh.exec_command(f"tar -xzf {remote_tar} -C {remote_dir} && rm -f {remote_tar}")
+    exit_status = stdout.channel.recv_exit_status()
+    err_msg = stderr.read().decode().strip()
+    if exit_status != 0:
+        print(f"Tar extraction failed: {err_msg}")
+        ssh.close()
+        return
+    print("Files successfully unpacked on remote server!")
+
+    print("\nEnsuring dependencies (httpx, pypdf) on remote server...")
+    _, stdout, stderr = ssh.exec_command(f"{remote_dir}/venv/bin/pip install httpx pypdf")
+    pip_status = stdout.channel.recv_exit_status()
+    print(f"Pip install status: {pip_status}")
+
     print("\nRestarting mars-bot.service...")
-    stdin, stdout, stderr = ssh.exec_command("systemctl restart mars-bot.service")
-    stdout.channel.recv_exit_status()
-    
-    print("\nChecking service status...")
-    stdin, stdout, stderr = ssh.exec_command("systemctl status mars-bot.service --no-pager")
-    print(stdout.read().decode('utf-8'))
-    
+    _, stdout, stderr = ssh.exec_command("systemctl restart mars-bot.service")
+    status = stdout.channel.recv_exit_status()
+    print(f"Service restart status: {status}")
+
+    time.sleep(2)
+
+    print("\nChecking service state...")
+    _, stdout, _ = ssh.exec_command("systemctl is-active mars-bot.service")
+    active_status = stdout.read().decode().strip()
+    print(f"Service active status: {active_status}")
+
     print("\nRecent service logs:")
-    stdin, stdout, stderr = ssh.exec_command("journalctl -u mars-bot.service -n 25 --no-pager")
-    print(stdout.read().decode('utf-8'))
-    
+    _, stdout, _ = ssh.exec_command("journalctl -u mars-bot.service -n 25 --no-pager")
+    print(stdout.read().decode())
+
     ssh.close()
-    print("Deployment completed successfully!")
+    print("\n🚀 Serverga to'liq muvaffaqiyatli deploy qilindi!")
 
 if __name__ == "__main__":
     deploy()

@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from aiogram import Bot, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -16,24 +17,14 @@ DEFAULT_ADMIN_IDS = [1966874161, 6436610869]
 
 DEFAULT_CONTACTS = [
     {
-        "name": "Mas'ul administrator / Texnik",
+        "name": "@quvonchbek_admin",
         "phone": "@quvonchbek_admin",
-        "role": "Admin / Texnik"
+        "role": "Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimi"
     },
     {
-        "name": "Bosh administrator (Eskalatsiya va to'lovlar)",
+        "name": "@Yashnarbek_butaev",
         "phone": "@Yashnarbek_butaev",
-        "role": "Bosh admin"
-    },
-    {
-        "name": "Texnik xizmat ko'rsatish bo'limi",
-        "phone": "+998 75 522 75 00",
-        "role": "Bosh mutaxassis / Usta"
-    },
-    {
-        "name": "Mijozlar bilan ishlash va to'lovlar bo'limi",
-        "phone": "+998 90 999 00 11",
-        "role": "Bosh operator"
+        "role": "Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimi"
     }
 ]
 
@@ -154,15 +145,11 @@ class AdminManager:
 
     def get_contacts_display(self) -> str:
         """Foydalanuvchilarga ko'rsatish uchun kontaktlar ro'yxati matni"""
-        if not self.contacts:
-            return "📞 <b>Aloqa uchun:</b> @quvonchbek_admin yoki @Yashnarbek_butaev"
-        
-        lines = ["📞 <b>Mas'ul mutaxassislar kontaktlari:</b>"]
-        for c in self.contacts:
-            role = c.get("role", "")
-            name = c.get("name", "")
-            phone = c.get("phone", "")
-            lines.append(f"• <b>{role}:</b> {name} ({phone})")
+        lines = [
+            "👨‍💻 <b>Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlari:</b>",
+            "• Mas'ul xodim: @quvonchbek_admin",
+            "• Bosh usta: @Yashnarbek_butaev"
+        ]
         return "\n".join(lines)
 
     async def notify_admins(
@@ -448,5 +435,97 @@ class AdminManager:
             f"Foydalanuvchi siz bilan bog'lanishni kutmoqda yoki yordam talab qilinmoqda.</i>"
         )
         await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)
+
+    async def notify_debt_free_device_issue(
+        self,
+        bot: Bot,
+        user: Optional[types.User],
+        chat_id: int,
+        org_name: str,
+        inn: str,
+        issue_summary: str,
+        user_comment: str = "",
+        photo_file_id: Optional[str] = None,
+        fiscal_module: Optional[str] = None,
+        device_model: Optional[str] = None
+    ):
+        """
+        To'lovlardan qarzdorlik bo'lmaganda (oylik 0 so'm, yillik 0 so'm/faol),
+        apparat nosozligi bo'yicha barcha to'plangan ma'lumotlar va rasmlarni
+        zudlik bilan mas'ul adminlarga (@quvonchbek_admin va @Yashnarbek_butaev) uzatish.
+        """
+        user_name = user.full_name if user else "Mijoz"
+        user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
+        user_id = user.id if user else 0
+
+        from excel_manager import excel_manager
+        tuman = excel_manager.get_district_for_inn(inn) if inn else ""
+        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+
+        fm_line = f"🏛 <b>Fiskal modul:</b> <code>{fiscal_module}</code>\n" if fiscal_module else ""
+        model_line = f"📱 <b>Apparat modeli:</b> {device_model}\n" if device_model else ""
+
+        text = (
+            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI (TEZKOR ESKALATSIYA)!</b>\n\n"
+            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
+            f"────────────────────\n"
+            f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
+            f"🔢 <b>INN / СТИР:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
+            f"{tuman_line}"
+            f"{model_line}"
+            f"{fm_line}"
+            f"────────────────────\n"
+            f"📊 <b>To'lovlar tekshiruvi:</b>\n"
+            f"▫️ «Mars» oylik to'lovi: ✅ <b>0 so'm (To'langan / Qarz yo'q)</b>\n"
+            f"▫️ Davlat Soliq (OFD) yillik to'lovi: ✅ <b>Faol (To'langan / Qarz yo'q)</b>\n"
+            f"────────────────────\n"
+            f"⚠️ <b>Muammo / Xatolik:</b>\n"
+            f"<b>{issue_summary}</b>\n"
+        )
+        if user_comment:
+            text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
+
+        if photo_file_id:
+            text += f"\n📸 <b>Apparat ekrani / xatolik fotosurati ilova qilindi.</b>\n"
+
+        text += (
+            f"\n⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): "
+            f"Mijozda hech qanday qarzdorlik yo'q! Apparatida texnik muammo mavjud, "
+            f"mijoz siz bilan bog'lanishni kutmoqda. Zudlik bilan tekshiring!</i>"
+        )
+
+        short_caption = (
+            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI!</b>\n\n"
+            f"🏢 <b>{org_name or 'Korxona'}</b> (INN: <code>{inn or '-'}</code>)\n"
+            f"{tuman_line}"
+            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
+            f"✅ To'lovlar: Qarz yo'q (0 so'm)\n"
+            f"⚠️ Muammo: {issue_summary[:150]}\n\n"
+            f"⚡️ @quvonchbek_admin, @Yashnarbek_butaev"
+        )
+
+        await self.notify_admins(
+            bot=bot,
+            text=text,
+            photo_file_id=photo_file_id,
+            short_caption=short_caption
+        )
+
+
+def get_admin_contact_keyboard() -> InlineKeyboardMarkup:
+    """Foydalanuvchini to'g'ridan-to'g'ri mas'ul mutaxassislar bilan bog'lovchi interaktiv tugmalar"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👨‍💻 Hududiy THKM mas'ul xodimi (@quvonchbek_admin)", url="https://t.me/quvonchbek_admin"),
+            ],
+            [
+                InlineKeyboardButton(text="🛠 Hududiy THKM mas'ul xodimi (@Yashnarbek_butaev)", url="https://t.me/Yashnarbek_butaev"),
+            ]
+        ]
+    )
+    return keyboard
+
 
 admin_manager = AdminManager()

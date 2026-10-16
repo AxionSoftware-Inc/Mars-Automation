@@ -485,7 +485,7 @@ class OFDBridgeManager:
             await client.download_media(found_msg, file=temp_path)
 
             if os.path.exists(temp_path):
-                success = excel_manager.update_file(temp_path)
+                success = await asyncio.to_thread(excel_manager.update_file, temp_path)
                 try:
                     os.remove(temp_path)
                 except Exception:

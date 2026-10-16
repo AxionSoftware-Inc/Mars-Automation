@@ -195,6 +195,27 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         if is_p3 and saved_summary:
             resp = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {saved_summary}\n\n──────────────\n{resp}"
 
+    raw_msg_text = (message.text or "")
+    from handlers.intents.hardware import is_device_issue
+    if is_device_issue(raw_msg_text):
+        user_memory.set_issue_mode(chat_id, user_id, True, initial_query=raw_msg_text)
+
+    is_in_issue = user_memory.is_issue_mode(chat_id, user_id)
+    if is_in_issue:
+        if total_debt > 0:
+            resp += (
+                "\n\n⚠️ <i>Apparat to'xtab qolishining sababi: «Mars» oylik abonent to'lovidan qarzdorlik mavjud. "
+                "Quyidagi hisob raqamga to'lov qilingandan so'ng apparat avtomatik faollashadi.</i>"
+            )
+        else:
+            resp += (
+                "\n\n──────────────\n"
+                "🔍 <b>2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish</b>\n"
+                "✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
+                "🏛 Soliq litsenziyasi muddatini tekshirishimiz uchun kassa chekining eng pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
+            )
+            user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
+
     resp = adapt_to_user_script(resp, user_script)
     logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")
     try:
@@ -230,6 +251,16 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
             )
         except Exception as e:
             logger.error(f"To'lov videosini (148) nusxalashda xatolik: {e}")
+    elif is_in_issue:
+        from payment_accounts import FISKAL_MODUL_SAMPLE_POST_ID
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=SOURCE_CHANNEL_ID,
+                message_id=FISKAL_MODUL_SAMPLE_POST_ID
+            )
+        except Exception as e:
+            logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
 
 
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI

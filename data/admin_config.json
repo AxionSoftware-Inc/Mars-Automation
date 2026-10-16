@@ -12,24 +12,14 @@
   ],
   "contacts": [
     {
-      "name": "Mas'ul administrator / Texnik",
+      "name": "@quvonchbek_admin",
       "phone": "@quvonchbek_admin",
-      "role": "Admin / Texnik"
+      "role": "Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimi"
     },
     {
-      "name": "Bosh administrator (Eskalatsiya va to'lovlar)",
+      "name": "@Yashnarbek_butaev",
       "phone": "@Yashnarbek_butaev",
-      "role": "Bosh admin"
-    },
-    {
-      "name": "Texnik xizmat ko'rsatish bo'limi",
-      "phone": "+998 75 522 75 00",
-      "role": "Bosh mutaxassis / Usta"
-    },
-    {
-      "name": "Mijozlar bilan ishlash va to'lovlar bo'limi",
-      "phone": "+998 90 999 00 11",
-      "role": "Bosh operator"
+      "role": "Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimi"
     }
   ],
   "notification_channel_id": null

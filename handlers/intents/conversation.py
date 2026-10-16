@@ -4,7 +4,7 @@ from aiogram import types, Bot
 from user_memory import user_memory
 from translit_manager import adapt_to_user_script
 from catalog_manager import catalog_manager
-from admin_manager import admin_manager
+from admin_manager import admin_manager, get_admin_contact_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +13,25 @@ SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 CONVERSATIONAL_FOLLOWUPS = [
     "qachon qo'shiladi", "qachon qoshiladi", "qachon yoqiladi", "qachon ochiladi",
     "qachon ishlaydi", "qachon aktivlashadi", "qachon yoqasiz", "keyingi to'lov", "keyingi tolov",
-    "keyingi to'lovni", "keyingi tolovni", "qancha to'layman", "qancha tolayman", "qancha to'lashim",
-    "qancha tolashim", "qancha qarz", "qarzim qancha", "yana to'laymanmi", "yana tolaymanmi",
+    "keyingi to'lovni", "keyingi tolovni", "qachongacha", "qachongacha to'lash", "qachongacha tolash",
+    "qachongacha to'lash kerak", "qachongacha tolash kerak", "qachon to'lash kerak", "qachon tolash kerak",
+    "qancha to'layman", "qancha tolayman", "qancha to'lashim",
+    "qancha tolashim", "qancha qarz", "qarzim qancha", "qancha to'lay", "qancha tolay", "qancha tulay",
+    "qancha to'lashim kerak", "qancha tolashim kerak", "yana to'laymanmi", "yana tolaymanmi",
+    "yana pul tolaymanmi", "yana pul to'laymanmi", "yana pul", "yana to'lashim kerakmi", "yana tolashim kerakmi",
+    "keyinchi", "keyin-chi", "keyin nima", "keyin nima bo'ladi", "keyin nima boladi",
+    "endi nima", "endi nima qilay", "nima qilish kerak", "nimani yuboray", "nimani tashlay",
+    "tushunmadim", "tushunmadim nimani", "qaysi biriga tolayman", "qaysi biriga to'layman", "qaysiga tolay",
+    "nega ochib qolgan unda", "nega o'chib qolgan unda", "nega ishlamayapti unda",
     "adminga bordimi", "adminga jo'natildimi", "chek tushdimi", "kvitansiya tushdimi",
-    "to'lov tushdimi", "tolov tushdimi", "endi nima", "endi nima qilay", "nima qilish kerak",
-    "qarzim bormi", "qancha qarzim bor", "yana to'lashim kerakmi", "yana tolashim kerakmi",
+    "to'lov tushdimi", "tolov tushdimi",
+    "qarzim bormi", "qancha qarzim bor",
     "rahmat", "tushundim", "yaxshi", "ok", "xa", "ha", "boladi", "bo'ladi",
     "когда включите", "чек отправил", "оплатил", "следующая оплата", "сколько платить"
 ]
 
+
+import asyncio
 
 class ConversationIntentHandler:
     """Davomiy suhbatlar, video katalog qidiruvi va AI asosiy muloqotini boshqaruvchi modul"""
@@ -29,10 +39,10 @@ class ConversationIntentHandler:
     async def handle(self, message: types.Message, bot: Bot, user_script: str, ai_func=None) -> bool:
         if ai_func is None:
             import handlers.chat
-            ai_func = getattr(handlers.chat, "generate_ai_reply_ex", None)
+            ai_func = getattr(handlers.chat, "generate_ai_reply_ex_async", None) or getattr(handlers.chat, "generate_ai_reply_ex", None)
             if not ai_func:
-                from ai_helper import generate_ai_reply_ex
-                ai_func = generate_ai_reply_ex
+                from ai_helper import generate_ai_reply_ex_async
+                ai_func = generate_ai_reply_ex_async
 
         text = message.text.strip()
         lower_text = text.lower()
@@ -49,7 +59,11 @@ class ConversationIntentHandler:
         # 1. Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
         if is_conversational or (has_active_context and not explicit_video_request):
             context_summary = user_memory.get_context_summary(chat_id, user_id)
-            reply_text, ai_video_id, needs_admin = ai_func(text, context_history=context_summary, target_script=user_script)
+            ai_res = ai_func(text, context_history=context_summary, target_script=user_script)
+            if asyncio.iscoroutine(ai_res):
+                reply_text, ai_video_id, needs_admin = await ai_res
+            else:
+                reply_text, ai_video_id, needs_admin = ai_res
 
             if not reply_text or not reply_text.strip():
                 fallback = "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz СТИР (INN) raqamini yuboring."
@@ -69,6 +83,7 @@ class ConversationIntentHandler:
             user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
             if needs_admin:
+                user_memory.mark_escalated_to_admin(chat_id, user_id, reason="AI bilmadi va adminga yo'naltirdi")
                 last_id = user_memory.get_last_id(chat_id, user_id)
                 saved_photo = user_memory.get_last_photo(chat_id, user_id)
                 await admin_manager.notify_user_query_escalation(
@@ -112,7 +127,11 @@ class ConversationIntentHandler:
 
         # 3. Boshqalari bo'yicha umumiy AI javobi
         context_summary = user_memory.get_context_summary(chat_id, user_id)
-        reply_text, ai_video_id, needs_admin = ai_func(text, context_history=context_summary, target_script=user_script)
+        ai_res = ai_func(text, context_history=context_summary, target_script=user_script)
+        if asyncio.iscoroutine(ai_res):
+            reply_text, ai_video_id, needs_admin = await ai_res
+        else:
+            reply_text, ai_video_id, needs_admin = ai_res
 
         if not reply_text or not reply_text.strip():
             fallback = "Savolingiz bo'yicha to'liq ma'lumot berishimiz uchun korxonangiz СТИР (INN) raqamini yuboring."
@@ -132,6 +151,7 @@ class ConversationIntentHandler:
         user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
         if needs_admin:
+            user_memory.mark_escalated_to_admin(chat_id, user_id, reason="AI bilmadi va adminga yo'naltirdi")
             last_id = user_memory.get_last_id(chat_id, user_id)
             saved_photo = user_memory.get_last_photo(chat_id, user_id)
             await admin_manager.notify_user_query_escalation(

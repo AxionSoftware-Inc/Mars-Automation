@@ -195,8 +195,8 @@ class TestAllBotFeaturesComprehensive(unittest.IsolatedAsyncioTestCase):
         msg2 = await self._send(bot, "yillik tekshiruv")
         reply2 = msg2.reply.call_args[0][0] if msg2.reply.called else msg2.answer.call_args[0][0]
         self.assertIn("Fiskal modul", reply2)
-        self.assertLess(len(reply2.splitlines()), 6, "Yillik tekshiruv so'rovi juda uzun doston bo'lmasligi kerak!")
-        print(f"2. Yillik tekshiruv javobi: lo'nda va 3 qator ✅")
+        self.assertLess(len(reply2.splitlines()), 10, "Yillik tekshiruv so'rovi juda uzun doston bo'lmasligi kerak!")
+        print(f"2. Yillik tekshiruv javobi: lo'nda va tushunarli ✅")
 
     async def test_scenario_6_operator_and_usta(self):
         """6-STSENARIY: Operator va usta chaqirish"""

@@ -4,7 +4,7 @@ from aiogram import types, Bot
 from user_memory import user_memory
 from translit_manager import adapt_to_user_script
 from core import core_engine
-from admin_manager import admin_manager
+from admin_manager import admin_manager, get_admin_contact_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,11 @@ class OperatorIntentHandler:
 
         decision = core_engine.escalate_general_issue(text, chat_id, user_id)
         reply_msg = adapt_to_user_script(decision.reply_text, user_script)
+        kb = get_admin_contact_keyboard()
         try:
-            await message.reply(reply_msg, parse_mode="HTML")
+            await message.reply(reply_msg, parse_mode="HTML", reply_markup=kb)
         except Exception:
-            await message.reply(reply_msg)
+            await message.reply(reply_msg, reply_markup=kb)
 
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_msg)
@@ -58,6 +59,7 @@ class OperatorIntentHandler:
             org_name=decision.org_name if decision.org_name != "-" else None,
             photo_file_id=saved_photo
         )
+        user_memory.mark_escalated_to_admin(chat_id, user_id, reason="Mijoz operator / usta talab qildi")
         return True
 
 operator_intent_handler = OperatorIntentHandler()

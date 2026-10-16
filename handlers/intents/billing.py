@@ -114,11 +114,13 @@ class BillingIntentHandler:
 
         # 1.9 Maxsus holat: Ikkala to'lovni bitta hisob raqamga to'lash mumkinmi deb so'ralsa
         single_account_query = any(w in lower_text for w in [
-            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "birga to'la", "birga tola",
-            "bitta qilib to'la", "bitta qilib tola", "qo'shib to'la", "qoshib tola", "bitta schet",
-            "битта ҳисоб", "битта хисоб", "битта шот", "бирга тўла", "бирга тола", "битта счёт"
+            "bitta hisob", "bitta shot", "bitta xisob", "bitta raqam", "bitta karta", "bitta plastik",
+            "birga to'la", "birga tola", "birga tashla", "birga tashvor",
+            "bitta qilib to'la", "bitta qilib tola", "bitta qilib tashla", "bitta qilib tashvor", "bitta qilib",
+            "qo'shib to'la", "qoshib tola", "qoshib tashla", "qo'shib tashla", "bitta schet",
+            "битта ҳисоб", "битта хисоб", "битта шот", "битта карта", "бирга тўла", "бирга тола", "битта счёт"
         ])
-        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam"]):
+        if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam", "tashlasam", "tashvorsam", "tashlasak", "yuborsam"]):
             single_warn = (
                 "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
                 "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
@@ -143,6 +145,29 @@ class BillingIntentHandler:
             except Exception:
                 pass
             user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
+            return True
+
+        # 1.5 To'lov muddatlari haqidagi so'rovlar ("qachongacha to'lash kerak", "oylik to'lov muddati")
+        due_date_queries = [
+            "qachongacha to'lash", "qachongacha tolash", "qachongacha to'lash kerak",
+            "qachongacha tolash kerak", "qachongacha to'lanadi", "qachongacha tolanadi",
+            "to'lov muddati", "tolov muddati", "to'lov qachongacha", "tolov qachongacha",
+            "oylik to'lov qachongacha", "oylik tolov qachongacha", "oylik qachongacha"
+        ]
+        if any(q in lower_text for q in due_date_queries):
+            due_msg = (
+                "📅 <b>«Mars» oylik abonent to'lovi muddati:</b>\n\n"
+                "🔹 Har oyning <b>6-sanasigacha</b> to'lanishi shart (100 000 so'm/oy).\n"
+                "⚠️ Agar 6-sanasigacha to'lanmasa, apparat tizim tomonidan avtomatik ravishda to'xtatiladi (bloklanadi).\n\n"
+                "🏛 <i>Davlat Soliq (OFD) yillik to'lovi esa har yili 1 marta (440 000 so'm) to'lanadi.</i>"
+            )
+            due_msg = adapt_to_user_script(due_msg, user_script)
+            try:
+                await message.reply(due_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(due_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, due_msg)
             return True
 
         # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
@@ -222,18 +247,93 @@ class BillingIntentHandler:
         # 2.1 Agar to'g'ridan-to'g'ri faqat Fiskal modul (LG..., YG..., UZ...) yuborilgan bo'lsa -> darhol OFD tekshiruvi!
         if found_fm and not is_annual_check_intent(text):
             ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
-            ofd_text = format_ofd_annual_status(found_fm, ofd_reply, user_script)
-            try:
-                await message.reply(ofd_text, parse_mode="HTML")
-            except Exception:
-                await message.reply(ofd_text)
-            user_memory.add_user_message(chat_id, user_id, text)
-            user_memory.add_assistant_message(chat_id, user_id, ofd_text)
-            if ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"]):
+            user_memory.set_last_fm(chat_id, user_id, found_fm)
+            has_ann_debt = ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"])
+            user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details=ofd_reply or "")
+
+            is_issue = user_memory.is_issue_mode(chat_id, user_id)
+            remembered_id = user_memory.get_last_id(chat_id, user_id)
+            org_name = user_memory.get_org_name(chat_id, user_id) or ""
+
+            if has_ann_debt:
+                ofd_text = (
+                    f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
+                    f"🏛 <b>Fiskal modul:</b> <code>{found_fm}</code>\n"
+                    f"💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
+                )
+                if is_issue:
+                    ofd_text += (
+                        "⚠️ <b>Apparat to'xtab qolishining sababi:</b> Davlat Soliq Qo'mitasi (OFD) yillik litsenziya muddati tugagan.\n\n"
+                    )
+                ofd_text += "💳 <i>To'lov rekvizitlari quyida kanaldan uzatildi:</i>"
+                ofd_text = adapt_to_user_script(ofd_text, user_script)
+                try:
+                    await message.reply(ofd_text, parse_mode="HTML")
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
+                        reply_to_message_id=message.message_id
+                    )
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+                    )
+                except Exception as e:
+                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
-            elif ofd_reply and "faol" in ofd_reply.lower():
-                user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
-            return True
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+                return True
+            else:
+                if is_issue:
+                    # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
+                    step3_text = (
+                        f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
+                        f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
+                        f"🏛 <b>Fiskal modul:</b> <code>{found_fm}</code>\n"
+                        f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
+                        f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                        f"📌 <b>Apparatni ishga tushirish uchun quyidagilarni tekshiring:</b>\n"
+                        f"1️⃣ <b>Internet aloqasi:</b> Apparatda Wi-Fi yoki SIM-karta tarmog'i (antenna belgisi) borligini tekshiring;\n"
+                        f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
+                        f"3️⃣ <b>Qayta yoqish:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot);\n"
+                        f"4️⃣ <b>Rasm yuborish:</b> Agar baribir ishlamasa, apparat ekranidagi xatolik yozuvini rasmga olib yuboring.\n\n"
+                        f"👨‍💻 <b>Barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.</b> Tez orada mutaxassis siz bilan bog'lanadi."
+                    )
+                    step3_text = adapt_to_user_script(step3_text, user_script)
+                    try:
+                        await message.reply(step3_text, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(step3_text)
+
+                    from admin_manager import admin_manager
+                    init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat ishlamayapti"
+                    await admin_manager.notify_user_query_escalation(
+                        bot=bot,
+                        user=message.from_user,
+                        chat_id=chat_id,
+                        query_text=f"Dastlabki murojaat: {init_q}. Oylik va Yillik qarz yo'q (to'langan), lekin apparat ishlamayapti. Fiskal modul: {found_fm}",
+                        reason="Apparat ishlamayapti (Oylik va Yillik to'lovlar 0 so'm / to'langan)",
+                        inn=remembered_id,
+                        org_name=org_name
+                    )
+                    user_memory.clear_issue_mode(chat_id, user_id)
+                    user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, step3_text)
+                    return True
+                else:
+                    ofd_text = format_ofd_annual_status(found_fm, ofd_reply, user_script)
+                    try:
+                        await message.reply(ofd_text, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(ofd_text)
+                    user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+                    return True
 
         # 2.2 Fiskal modul qayerdaligi / chekdan topish haqidagi savollar
         fm_where_phrases = [
@@ -266,9 +366,12 @@ class BillingIntentHandler:
             return True
 
         # 2.3 Hisob raqamlar postini kanaldan uzatish / to'lov intentlari ("oylikchi", "yillikchi", "to'layman", "shot tashla")
+        is_ann_check = is_annual_check_intent(text)
+        is_mon_check = is_monthly_check_intent(text)
+
         payment_intent = classify_payment_intent(text)
-        is_ann_pay = is_annual_pay_intent(text, last_topic) or payment_intent == "annual"
-        is_mon_pay = is_monthly_pay_intent(text, last_topic) or payment_intent == "monthly"
+        is_ann_pay = (is_annual_pay_intent(text, last_topic) or payment_intent == "annual") and not is_ann_check
+        is_mon_pay = (is_monthly_pay_intent(text, last_topic) or payment_intent == "monthly") and not is_mon_check
         is_explicit_both = any(w in lower_text for w in ["ikkala", "har ikkala", "ikkisidan", "иккала", "ҳар иккала"])
         is_both_pay = (payment_intent == "both" and not is_ann_pay and not is_mon_pay) or is_explicit_both
 
@@ -418,13 +521,21 @@ class BillingIntentHandler:
 
                 user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details="Qarzdorlik" if has_ann_debt else "Faol")
 
+                is_issue = user_memory.is_issue_mode(chat_id, user_id)
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                org_name = user_memory.get_org_name(chat_id, user_id) or ""
+
                 if has_ann_debt:
                     ofd_text = (
                         f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
                         f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
                         f"💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
-                        f"💳 <i>To'lov rekvizitlari quyida kanaldan uzatildi:</i>"
                     )
+                    if is_issue:
+                        ofd_text += (
+                            "⚠️ <b>Apparat to'xtab qolishining sababi:</b> Davlat Soliq Qo'mitasi (OFD) yillik litsenziya muddati tugagan.\n\n"
+                        )
+                    ofd_text += "💳 <i>To'lov rekvizitlari quyida kanaldan uzatildi:</i>"
                     ofd_text = adapt_to_user_script(ofd_text, user_script)
                     try:
                         await message.reply(ofd_text, parse_mode="HTML")
@@ -450,21 +561,67 @@ class BillingIntentHandler:
                         logger.warning(f"Post 34 nusxalashda xatolik: {e}")
                     return True
                 else:
-                    # QARZ YO'Q! Hisob raqam uzatilmaydi!
-                    ofd_text = (
-                        f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
-                        f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
-                        f"✅ <b>Holati:</b> To'langan va faol (Litsenziya muddati joyida)."
-                    )
-                    ofd_text = adapt_to_user_script(ofd_text, user_script)
-                    try:
-                        await message.reply(ofd_text, parse_mode="HTML")
-                    except Exception:
-                        await message.reply(ofd_text)
-                    user_memory.add_user_message(chat_id, user_id, text)
-                    user_memory.add_assistant_message(chat_id, user_id, ofd_text)
-                    user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
-                    return True
+                    if is_issue:
+                        # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
+                        from admin_manager import admin_manager, get_admin_contact_keyboard
+                        last_photo = user_memory.get_last_photo(chat_id, user_id)
+                        photo_note = "\n📸 <i>Yuborgan fotosuratingiz ham mas'ul ustaga yetkazildi.</i>\n" if last_photo else ""
+                        step3_text = (
+                            f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
+                            f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
+                            f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
+                            f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
+                            f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                            f"📌 <b>Apparatni ishga tushirish uchun tekshirib ko'ring:</b>\n"
+                            f"1️⃣ <b>Internet aloqasi:</b> Apparatda Wi-Fi yoki SIM-karta tarmog'i (antenna belgisi) borligini tekshiring;\n"
+                            f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
+                            f"3️⃣ <b>Qayta yoqish:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot);\n"
+                            f"4️⃣ <b>Rasm yuborish:</b> Agar baribir ishlamasa, apparat ekranidagi xatolik yozuvini rasmga olib yuboring.\n\n"
+                            f"👨‍💻 <b>Barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) tezkor yetkazildi!</b>\n"
+                            f"{photo_note}"
+                            f"Quyidagi tugmalar orqali to'g'ridan-to'g'ri mutaxassis bilan bog'lanishingiz mumkin:"
+                        )
+                        step3_text = adapt_to_user_script(step3_text, user_script)
+                        kb = get_admin_contact_keyboard()
+                        try:
+                            await message.reply(step3_text, parse_mode="HTML", reply_markup=kb)
+                        except Exception:
+                            await message.reply(step3_text, reply_markup=kb)
+
+                        init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat ishlamayapti"
+                        await admin_manager.notify_debt_free_device_issue(
+                            bot=bot,
+                            user=message.from_user,
+                            chat_id=chat_id,
+                            org_name=org_name,
+                            inn=remembered_id or "",
+                            issue_summary=f"Dastlabki murojaat: {init_q}. Oxirgi xabar: {text}",
+                            user_comment=text,
+                            photo_file_id=last_photo,
+                            fiscal_module=target_fm
+                        )
+                        user_memory.clear_issue_mode(chat_id, user_id)
+                        user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
+                        user_memory.mark_escalated_to_admin(chat_id, user_id, reason="Apparat ishlamayapti (Yillik va oylik to'lovlar 0 so'm)")
+                        user_memory.add_user_message(chat_id, user_id, text)
+                        user_memory.add_assistant_message(chat_id, user_id, step3_text)
+                        return True
+                    else:
+                        # QARZ YO'Q! Oddiy so'rov
+                        ofd_text = (
+                            f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
+                            f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
+                            f"✅ <b>Holati:</b> To'langan va faol (Litsenziya muddati joyida)."
+                        )
+                        ofd_text = adapt_to_user_script(ofd_text, user_script)
+                        try:
+                            await message.reply(ofd_text, parse_mode="HTML")
+                        except Exception:
+                            await message.reply(ofd_text)
+                        user_memory.add_user_message(chat_id, user_id, text)
+                        user_memory.add_assistant_message(chat_id, user_id, ofd_text)
+                        user_memory.set_last_topic(chat_id, user_id, "annual_debt_clear")
+                        return True
             else:
                 # OFD tizimi faqat Fiskal modul (LG/YG/UZ) bilan ishlaydi, INN bilan emas
                 fm_prompt = get_fiscal_module_request_prompt(user_script)

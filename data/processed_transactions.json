@@ -33,5 +33,12 @@
     "amount": 200000.0,
     "user_id": 103,
     "payment_date": ""
+  },
+  "txchaosduplicate001": {
+    "recorded_at": "2026-10-15 18:03:23",
+    "inn": "300600431",
+    "amount": 100000.0,
+    "user_id": 778899,
+    "payment_date": ""
   }
 }

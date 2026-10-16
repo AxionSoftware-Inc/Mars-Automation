@@ -1,6 +1,6 @@
 import logging
 from typing import Callable, Dict, Any, Awaitable
-from aiogram import Router, BaseMiddleware, types, Bot
+from aiogram import Router, BaseMiddleware, types, Bot, F
 from aiogram.types import TelegramObject, User
 
 from admin_manager import admin_manager
@@ -60,6 +60,22 @@ async def handle_bot_chat_member_update(event: types.ChatMemberUpdated, bot: Bot
         # OFD bot borligini tekshirib avtomatik ulash
         if await ofd_bridge.check_and_bind_chat_if_ofd(chat.id, bot):
             logger.info(f"✅ Bot qo'shilgan {chat.type} ({chat.id}) OFD ko'prigi sifatida avtomatik ulandi!")
+
+@main_router.callback_query(F.data == "call_support")
+async def handle_call_support(callback: types.CallbackQuery):
+    """Admin yoki texnik xizmat kontaktlarini ko'rsatish"""
+    await callback.answer()
+    text = (
+        "👨‍💻 <b>Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlari:</b>\n\n"
+        "• Mas'ul xodim: @quvonchbek_admin\n"
+        "• Bosh usta: @Yashnarbek_butaev\n\n"
+        "Telegram orqali to'g'ridan-to'g'ri bog'lanishingiz mumkin."
+    )
+    try:
+        if callback.message:
+            await callback.message.answer(text, parse_mode="HTML")
+    except Exception as e:
+        logger.warning(f"Callback answer xatolik: {e}")
 
 # Routerlar qat'iy ustuvorlik ketma-ketligida ulanadi:
 # 1. Admin buyruqlari (/admin, /statistika, /errors, /admins, /add_admin, /contacts, /ofd)

@@ -125,6 +125,28 @@ class CoreEngine:
             or user_memory.get_last_fm(chat_id, user_id)
         )
 
+        # Agar INN topilmagan bo'lsa, ekran yozuvidan (kassa/terminal raqami yoki INN) qidirish
+        if not target_inn and facts.screen_text_summary:
+            import re
+            inn_in_text = extract_clean_inn(facts.screen_text_summary)
+            if inn_in_text:
+                target_inn = inn_in_text
+            else:
+                # Ekranda kassa/terminal raqamlari bo'lsa (masalan: UZ84577361 yoki 8-10 xonali sonlar)
+                digits_matches = re.findall(r'\b\d{7,10}\b', facts.screen_text_summary)
+                for dig in digits_matches:
+                    search_res = excel_manager.search(dig)
+                    if search_res and search_res[0].get("stir"):
+                        target_inn = search_res[0].get("stir")
+                        logger.info(f"Ekran matnidagi raqam ({dig}) orqali INN ({target_inn}) topildi!")
+                        break
+
+        # Agar target_fm topilmagan bo'lsa, ekran yozuvidan qidirish
+        if not target_fm and facts.screen_text_summary:
+            fm_in_text = extract_fiscal_module(facts.screen_text_summary)
+            if fm_in_text:
+                target_fm = fm_in_text
+
         is_p3_device: bool = bool((facts.raw_facts or {}).get("is_p3_device", False))
 
         # A) P3 HUMO APPARATI (Sariq qator):

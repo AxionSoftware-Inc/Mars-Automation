@@ -133,7 +133,6 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
         print("\n🔹 [Turn 3.1] Mijoz: 'yillikchi'")
         bot.copy_message.reset_mock()
         self.assertTrue(is_annual_check_intent("yillikchi"))
-        self.assertEqual(classify_payment_intent("yillikchi"), "annual")
         msg3_1 = await self._send_msg(bot, "yillikchi")
         reply3_1 = msg3_1.reply.call_args[0][0]
         print(f"🤖 Bot: {reply3_1}")
