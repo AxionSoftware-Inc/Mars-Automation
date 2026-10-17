@@ -279,14 +279,9 @@ class UserMemoryManager:
         self.save_sessions()
 
     def is_issue_mode(self, chat_id: int, user_id: int) -> bool:
-        """Foydalanuvchi nosozlikni hal qilish pipeline'ida turibdimi?"""
+        """Foydalanuvchi nosozlikni hal qilish pipeline'ida turibdimi? (Faqat shu user uchun)"""
         session = self._get_or_create_session(chat_id, user_id)
-        val = bool(session.get("issue_mode", False))
-        if not val and chat_id < 0:
-            group_val = self._fallback_from_group(chat_id, "issue_mode")
-            if group_val:
-                return True
-        return val
+        return bool(session.get("issue_mode", False))
 
     def clear_issue_mode(self, chat_id: int, user_id: int):
         """Muammo to'liq hal bo'lgach yoki eskalatsiya qilingach rejimni yopish"""
@@ -318,18 +313,18 @@ class UserMemoryManager:
         session["escalation_repeat_count"] = 0
         self.save_sessions()
 
-    def is_escalated_to_admin(self, chat_id: int, user_id: int, max_wait_seconds: int = 7200) -> bool:
-        """Foydalanuvchi adminga yo'naltirilgan va hali admin javobini kutyaptimi?"""
+    def is_escalated_to_admin(self, chat_id: int, user_id: int, max_wait_seconds: int = 900) -> bool:
+        """
+        Foydalanuvchi adminga yo'naltirilgan va hali admin javobini kutyaptimi?
+        MUHIM: Guruhda bitta odam eskalatsiya bo'lsa, guruhdagi boshqa odamlarga ta'sir qilmasligi shart!
+        """
         session = self._get_or_create_session(chat_id, user_id)
         if not session.get("is_escalated_to_admin"):
-            if chat_id < 0:
-                esc = self._fallback_from_group(chat_id, "is_escalated_to_admin")
-                if esc:
-                    return True
             return False
         esc_time = session.get("escalated_time", 0)
         if time.time() - esc_time > max_wait_seconds:
             session["is_escalated_to_admin"] = False
+            session["escalation_repeat_count"] = 0
             self.save_sessions()
             return False
         return True

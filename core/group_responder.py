@@ -210,41 +210,78 @@ class GroupResponseOrchestrator:
             if await operator_intent_handler.handle(message, bot, user_script):
                 return True
 
-        # 3.2 Agar mijoz ALLAQACHON adminga topshirilgan bo'lsa va yangi INN/FM yubormasdan gap yozaversa:
-        if not found_inn and not found_fm and not is_command:
+        # 3.2 Agar mijoz ALLAQACHON adminga topshirilgan bo'lsa:
+        # MUHIM: Agar mijoz yangi mavzu boshlasa ("salom", "aparatim ishlamay qoldi", "qarzim bormi", "oylik shot", "mxik" va h.k.),
+        # eskalatsiya qulfini ochamiz va unga normal javob beramiz!
+        # Faqat sabrsizlik/noo'rin davomiy gaplarda ("tashladimku boya", "qachon javob", "hudoga soldim", "gap qaytarma") "Admin javobini kuting" deymiz.
+        is_greeting = lower_text in ("salom", "assalomu alaykum", "assalomu aleykum", "привет", "салом", "ассалому алайкум")
+        is_new_meaningful_intent = (
+            is_greeting
+            or bool(found_inn)
+            or bool(found_fm)
+            or is_command
+            or is_device_issue(clean_text)
+            or is_debt_inquiry(message)
+        )
+        if is_new_meaningful_intent and user_memory.is_escalated_to_admin(chat_id, user_id):
+            user_memory.clear_escalation(chat_id, user_id)
+
+        if not is_new_meaningful_intent:
             if user_memory.is_escalated_to_admin(chat_id, user_id):
-                repeats = user_memory.increment_escalation_repeats(chat_id, user_id)
-                esc_ack = (
-                    "👨‍💻 <b>Murojaatingiz mas'ul administratorga yo'naltirilgan. Iltimos, admin javobini kuting!</b>\n\n"
-                    "Apparatingiz va barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazilgan.\n"
-                    "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanadi.\n\n"
-                    "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+                # Tekshiramiz: balki mijoz aniq hisob raqam, MXIK yoki video katalog so'ragandir?
+                from payment_accounts import (
+                    classify_payment_intent,
+                    is_annual_check_intent,
+                    is_monthly_check_intent,
+                    is_both_check_intent,
+                    is_general_debt_check_intent,
+                    is_mxik_intent
                 )
-                esc_ack = adapt_to_user_script(esc_ack, user_script)
-                kb = get_admin_contact_keyboard()
-                try:
-                    await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
-                except Exception:
-                    await message.reply(esc_ack, reply_markup=kb)
-
-                user_memory.add_user_message(chat_id, user_id, raw_text)
-                user_memory.add_assistant_message(chat_id, user_id, esc_ack)
-
-                if repeats in (1, 3, 5):
-                    remembered_id = user_memory.get_last_id(chat_id, user_id)
-                    org_name = user_memory.get_org_name(chat_id, user_id)
-                    last_photo = user_memory.get_last_photo(chat_id, user_id)
-                    await admin_manager.notify_user_query_escalation(
-                        bot=bot,
-                        user=message.from_user,
-                        chat_id=chat_id,
-                        query_text=f"Mijoz admin javobini kutayotgan paytda qo'shimcha xabar yozdi: {raw_text}",
-                        reason="Admin javobini kutayotgan mijozdan xabar",
-                        inn=remembered_id,
-                        org_name=org_name,
-                        photo_file_id=last_photo
+                from catalog_manager import catalog_manager
+                is_structured_request = (
+                    bool(classify_payment_intent(clean_text))
+                    or is_annual_check_intent(clean_text)
+                    or is_monthly_check_intent(clean_text)
+                    or is_both_check_intent(clean_text)
+                    or is_general_debt_check_intent(clean_text)
+                    or is_mxik_intent(clean_text)
+                    or bool(catalog_manager.find_post_by_keywords(clean_text))
+                )
+                if is_structured_request:
+                    user_memory.clear_escalation(chat_id, user_id)
+                else:
+                    repeats = user_memory.increment_escalation_repeats(chat_id, user_id)
+                    esc_ack = (
+                        "👨‍💻 <b>Murojaatingiz mas'ul administratorga yo'naltirilgan. Iltimos, admin javobini kuting!</b>\n\n"
+                        "Apparatingiz va barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazilgan.\n"
+                        "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanadi.\n\n"
+                        "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
                     )
-                return True
+                    esc_ack = adapt_to_user_script(esc_ack, user_script)
+                    kb = get_admin_contact_keyboard()
+                    try:
+                        await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
+                    except Exception:
+                        await message.reply(esc_ack, reply_markup=kb)
+
+                    user_memory.add_user_message(chat_id, user_id, raw_text)
+                    user_memory.add_assistant_message(chat_id, user_id, esc_ack)
+
+                    if repeats in (1, 3, 5):
+                        remembered_id = user_memory.get_last_id(chat_id, user_id)
+                        org_name = user_memory.get_org_name(chat_id, user_id)
+                        last_photo = user_memory.get_last_photo(chat_id, user_id)
+                        await admin_manager.notify_user_query_escalation(
+                            bot=bot,
+                            user=message.from_user,
+                            chat_id=chat_id,
+                            query_text=f"Mijoz admin javobini kutayotgan paytda qo'shimcha xabar yozdi: {raw_text}",
+                            reason="Admin javobini kutayotgan mijozdan xabar",
+                            inn=remembered_id,
+                            org_name=org_name,
+                            photo_file_id=last_photo
+                        )
+                    return True
 
             # 3.3 Agar mijoz aniq sabrsizlik iboralarini yozsa (masalan: "alo", "qachon javob", "tashladimku boya"):
             is_prolonged = any(p in lower_text for p in PROLONGED_CHAT_PHRASES)
@@ -352,7 +389,7 @@ class GroupResponseOrchestrator:
         # Agar yuqoridagi 1-7 qadamlardagi aniq qoidalarning hech biriga tushmagan bo'lsa
         # va foydalanuvchi allaqachon 4 martadan ortiq yozishma qilib gapni cho'zayotgan bo'lsa -> Adminga!
         turn_cnt = user_memory.get_user_turn_count(chat_id, user_id)
-        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not found_inn and not found_fm and not is_command:
+        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not is_greeting and not found_inn and not found_fm and not is_command:
             from catalog_manager import catalog_manager
             if not catalog_manager.find_post_by_keywords(clean_text):
                 user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / uzoq suhbat")

@@ -84,6 +84,17 @@ def deploy():
     pip_status = stdout.channel.recv_exit_status()
     print(f"Pip install status: {pip_status}")
 
+    print("\nClearing stale escalation locks in user_sessions.json on server...")
+    clear_cmd = (
+        f"{remote_dir}/venv/bin/python -c \""
+        f"import json, os; p='{remote_dir}/data/user_sessions.json'; "
+        f"d=json.load(open(p)) if os.path.exists(p) else {{}}; "
+        f"[v.update({{'is_escalated_to_admin': False, 'escalation_repeats': 0}}) for v in d.values() if isinstance(v, dict)]; "
+        f"json.dump(d, open(p, 'w'), ensure_ascii=False, indent=2) if os.path.exists(p) else None\""
+    )
+    _, stdout, _ = ssh.exec_command(clear_cmd)
+    stdout.channel.recv_exit_status()
+
     print("\nRestarting mars-bot.service...")
     _, stdout, stderr = ssh.exec_command("systemctl restart mars-bot.service")
     status = stdout.channel.recv_exit_status()
