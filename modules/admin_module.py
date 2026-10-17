@@ -414,3 +414,11 @@ class AdminModule(BaseBotModule):
     def get_router(self):
         from handlers.admin import router as admin_router
         return admin_router
+
+    def get_services(self) -> Dict[str, Any]:
+        from admin_manager import admin_manager
+        return {
+            "regional_admin_service": regional_admin_service,
+            "admin_manager": admin_manager
+        }
+

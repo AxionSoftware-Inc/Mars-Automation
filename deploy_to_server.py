@@ -18,6 +18,7 @@ def deploy():
 
     files_to_sync = [
         'requirements.txt',
+        'bot.py',
         'admin_manager.py',
         'openrouter_client.py',
         'ai_helper.py',

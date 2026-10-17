@@ -56,11 +56,19 @@ async def main():
 
     logger.info("Mars Smart POS boti modulli arxitektura bilan ishga tushirildi...")
     
+    # Barcha ulangan modullarning on_startup metodlarini ishga tushirish
+    from core.module_registry import module_registry
+    await module_registry.startup_all(bot, dp)
+
     # Ishga tushganda fon rejimida oxirgi Excel faylni tekshirish
     asyncio.create_task(daily_channel_file_maintenance(bot))
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await module_registry.shutdown_all(bot, dp)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 

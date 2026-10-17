@@ -51,6 +51,14 @@ class BillingModule(BaseBotModule):
         from handlers.debt import router as debt_router
         return debt_router
 
+    def get_services(self):
+        from excel_manager import excel_manager
+        from ofd_bridge import ofd_bridge
+        return {
+            "excel_manager": excel_manager,
+            "ofd_bridge": ofd_bridge
+        }
+
 
 class ChannelModule(BaseBotModule):
     name = "channel_module"
@@ -61,6 +69,10 @@ class ChannelModule(BaseBotModule):
     def get_router(self):
         from handlers.channel import router as channel_router
         return channel_router
+
+    def get_services(self):
+        from catalog_manager import catalog_manager
+        return {"catalog_manager": catalog_manager}
 
 
 class GroupSupportModule(BaseBotModule):
@@ -73,15 +85,40 @@ class GroupSupportModule(BaseBotModule):
         from handlers.chat import router as chat_router
         return chat_router
 
+    def get_services(self):
+        from core.group_responder import group_responder
+        from core.rule_engine import rule_engine
+        from user_memory import user_memory
+        return {
+            "group_responder": group_responder,
+            "rule_engine": rule_engine,
+            "user_memory": user_memory
+        }
+
 
 def register_default_modules():
-    """Barcha standart modullarni reestrga ro'yxatdan o'tkazish"""
+    """
+    1. Barcha standart modullarni reestrga ro'yxatdan o'tkazish.
+    2. `modules/` papkasiga tashlangan har qanday yangi `*_module.py` faylni avtomatik topib ulash!
+    3. Agar yangi modulda `handle_group_message` переопределение (override) qilingan bo'lsa,
+       uni avtomatik `group_responder` zanjiriga ulash!
+    """
     module_registry.register(AdminModule())
     module_registry.register(CommandsModule())
     module_registry.register(MediaModule())
     module_registry.register(BillingModule())
     module_registry.register(ChannelModule())
     module_registry.register(GroupSupportModule())
+
+    # modules/ papkasidagi barcha yangi modullarni avto-kashf qilish
+    module_registry.autodiscover("modules")
+
+    # Har bir faol modulning guruh javob qadamini (agar yozilgan bo'lsa) GroupResponder'ga ulash
+    from core.group_responder import group_responder
+    for mod in module_registry.get_active_modules():
+        if type(mod).handle_group_message is not BaseBotModule.handle_group_message:
+            if mod.handle_group_message not in group_responder._custom_steps:
+                group_responder.register_custom_step(mod.handle_group_message)
 
 
 __all__ = [
@@ -94,3 +131,4 @@ __all__ = [
     "register_default_modules",
     "module_registry"
 ]
+
