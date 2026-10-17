@@ -14,7 +14,7 @@ router = Router(name="debt_router")
 
 SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
-def format_debt_response(results: list) -> str:
+def format_debt_response(results: list, checked_fm: str = None, annual_status: dict = None) -> str:
     """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
     if not results:
         return (
@@ -86,17 +86,29 @@ def format_debt_response(results: list) -> str:
         )
     elif total_debt < 0:
         text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
-        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>\n\n"
-        text += (
-            "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
-            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
-        )
+        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>"
+        if checked_fm and annual_status is not None:
+            if annual_status.get("has_debt"):
+                text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
+            else:
+                text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
+        else:
+            text += (
+                "\n\n🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+                "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
+            )
     else:
-        text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>\n\n"
-        text += (
-            "🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
-            "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
-        )
+        text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>"
+        if checked_fm and annual_status is not None:
+            if annual_status.get("has_debt"):
+                text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
+            else:
+                text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
+        else:
+            text += (
+                "\n\n🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+                "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
+            )
 
     return text
 
@@ -186,7 +198,9 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     else:
         user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
 
-    resp = format_debt_response(results)
+    checked_fm = user_memory.get_last_fm(chat_id, user_id)
+    annual_status = user_memory.get_annual_status(chat_id, user_id)
+    resp = format_debt_response(results, checked_fm=checked_fm, annual_status=annual_status)
     pending_screen = user_memory.get_pending_device_screen(chat_id, user_id)
     if pending_screen:
         user_memory.clear_pending_device_screen(chat_id, user_id)
@@ -204,16 +218,10 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     if is_in_issue:
         if total_debt > 0:
             resp += (
-                "\n\n⚠️ <i>Apparat to'xtab qolishining sababi: «Mars» oylik abonent to'lovidan qarzdorlik mavjud. "
+                "\n\n⚠️ <i>Apparat to'xtab qolishining sababi: «Mars» oylik abonent to'lovidagi qarzdorlik. "
                 "Quyidagi hisob raqamga to'lov qilingandan so'ng apparat avtomatik faollashadi.</i>"
             )
-        else:
-            resp += (
-                "\n\n──────────────\n"
-                "🔍 <b>2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish</b>\n"
-                "✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
-                "🏛 Soliq litsenziyasi muddatini tekshirishimiz uchun kassa chekining eng pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
-            )
+        elif not checked_fm:
             user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
 
     resp = adapt_to_user_script(resp, user_script)

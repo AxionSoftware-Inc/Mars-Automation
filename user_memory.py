@@ -215,25 +215,16 @@ class UserMemoryManager:
     def get_annual_status(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Yillik Davlat Soliq (OFD) to'lovi holatini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("annual_status")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "annual_status")
-        return val
+        return session.get("annual_status")
 
     def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
         """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("last_id")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "last_id")
-        return val
+        return session.get("last_id")
 
     def get_org_name(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("org_name")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "org_name")
-        return val
+        return session.get("org_name")
 
     def set_last_receipt(self, chat_id: int, user_id: int, receipt_info: Dict[str, Any]):
         """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash"""
@@ -259,10 +250,7 @@ class UserMemoryManager:
     def get_debt_info(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Oxirgi tekshirilgan qarz ma'lumotlarini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("debt_info")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "debt_info")
-        return val
+        return session.get("debt_info")
 
     def set_last_topic(self, chat_id: int, user_id: int, topic: str):
         """Oxirgi mavzuni saqlash (masalan: 'receipt_submitted', 'debt_checked', 'time_error')"""
@@ -292,17 +280,11 @@ class UserMemoryManager:
 
     def get_issue_initial_query(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("issue_initial_query")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "issue_initial_query")
-        return val
+        return session.get("issue_initial_query")
 
     def get_last_topic(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("last_topic")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "last_topic")
-        return val
+        return session.get("last_topic")
 
     def mark_escalated_to_admin(self, chat_id: int, user_id: int, reason: str = ""):
         """Foydalanuvchi adminga/ustaga yo'naltirilganini xotiraga belgilash"""
@@ -487,10 +469,7 @@ class UserMemoryManager:
 
     def get_last_fm(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("last_fm")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "last_fm")
-        return val
+        return session.get("last_fm")
 
     def set_last_photo(self, chat_id: int, user_id: int, file_id: str):
         """Oxirgi yuborilgan kassa rasmi file_id sini saqlash"""
@@ -500,10 +479,7 @@ class UserMemoryManager:
 
     def get_last_photo(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        val = session.get("last_photo")
-        if not val and chat_id < 0:
-            val = self._fallback_from_group(chat_id, "last_photo")
-        return val
+        return session.get("last_photo")
 
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""

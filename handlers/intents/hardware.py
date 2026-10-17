@@ -254,7 +254,14 @@ class HardwareIntentHandler:
 
         # Fiskal modul bor -> OFD litsenziyasini tekshirish
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
-        has_ann_debt = ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"])
+        has_ann_debt = False
+        if ofd_reply:
+            lower_ofd = ofd_reply.lower()
+            has_no_debt = any(w in lower_ofd for w in [
+                "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"
+            ])
+            if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan", "muddati o‘tgan"]):
+                has_ann_debt = True
         user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details=ofd_reply or "")
 
         if has_ann_debt:

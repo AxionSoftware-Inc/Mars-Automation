@@ -616,7 +616,9 @@ async def _process_image_content(
     # 3. BEGONA TASVIR YOKI XATOLIK BO'LGANDA XAVFSIZLIK CHIQISHI
     else:
         is_issue = user_memory.is_issue_mode(chat_id, user_id)
-        if is_issue:
+        last_topic = user_memory.get_last_topic(chat_id, user_id)
+        if is_issue or last_topic in ("awaiting_screen_photo", "issue_escalated_to_admin"):
+            user_memory.set_last_photo(chat_id, user_id, file_id)
             inn_to_use = user_memory.get_last_id(chat_id, user_id) or ""
             org_to_use = user_memory.get_org_name(chat_id, user_id) or ""
             init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat nosozligi rasmi"

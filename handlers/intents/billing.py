@@ -245,10 +245,17 @@ class BillingIntentHandler:
                 return True
 
         # 2.1 Agar to'g'ridan-to'g'ri faqat Fiskal modul (LG..., YG..., UZ...) yuborilgan bo'lsa -> darhol OFD tekshiruvi!
-        if found_fm and not is_annual_check_intent(text):
+        if found_fm and not found_inn and not is_annual_check_intent(text):
             ofd_reply = await ofd_bridge.query_fiscal_module(bot, found_fm)
             user_memory.set_last_fm(chat_id, user_id, found_fm)
-            has_ann_debt = ofd_reply and any(w in ofd_reply.lower() for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik"])
+            has_ann_debt = False
+            if ofd_reply:
+                lower_ofd = ofd_reply.lower()
+                has_no_debt = any(w in lower_ofd for w in [
+                    "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"
+                ])
+                if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan", "muddati o‘tgan"]):
+                    has_ann_debt = True
             user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details=ofd_reply or "")
 
             is_issue = user_memory.is_issue_mode(chat_id, user_id)
@@ -366,12 +373,31 @@ class BillingIntentHandler:
             return True
 
         # 2.3 Hisob raqamlar postini kanaldan uzatish / to'lov intentlari ("oylikchi", "yillikchi", "to'layman", "shot tashla")
-        is_ann_check = is_annual_check_intent(text)
-        is_mon_check = is_monthly_check_intent(text)
+        is_in_payment_card_context = last_topic in (
+            "payment_info_both",
+            "monthly_payment_card_sent",
+            "annual_payment_card_sent",
+            "payment_instruction"
+        )
+
+        # Agar mijoz hozirgina "shot raqam" / "qayerga to'layman" deb hisob raqam so'ragan bo'lsa,
+        # va keyingi gapida "yillikchi", "yillik-chi", "oylikchi" desa — u yillik/oylik SHOT (hisob raqam) so'rayapti!
+        is_contextual_ann_shot = is_in_payment_card_context and any(w in lower_text for w in [
+            "yillikchi", "yilikchi", "yillik-chi", "yillikkachi", "yillikdanchi", "fiskalchi", "soliqchi", "ofdchi",
+            "yillik", "fiskal", "soliq", "ofd", "йилликчи", "йилликкачи", "йилликданчи", "фискалчи", "солиқчи", "йиллик"
+        ]) and not any(w in lower_text for w in ["qarz", "bormi", "tekshir", "қарз", "борми", "текшир"])
+
+        is_contextual_mon_shot = is_in_payment_card_context and any(w in lower_text for w in [
+            "oylikchi", "oylik-chi", "oylikkachi", "oylikdanchi", "marschi", "abonentchi",
+            "oylik", "mars", "abonent", "ойликчи", "ойликкачи", "ойликданчи", "марсчи", "ойлик"
+        ]) and not any(w in lower_text for w in ["qarz", "bormi", "tekshir", "қарз", "борми", "текшир"])
+
+        is_ann_check = is_annual_check_intent(text) and not is_contextual_ann_shot
+        is_mon_check = is_monthly_check_intent(text) and not is_contextual_mon_shot
 
         payment_intent = classify_payment_intent(text)
-        is_ann_pay = (is_annual_pay_intent(text, last_topic) or payment_intent == "annual") and not is_ann_check
-        is_mon_pay = (is_monthly_pay_intent(text, last_topic) or payment_intent == "monthly") and not is_mon_check
+        is_ann_pay = is_contextual_ann_shot or ((is_annual_pay_intent(text, last_topic) or payment_intent == "annual") and not is_ann_check)
+        is_mon_pay = is_contextual_mon_shot or ((is_monthly_pay_intent(text, last_topic) or payment_intent == "monthly") and not is_mon_check)
         is_explicit_both = any(w in lower_text for w in ["ikkala", "har ikkala", "ikkisidan", "иккала", "ҳар иккала"])
         is_both_pay = (payment_intent == "both" and not is_ann_pay and not is_mon_pay) or is_explicit_both
 
@@ -433,11 +459,11 @@ class BillingIntentHandler:
 
             elif is_ann_pay:
                 ann_st = user_memory.get_annual_status(chat_id, user_id)
-                is_explicit_acc_ask = any(w in lower_text for w in [
+                is_explicit_acc_ask = is_contextual_ann_shot or any(w in lower_text for w in [
                     "shot", "rekvizit", "hisob", "xisob", "kartasi", "karta", "to'lash uchun", "tolash uchun",
                     "to'lashga", "tolashga", "шот", "реквизит", "ҳисоб", "счёт", "счет"
                 ])
-                # Agar mijoz shunchaki "yillikchi" yoki "yillik" deb so'ragan bo'lsa va xotirada yillikdan qarz yo'qligi ma'lum bo'lsa:
+                # Agar mijoz shunchaki "yillikchi" yoki "yillik" deb so'ragan bo'lsa va xotirada yillikdan qarz yo'qligi ma'lum bo'lsa (va hisob raqam kontekstida bo'lmasa):
                 if ann_st and not ann_st.get("has_debt") and not is_explicit_acc_ask:
                     clear_msg = "🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol)"
                     clear_msg = adapt_to_user_script(clear_msg, user_script)
@@ -677,21 +703,33 @@ class BillingIntentHandler:
                 return True
 
 
-        # 9. Click orqali to'lov tartibi so'ralganda
+        # 9. Click orqali to'lov tartibi yoki "qayerga/qanday to'layman" so'ralganda:
+        # Faqat videoni emas, avval hisob raqam postini (85) va ketidan videoni (148) uzatamiz!
         if any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS):
             try:
                 await bot.copy_message(
                     chat_id=message.chat.id,
                     from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=148,
+                    message_id=MARS_POST_ID,
                     reply_to_message_id=message.message_id
                 )
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, "[Click orqali to'lash videosi yuborildi]")
-                user_memory.set_last_topic(chat_id, user_id, "payment_instruction")
-                return True
+            except Exception as e:
+                logger.warning(f"Post 85 yuborishda xatolik: {e}")
+                await message.reply(adapt_to_user_script(get_monthly_payment_card(), user_script), parse_mode="HTML")
+
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=MARS_VIDEO_ID
+                )
             except Exception as e:
                 logger.error(f"To'lov videosi yuborishda xatolik: {e}")
+
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) va Click video (148) yuborildi]")
+            user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")
+            return True
 
         # 10. Pul yechilgan / to'langan lekin apparat yoqilmagan bo'lsa
         paid_not_active_words = [

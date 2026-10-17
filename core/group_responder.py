@@ -237,6 +237,7 @@ class GroupResponseOrchestrator:
                     is_general_debt_check_intent,
                     is_mxik_intent
                 )
+                from handlers.intents.billing import PAYMENT_METHODS_KEYWORDS
                 from catalog_manager import catalog_manager
                 is_structured_request = (
                     bool(classify_payment_intent(clean_text))
@@ -245,6 +246,7 @@ class GroupResponseOrchestrator:
                     or is_both_check_intent(clean_text)
                     or is_general_debt_check_intent(clean_text)
                     or is_mxik_intent(clean_text)
+                    or any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS)
                     or bool(catalog_manager.find_post_by_keywords(clean_text))
                 )
                 if is_structured_request:
