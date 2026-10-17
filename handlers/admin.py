@@ -51,6 +51,8 @@ async def cmd_admin_panel(message: types.Message):
         "🔹 /contacts — Mas'ul xodimlar kontaktlari\n"
         "🔹 /add_contact <code>Ism | Telefon | Lavozim</code> — Yangi kontakt qo'shish\n"
         "🔹 /del_contact <code>Telefon</code> — Kontaktni o'chirish\n"
+        "🔹 /hududlar — Viloyat va tumanlar bo'yicha hududiy adminlar ro'yxati\n"
+        "🔹 /set_hudud_admin <code>region_id | Ism | @user | tg_id | tel</code> — Hudud adminini yangilash\n"
         "🔹 /modules — Ulangan tizim modullari ro'yxati\n"
         "🔹 /patches — Dinamik qoidalar (Plug & Play) ro'yxati\n"
         "🔹 /add_patch <code>id | so'z1, so'z2 | Javob | video_id</code> — Yangi qoida qo'shish\n"
@@ -491,5 +493,66 @@ async def cmd_del_patch(message: types.Message):
         await message.reply(f"✅ Qoida o'chirildi: <code>{patch_id}</code>", parse_mode="HTML")
     else:
         await message.reply(f"❌ Qoida topilmadi: <code>{patch_id}</code>", parse_mode="HTML")
+
+
+# =============================================================================
+# HUDUDIY ADMINLAR MODULI BOSHQARUVI (data/regional_admins.json)
+# =============================================================================
+
+@router.message(Command("hududlar", "regional_admins"), is_admin_filter)
+async def cmd_list_hududlar(message: types.Message):
+    """Viloyat va tumanlar bo'yicha biriktirilgan hududiy adminlar ro'yxatini ko'rsatish"""
+    from modules.admin_module import regional_admin_service
+    text = regional_admin_service.get_all_regions_summary()
+    await message.reply(text, parse_mode="HTML")
+
+
+@router.message(Command("set_hudud_admin"), is_admin_filter)
+async def cmd_set_hudud_admin(message: types.Message):
+    """
+    Hududiy admin ma'lumotlarini yangilash:
+    /set_hudud_admin qarshi | Quvonchbek (Qarshi) | @quvonchbek_admin | 7516266624 | +998 97 383 22 25
+    """
+    from modules.admin_module import regional_admin_service
+    raw_args = message.text[len("/set_hudud_admin"):].strip()
+    parts = [p.strip() for p in raw_args.split("|")]
+    if len(parts) < 3:
+        await message.reply(
+            "Format xato. Misol:\n"
+            "<code>/set_hudud_admin shahrisabz | Anvar Aka | @anvar_admin | 123456789 | +998 90 123 45 67</code>\n\n"
+            "Barcha hudud kodlarini ko'rish uchun: /hududlar",
+            parse_mode="HTML"
+        )
+        return
+
+    region_id = parts[0].lower()
+    admin_name = parts[1]
+    username = parts[2]
+    tg_id = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None
+    phone = parts[4] if len(parts) > 4 else None
+
+    ok = regional_admin_service.update_region_admin(
+        region_id=region_id,
+        admin_name=admin_name,
+        username=username,
+        telegram_id=tg_id,
+        phone=phone
+    )
+    if ok:
+        await message.reply(
+            f"✅ <b>Hududiy admin muvaffaqiyatli yangilandi!</b>\n\n"
+            f"📍 <b>Hudud kodi:</b> <code>{region_id}</code>\n"
+            f"👤 <b>Mas'ul:</b> {admin_name}\n"
+            f"💬 <b>Telegram:</b> @{username.lstrip('@')}\n"
+            f"🆔 <b>Telegram ID:</b> <code>{tg_id or 'Avto-aniqlanadi'}</code>\n"
+            f"📞 <b>Telefon:</b> {phone or 'Kiritilmagan'}",
+            parse_mode="HTML"
+        )
+    else:
+        await message.reply(
+            f"❌ Bunday hudud kodi topilmadi: <code>{region_id}</code>\n"
+            f"Mavjud hudud kodlarini ko'rish uchun /hududlar buyrug'ini yuboring.",
+            parse_mode="HTML"
+        )
 
 

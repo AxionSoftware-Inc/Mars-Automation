@@ -360,12 +360,13 @@ async def _process_fiscal_receipt_content(
     is_issue = user_memory.is_issue_mode(chat_id, user_id)
     if not has_monthly_debt and not has_annual_debt and fm and is_issue:
         final_text += adapt_to_user_script(
-            "\n\n🟢 <b>To'lovlar bo'yicha qarzdorlik yo'q!</b>\n"
-            "Kassa cheki va apparat ma'lumotlari zudlik bilan Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
+            f"\n\n🟢 <b>To'lovlar bo'yicha qarzdorlik yo'q!</b>\n"
+            f"{admin_manager.get_contacts_display(inn=inn)}\n\n"
+            "Kassa cheki va apparat ma'lumotlari zudlik bilan hududiy mas'ul adminga yetkazildi.\n"
             "Quyidagi tugmalar orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:",
             user_script
         )
-        kb = get_admin_contact_keyboard()
+        kb = get_admin_contact_keyboard(inn=inn)
         try:
             await message.reply(final_text, parse_mode="HTML", reply_markup=kb)
         except Exception:
@@ -548,16 +549,16 @@ async def _process_image_content(
             )
             fm_text = f"\n🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>" if target_fm else ""
             esc_ack = (
-                "👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz mas'ul adminga yuborildi!</b>\n\n"
+                "👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz hududiy mas'ul adminga yuborildi!</b>\n\n"
                 f"🏢 <b>Korxona:</b> {org_to_use}\n"
                 f"🆔 <b>INN:</b> <code>{inn_to_use}</code>"
-                f"{fm_text}\n"
-                "📸 Kassa apparati ekranidagi xatolik rasmi va texnik holati bo'yicha ma'lumotlar Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n\n"
-                "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanib, apparatni sozlab beradi.\n"
+                f"{fm_text}\n\n"
+                f"{admin_manager.get_contacts_display(inn=inn_to_use)}\n\n"
+                "📸 Kassa apparati ekranidagi xatolik rasmi va korxona ma'lumotlari hududingiz bo'yicha mas'ul adminga yetkazildi. Tez orada admin o'zi siz bilan bog'lanadi!\n"
                 "Quyidagi tugmalar orqali ham to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
             )
             esc_ack = adapt_to_user_script(esc_ack, user_script)
-            kb = get_admin_contact_keyboard()
+            kb = get_admin_contact_keyboard(inn=inn_to_use)
             try:
                 await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
             except Exception:
@@ -570,7 +571,7 @@ async def _process_image_content(
 
         if decision.reply_text:
             reply_text = adapt_to_user_script(decision.reply_text, user_script)
-            kb = get_admin_contact_keyboard() if is_escalation_target else None
+            kb = get_admin_contact_keyboard(inn=inn_to_use) if is_escalation_target else None
             try:
                 if kb:
                     await message.reply(reply_text, parse_mode="HTML", reply_markup=kb)
@@ -635,11 +636,12 @@ async def _process_image_content(
             user_memory.clear_issue_mode(chat_id, user_id)
             user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
             ack_msg = (
-                "📸 <b>Tasvir qabul qilindi va mutaxassislarimizga uzatildi.</b>\n\n"
-                "👨‍💻 Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimiz (@quvonchbek_admin, @Yashnarbek_butaev) apparatingiz holatini tekshirib, tez orada yordam berishadi.\n"
+                "📸 <b>Tasvir qabul qilindi va hududiy mutaxassisimizga uzatildi.</b>\n\n"
+                f"{admin_manager.get_contacts_display(inn=inn_to_use)}\n\n"
+                "👨‍💻 Hududingiz bo'yicha mas'ul adminimiz apparatingiz holatini tekshirib, tez orada o'zi siz bilan bog'lanadi.\n"
                 "Quyidagi tugmalar orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:"
             )
-            kb = get_admin_contact_keyboard()
+            kb = get_admin_contact_keyboard(inn=inn_to_use)
             try:
                 await message.reply(adapt_to_user_script(ack_msg, user_script), parse_mode="HTML", reply_markup=kb)
             except Exception:

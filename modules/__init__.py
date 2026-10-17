@@ -16,17 +16,7 @@ Yangi katta modul (masalan: CRMModule, ClickMerchantModule, AnalyticsModule) qo'
 """
 
 from core.module_registry import BaseBotModule, module_registry
-
-
-class AdminModule(BaseBotModule):
-    name = "admin_module"
-    version = "2.0.0"
-    description = "Admin panel, statistika, xatolik qoidalari va OFD ko'prik boshqaruvi"
-    priority = 100
-
-    def get_router(self):
-        from handlers.admin import router as admin_router
-        return admin_router
+from modules.admin_module import AdminModule, regional_admin_service, RegionalAdminRouterService
 
 
 class CommandsModule(BaseBotModule):

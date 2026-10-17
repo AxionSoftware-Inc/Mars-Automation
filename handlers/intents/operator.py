@@ -39,7 +39,7 @@ class OperatorIntentHandler:
 
         decision = core_engine.escalate_general_issue(text, chat_id, user_id)
         reply_msg = adapt_to_user_script(decision.reply_text, user_script)
-        kb = get_admin_contact_keyboard()
+        kb = get_admin_contact_keyboard(inn=decision.detected_inn, tuman=decision.tuman)
         try:
             await message.reply(reply_msg, parse_mode="HTML", reply_markup=kb)
         except Exception:

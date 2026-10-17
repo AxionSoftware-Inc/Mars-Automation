@@ -296,6 +296,8 @@ class BillingIntentHandler:
             else:
                 if is_issue:
                     # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
+                    from admin_manager import admin_manager, get_admin_contact_keyboard
+                    last_photo = user_memory.get_last_photo(chat_id, user_id)
                     step3_text = (
                         f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
                         f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
@@ -307,24 +309,27 @@ class BillingIntentHandler:
                         f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
                         f"3️⃣ <b>Qayta yoqish:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot);\n"
                         f"4️⃣ <b>Rasm yuborish:</b> Agar baribir ishlamasa, apparat ekranidagi xatolik yozuvini rasmga olib yuboring.\n\n"
-                        f"👨‍💻 <b>Barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.</b> Tez orada mutaxassis siz bilan bog'lanadi."
+                        f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
+                        f"👨‍💻 <b>Barcha ma'lumotlaringiz hududingiz bo'yicha mas'ul adminga yetkazildi.</b> Tez orada mutaxassis siz bilan bog'lanadi:"
                     )
                     step3_text = adapt_to_user_script(step3_text, user_script)
+                    kb = get_admin_contact_keyboard(inn=remembered_id)
                     try:
-                        await message.reply(step3_text, parse_mode="HTML")
+                        await message.reply(step3_text, parse_mode="HTML", reply_markup=kb)
                     except Exception:
-                        await message.reply(step3_text)
+                        await message.reply(step3_text, reply_markup=kb)
 
-                    from admin_manager import admin_manager
                     init_q = user_memory.get_issue_initial_query(chat_id, user_id) or "Apparat ishlamayapti"
-                    await admin_manager.notify_user_query_escalation(
+                    await admin_manager.notify_debt_free_device_issue(
                         bot=bot,
                         user=message.from_user,
                         chat_id=chat_id,
-                        query_text=f"Dastlabki murojaat: {init_q}. Oylik va Yillik qarz yo'q (to'langan), lekin apparat ishlamayapti. Fiskal modul: {found_fm}",
-                        reason="Apparat ishlamayapti (Oylik va Yillik to'lovlar 0 so'm / to'langan)",
-                        inn=remembered_id,
-                        org_name=org_name
+                        org_name=org_name,
+                        inn=remembered_id or "",
+                        issue_summary=f"Dastlabki murojaat: {init_q}. Oylik va Yillik qarz yo'q (to'langan), lekin apparat ishlamayapti. Fiskal modul: {found_fm}",
+                        user_comment=text,
+                        photo_file_id=last_photo,
+                        fiscal_module=found_fm
                     )
                     user_memory.clear_issue_mode(chat_id, user_id)
                     user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
@@ -591,7 +596,7 @@ class BillingIntentHandler:
                         # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
                         from admin_manager import admin_manager, get_admin_contact_keyboard
                         last_photo = user_memory.get_last_photo(chat_id, user_id)
-                        photo_note = "\n📸 <i>Yuborgan fotosuratingiz ham mas'ul ustaga yetkazildi.</i>\n" if last_photo else ""
+                        photo_note = "\n📸 <i>Yuborgan fotosuratingiz ham hududiy mas'ul adminga yetkazildi.</i>\n" if last_photo else ""
                         step3_text = (
                             f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
                             f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
@@ -603,12 +608,13 @@ class BillingIntentHandler:
                             f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
                             f"3️⃣ <b>Qayta yoqish:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot);\n"
                             f"4️⃣ <b>Rasm yuborish:</b> Agar baribir ishlamasa, apparat ekranidagi xatolik yozuvini rasmga olib yuboring.\n\n"
-                            f"👨‍💻 <b>Barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) tezkor yetkazildi!</b>\n"
+                            f"{admin_manager.get_contacts_display(inn=remembered_id)}\n"
                             f"{photo_note}"
+                            f"👨‍💻 <b>Barcha ma'lumotlaringiz hududingiz bo'yicha mas'ul adminga tezkor yetkazildi!</b>\n"
                             f"Quyidagi tugmalar orqali to'g'ridan-to'g'ri mutaxassis bilan bog'lanishingiz mumkin:"
                         )
                         step3_text = adapt_to_user_script(step3_text, user_script)
-                        kb = get_admin_contact_keyboard()
+                        kb = get_admin_contact_keyboard(inn=remembered_id)
                         try:
                             await message.reply(step3_text, parse_mode="HTML", reply_markup=kb)
                         except Exception:

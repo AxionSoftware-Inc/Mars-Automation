@@ -99,18 +99,24 @@ class AdminManager:
         return self.admin_ids
 
     def is_admin(self, user_id: int, username: Optional[str] = None) -> bool:
-        """Foydalanuvchi admin yoki texnik ekanligini tekshirish"""
-        if user_id in self.admin_ids:
+        """Foydalanuvchi admin yoki hududiy texnik ekanligini tekshirish"""
+        from modules.admin_module import regional_admin_service
+        if user_id in self.admin_ids or user_id in regional_admin_service.get_all_admin_telegram_ids():
             return True
-        if username and username.lower().replace("@", "") in self.admin_usernames:
-            self.check_and_register_username(user_id, username)
-            return True
+        if username:
+            clean_u = username.lower().replace("@", "")
+            if clean_u in self.admin_usernames or clean_u in regional_admin_service.get_all_admin_usernames():
+                self.check_and_register_username(user_id, username)
+                regional_admin_service.register_user_id_by_username(user_id, username)
+                return True
         return False
 
     def check_and_register_username(self, user_id: int, username: str):
         """Agar xabar yozgan user admin username laridan biri bo'lsa, uning ID sini avtomatik saqlash"""
         if not username:
             return
+        from modules.admin_module import regional_admin_service
+        regional_admin_service.register_user_id_by_username(user_id, username)
         clean_u = username.lower().replace("@", "")
         if clean_u in self.admin_usernames and user_id not in self.admin_ids:
             self.admin_ids.append(user_id)
@@ -143,14 +149,21 @@ class AdminManager:
         self.contacts = [c for c in self.contacts if c.get("phone") != phone]
         self.save_config()
 
-    def get_contacts_display(self) -> str:
-        """Foydalanuvchilarga ko'rsatish uchun kontaktlar ro'yxati matni"""
-        lines = [
-            "👨‍💻 <b>Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlari:</b>",
-            "• Mas'ul xodim: @quvonchbek_admin",
-            "• Bosh usta: @Yashnarbek_butaev"
-        ]
-        return "\n".join(lines)
+    def get_contacts_display(self, inn: Optional[str] = None, tuman: Optional[str] = None) -> str:
+        """Foydalanuvchilarga ko'rsatish uchun hududiy mas'ul xodim va kontaktlar matni"""
+        from modules.admin_module import regional_admin_service
+        return regional_admin_service.format_user_facing_admin_info(inn=inn, tuman=tuman)
+
+    def get_region_admin_info(self, inn: Optional[str] = None, tuman: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Berilgan INN yoki tuman bo'yicha hududiy admin ma'lumotlarini olish"""
+        from modules.admin_module import regional_admin_service
+        if tuman:
+            reg = regional_admin_service.find_region_admin(tuman)
+            if reg:
+                return reg
+        if inn:
+            return regional_admin_service.find_region_admin_by_inn(inn)
+        return None
 
     async def notify_admins(
         self,
@@ -158,16 +171,23 @@ class AdminManager:
         text: str,
         photo_file_id: Optional[str] = None,
         document_file_id: Optional[str] = None,
-        short_caption: Optional[str] = None
+        short_caption: Optional[str] = None,
+        inn: Optional[str] = None,
+        tuman: Optional[str] = None,
+        reply_markup: Optional[InlineKeyboardMarkup] = None
     ):
-        """Barcha adminlarga va bildirishnoma kanaliga xabar yuborish"""
+        """Hududiy mas'ul adminga, bosh adminlarga va bildirishnoma kanaliga xabar (rasmi bilan) yuborish"""
+        from modules.admin_module import regional_admin_service
         caption_text = short_caption or text
         if len(caption_text) > 1024:
             caption_text = caption_text[:1020] + "..."
 
-        targets = list(set(self.admin_ids))
-        if self.notification_channel_id and self.notification_channel_id not in targets:
-            targets.append(self.notification_channel_id)
+        targets = regional_admin_service.get_target_admin_ids_for_escalation(
+            inn=inn,
+            tuman=tuman,
+            fallback_admin_ids=self.admin_ids,
+            notification_channel_id=self.notification_channel_id
+        )
 
         for target_id in targets:
             try:
@@ -176,20 +196,23 @@ class AdminManager:
                         chat_id=target_id,
                         photo=photo_file_id,
                         caption=caption_text,
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=reply_markup
                     )
                 elif document_file_id:
                     await bot.send_document(
                         chat_id=target_id,
                         document=document_file_id,
                         caption=caption_text,
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=reply_markup
                     )
                 else:
                     await bot.send_message(
                         chat_id=target_id,
                         text=text,
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=reply_markup
                     )
             except Exception as e:
                 logger.warning(f"Adminga ({target_id}) xabarnoma yuborishda xatolik: {e}")
@@ -205,13 +228,14 @@ class AdminManager:
         is_photo: bool = True,
         user_comment: str = ""
     ):
-        """To'lov kvitansiyasi kelganda ikkala mas'ul texnik/adminga to'liq hisobot yuborish"""
+        """To'lov kvitansiyasi kelganda hududiy va bosh adminlarga to'liq hisobot yuborish"""
+        from modules.admin_module import regional_admin_service
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
         user_id = user.id if user else 0
 
         paid_amount = getattr(receipt_facts, "amount", 0.0) or 0.0
-        prev_debt = debt_status_info.get("previous_debt", 0.0)
+        prev_debt = debt_status_info.get("previous_debt", debt_status_info.get("prev_debt", 0.0))
         remaining_debt = debt_status_info.get("remaining_debt", 0.0)
         org_name = debt_status_info.get("org_name") or getattr(receipt_facts, "payer_name", "") or "Aniqlanmadi"
         inn = getattr(receipt_facts, "payer_inn", "") or debt_status_info.get("inn", "")
@@ -223,6 +247,12 @@ class AdminManager:
 
         from excel_manager import excel_manager
         tuman = debt_status_info.get("tuman") or (excel_manager.get_district_for_inn(inn) if inn else "")
+        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
+        reg_admin_line = ""
+        if reg_admin:
+            ra_user = (reg_admin.get("username") or "").replace("@", "")
+            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
+
         tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
 
         purpose_label = getattr(receipt_facts, "purpose_label", None) or debt_status_info.get("purpose_label") or "Oylik abonent to'lovi"
@@ -266,6 +296,7 @@ class AdminManager:
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
                 f"{tuman_line}"
+                f"{reg_admin_line}"
                 f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
                 f"────────────────────\n"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
@@ -284,6 +315,8 @@ class AdminManager:
                 f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"{tuman_line}"
+                f"{reg_admin_line}"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
                 f"{bottom_inn_block}"
             )
@@ -309,6 +342,7 @@ class AdminManager:
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
                 f"{tuman_line}"
+                f"{reg_admin_line}"
                 f"{purpose_line}"
                 f"────────────────────\n"
                 f"📊 <b>Qarz tahlili:</b>\n"
@@ -321,7 +355,7 @@ class AdminManager:
                 f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
                 f"{user_comment_str}\n"
                 f"{bottom_inn_block}\n\n"
-                f"⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+                f"⚡️ <i>Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
             )
             short_caption = (
                 f"🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>\n\n"
@@ -330,19 +364,25 @@ class AdminManager:
                 f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"{tuman_line}"
+                f"{reg_admin_line}"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
                 f"{bottom_inn_block}"
             )
 
         photo_id = file_id if is_photo else None
         doc_id = file_id if not is_photo else None
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
 
         await self.notify_admins(
             bot=bot,
             text=text,
             photo_file_id=photo_id,
             document_file_id=doc_id,
-            short_caption=short_caption
+            short_caption=short_caption,
+            inn=inn,
+            tuman=tuman,
+            reply_markup=admin_kb
         )
 
     async def notify_technical_issue(
@@ -358,24 +398,42 @@ class AdminManager:
     ):
         """
         Apparatda muammo bor, internet ishlab turibdi, lekin qarz yo'q bo'lgan holatlarda
-        ikkala mas'ul texnikka (@quvonchbek_admin va @Yashnarbek_butaev) tezkor eskalatsiya yuborish.
+        aynan o'sha hududdagi mas'ul adminga (va bosh adminlarga) rasmi bilan tezkor eskalatsiya yuborish.
         """
+        from modules.admin_module import regional_admin_service
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
         user_id = user.id if user else 0
 
         from excel_manager import excel_manager
         tuman = excel_manager.get_district_for_inn(inn) if inn else ""
+        records = excel_manager.search(inn) if inn else []
+        comp_phone = records[0].get("phone", "") if records else ""
+        model_str = excel_manager.get_device_model_summary(records) if records else ""
+
+        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
+        reg_admin_line = ""
+        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
+        if reg_admin:
+            ra_user = (reg_admin.get("username") or "").replace("@", "")
+            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
+            target_mention = f"@{ra_user}"
+
         tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
+        model_line = f"📟 <b>Apparat modeli:</b> {model_str}\n" if model_str else ""
 
         text = (
-            f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA TEZKOR ESKALATSIYA!</b>\n\n"
+            f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA HUDUDIY ESKALATSIYA!</b>\n\n"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
+            f"{phone_line}"
             f"────────────────────\n"
             f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
             f"🔢 <b>INN / JSHSHIR:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
             f"{tuman_line}"
+            f"{reg_admin_line}"
+            f"{model_line}"
             f"📶 <b>Internet aloqasi:</b> ✅ ISHLAYAPTI (Faol)\n"
             f"💳 <b>Qarzdorlik holati:</b> ✅ QARZ YO'Q (To'langan / 0 so'm)\n"
             f"────────────────────\n"
@@ -386,11 +444,19 @@ class AdminManager:
             text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
 
         text += (
-            f"\n⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): Ushbu apparatda qarzdorlik yo'q va internet ishlayapti, "
-            f"lekin texnik muammo bor. Zudlik bilan tekshirish talab etiladi!</i>"
+            f"\n⚡️ <i>Mas'ul mutaxassis ({target_mention}): Mijozga sizning kontaktingiz berildi, "
+            f"iltimos mijoz bilan bog'lanib amaliy yordam bering!</i>"
         )
 
-        await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
+        await self.notify_admins(
+            bot,
+            text=text,
+            photo_file_id=photo_file_id,
+            inn=inn,
+            tuman=tuman,
+            reply_markup=admin_kb
+        )
 
     async def notify_user_query_escalation(
         self,
@@ -404,37 +470,67 @@ class AdminManager:
         photo_file_id: Optional[str] = None
     ):
         """
-        Foydalanuvchi adminga murojaat qilganda, tushunarsiz narsa so'raganda yoki
-        yordam talab qilganda ikkala texnikka (@quvonchbek_admin va @Yashnarbek_butaev)
-        zudlik bilan xabarnoma yuborish (agar apparat rasmi bo'lsa rasmi bilan birga!).
+        Foydalanuvchi adminga murojaat qilganda yoki yordam talab qilganda
+        hududiy adminga (va bosh adminlarga) mijoz ma'lumotlari va rasmi bilan xabar yuborish.
         """
+        from modules.admin_module import regional_admin_service
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
         user_id = user.id if user else 0
 
         tuman = ""
+        comp_phone = ""
+        model_str = ""
         if inn:
             from excel_manager import excel_manager
             tuman = excel_manager.get_district_for_inn(inn)
+            records = excel_manager.search(inn)
+            if records:
+                comp_phone = records[0].get("phone", "")
+                model_str = excel_manager.get_device_model_summary(records)
+                if not org_name:
+                    org_name = records[0].get("name", "")
+
+        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
+        reg_admin_line = ""
+        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
+        if reg_admin:
+            ra_user = (reg_admin.get("username") or "").replace("@", "")
+            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
+            target_mention = f"@{ra_user}"
+
         tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
         inn_line = f"🔢 <b>INN:</b> <code>{inn}</code>\n" if inn else ""
         org_line = f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n" if org_name else ""
+        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
+        model_line = f"📟 <b>Apparat modeli:</b> {model_str}\n" if model_str else ""
 
         text = (
-            f"🔔 <b>YANGI MUROJAAT / TEXNIK YORDAM SO'ROVI!</b>\n\n"
+            f"🔔 <b>YANGI HUDUDIY MUROJAAT / TEXNIK YORDAM SO'ROVI!</b>\n\n"
             f"📌 <b>Holat:</b> {reason}\n"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
+            f"{phone_line}"
             f"{inn_line}"
             f"{org_line}"
             f"{tuman_line}"
+            f"{reg_admin_line}"
+            f"{model_line}"
             f"────────────────────\n"
             f"💬 <b>Mijoz xabari:</b>\n"
             f"<i>{query_text}</i>\n\n"
-            f"⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): "
-            f"Foydalanuvchi siz bilan bog'lanishni kutmoqda yoki yordam talab qilinmoqda.</i>"
+            f"⚡️ <i>Mas'ul mutaxassis ({target_mention}): "
+            f"Foydalanuvchi siz bilan bog'lanishni kutmoqda. Quyidagi tugma orqali mijozga yozishingiz mumkin.</i>"
         )
-        await self.notify_admins(bot, text=text, photo_file_id=photo_file_id)
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
+        await self.notify_admins(
+            bot,
+            text=text,
+            photo_file_id=photo_file_id,
+            inn=inn,
+            tuman=tuman,
+            reply_markup=admin_kb
+        )
 
     async def notify_debt_free_device_issue(
         self,
@@ -452,27 +548,43 @@ class AdminManager:
         """
         To'lovlardan qarzdorlik bo'lmaganda (oylik 0 so'm, yillik 0 so'm/faol),
         apparat nosozligi bo'yicha barcha to'plangan ma'lumotlar va rasmlarni
-        zudlik bilan mas'ul adminlarga (@quvonchbek_admin va @Yashnarbek_butaev) uzatish.
+        zudlik bilan mijozning hududiy adminiga (@username) va bosh adminlarga uzatish.
         """
+        from modules.admin_module import regional_admin_service
         user_name = user.full_name if user else "Mijoz"
         user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
         user_id = user.id if user else 0
 
         from excel_manager import excel_manager
         tuman = excel_manager.get_district_for_inn(inn) if inn else ""
-        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+        records = excel_manager.search(inn) if inn else []
+        comp_phone = records[0].get("phone", "") if records else ""
+        if not device_model and records:
+            device_model = excel_manager.get_device_model_summary(records)
 
+        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
+        reg_admin_line = ""
+        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
+        if reg_admin:
+            ra_user = (reg_admin.get("username") or "").replace("@", "")
+            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
+            target_mention = f"@{ra_user}"
+
+        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
+        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
         fm_line = f"🏛 <b>Fiskal modul:</b> <code>{fiscal_module}</code>\n" if fiscal_module else ""
         model_line = f"📱 <b>Apparat modeli:</b> {device_model}\n" if device_model else ""
 
         text = (
-            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI (TEZKOR ESKALATSIYA)!</b>\n\n"
+            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI (HUDUDIY ESKALATSIYA)!</b>\n\n"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
+            f"{phone_line}"
             f"────────────────────\n"
             f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
             f"🔢 <b>INN / СТИР:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
             f"{tuman_line}"
+            f"{reg_admin_line}"
             f"{model_line}"
             f"{fm_line}"
             f"────────────────────\n"
@@ -490,42 +602,43 @@ class AdminManager:
             text += f"\n📸 <b>Apparat ekrani / xatolik fotosurati ilova qilindi.</b>\n"
 
         text += (
-            f"\n⚡️ <i>Mas'ul texniklar (@quvonchbek_admin, @Yashnarbek_butaev): "
+            f"\n⚡️ <i>Mas'ul mutaxassis ({target_mention}): "
             f"Mijozda hech qanday qarzdorlik yo'q! Apparatida texnik muammo mavjud, "
-            f"mijoz siz bilan bog'lanishni kutmoqda. Zudlik bilan tekshiring!</i>"
+            f"mijoz siz bilan bog'lanishni kutmoqda. Zudlik bilan bog'laning!</i>"
         )
 
         short_caption = (
             f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI!</b>\n\n"
             f"🏢 <b>{org_name or 'Korxona'}</b> (INN: <code>{inn or '-'}</code>)\n"
             f"{tuman_line}"
+            f"{phone_line}"
+            f"{reg_admin_line}"
+            f"{fm_line}"
             f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
             f"✅ To'lovlar: Qarz yo'q (0 so'm)\n"
-            f"⚠️ Muammo: {issue_summary[:150]}\n\n"
-            f"⚡️ @quvonchbek_admin, @Yashnarbek_butaev"
+            f"⚠️ Muammo: {issue_summary[:140]}\n\n"
+            f"⚡️ Mas'ul: {target_mention}"
         )
 
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
         await self.notify_admins(
             bot=bot,
             text=text,
             photo_file_id=photo_file_id,
-            short_caption=short_caption
+            short_caption=short_caption,
+            inn=inn,
+            tuman=tuman,
+            reply_markup=admin_kb
         )
 
 
-def get_admin_contact_keyboard() -> InlineKeyboardMarkup:
-    """Foydalanuvchini to'g'ridan-to'g'ri mas'ul mutaxassislar bilan bog'lovchi interaktiv tugmalar"""
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="👨‍💻 Hududiy THKM mas'ul xodimi (@quvonchbek_admin)", url="https://t.me/quvonchbek_admin"),
-            ],
-            [
-                InlineKeyboardButton(text="🛠 Hududiy THKM mas'ul xodimi (@Yashnarbek_butaev)", url="https://t.me/Yashnarbek_butaev"),
-            ]
-        ]
-    )
-    return keyboard
+def get_admin_contact_keyboard(inn: Optional[str] = None, tuman: Optional[str] = None) -> InlineKeyboardMarkup:
+    """
+    Foydalanuvchini aynan o'z hududidagi mas'ul mutaxassis (va bosh adminlar)
+    bilan to'g'ridan-to'g'ri bog'lovchi interaktiv tugmalar.
+    """
+    from modules.admin_module import regional_admin_service
+    return regional_admin_service.build_contact_keyboard(inn=inn, tuman=tuman)
 
 
 admin_manager = AdminManager()

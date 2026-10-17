@@ -253,14 +253,17 @@ class GroupResponseOrchestrator:
                     user_memory.clear_escalation(chat_id, user_id)
                 else:
                     repeats = user_memory.increment_escalation_repeats(chat_id, user_id)
+                    remembered_id = user_memory.get_last_id(chat_id, user_id)
+                    org_name = user_memory.get_org_name(chat_id, user_id)
+                    last_photo = user_memory.get_last_photo(chat_id, user_id)
                     esc_ack = (
-                        "👨‍💻 <b>Murojaatingiz mas'ul administratorga yo'naltirilgan. Iltimos, admin javobini kuting!</b>\n\n"
-                        "Apparatingiz va barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazilgan.\n"
-                        "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanadi.\n\n"
+                        "👨‍💻 <b>Murojaatingiz hududiy mas'ul administratorga yo'naltirilgan. Iltimos, admin javobini kuting!</b>\n\n"
+                        f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
+                        "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanadi.\n"
                         "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
                     )
                     esc_ack = adapt_to_user_script(esc_ack, user_script)
-                    kb = get_admin_contact_keyboard()
+                    kb = get_admin_contact_keyboard(inn=remembered_id)
                     try:
                         await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
                     except Exception:
@@ -270,9 +273,6 @@ class GroupResponseOrchestrator:
                     user_memory.add_assistant_message(chat_id, user_id, esc_ack)
 
                     if repeats in (1, 3, 5):
-                        remembered_id = user_memory.get_last_id(chat_id, user_id)
-                        org_name = user_memory.get_org_name(chat_id, user_id)
-                        last_photo = user_memory.get_last_photo(chat_id, user_id)
                         await admin_manager.notify_user_query_escalation(
                             bot=bot,
                             user=message.from_user,
@@ -295,13 +295,13 @@ class GroupResponseOrchestrator:
                 last_photo = user_memory.get_last_photo(chat_id, user_id)
 
                 esc_msg = (
-                    "👨‍💻 <b>Sizni mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
-                    "Barcha yozishmalaringiz va ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
-                    "Ular tez orada siz bilan bog'lanib, masalangizni hal qilib berishadi.\n\n"
+                    "👨‍💻 <b>Sizni hududiy mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
+                    f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
+                    "Barcha yozishmalaringiz va ma'lumotlaringiz mas'ul xodimimizga yetkazildi.\n"
                     "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
                 )
                 esc_msg = adapt_to_user_script(esc_msg, user_script)
-                kb = get_admin_contact_keyboard()
+                kb = get_admin_contact_keyboard(inn=remembered_id)
                 try:
                     await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
                 except Exception:
@@ -400,13 +400,13 @@ class GroupResponseOrchestrator:
                 last_photo = user_memory.get_last_photo(chat_id, user_id)
 
                 esc_msg = (
-                    "👨‍💻 <b>Sizni mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
-                    "Barcha yozishmalaringiz va ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
-                    "Ular tez orada siz bilan bog'lanib, masalangizni hal qilib berishadi.\n\n"
+                    "👨‍💻 <b>Sizni hududiy mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
+                    f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
+                    "Barcha yozishmalaringiz va ma'lumotlaringiz mas'ul xodimimizga yetkazildi.\n"
                     "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
                 )
                 esc_msg = adapt_to_user_script(esc_msg, user_script)
-                kb = get_admin_contact_keyboard()
+                kb = get_admin_contact_keyboard(inn=remembered_id)
                 try:
                     await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
                 except Exception:

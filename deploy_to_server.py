@@ -45,7 +45,9 @@ def deploy():
         'core/module_registry.py',
         'core/group_responder.py',
         'modules/__init__.py',
-        'data/custom_patches.json'
+        'modules/admin_module.py',
+        'data/custom_patches.json',
+        'data/regional_admins.json'
     ]
 
     print("Building compressed tar archive in memory...")

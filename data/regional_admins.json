@@ -1,0 +1,291 @@
+{
+  "default_super_admins": [
+    {
+      "name": "Yashnarbek Butaev",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 94 299 77 99",
+      "role": "Bosh administrator / Bosh usta",
+      "receive_all_escalations": true
+    },
+    {
+      "name": "Quvonchbek Admin",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 91 945 32 89",
+      "role": "Viloyat mas'ul ustasi",
+      "receive_all_escalations": true
+    }
+  ],
+  "regional_admins": [
+    {
+      "region_id": "qarshi",
+      "region_name": "Qarshi shahri va tumani",
+      "keywords": [
+        "карши",
+        "қарши",
+        "қарши шаҳар",
+        "қарши тумани",
+        "карши шахар",
+        "карши тумани",
+        "qarshi",
+        "qarshi shahar",
+        "qarshi tumani",
+        "karshi"
+      ],
+      "admin_name": "Qarshi hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 01",
+      "active": true
+    },
+    {
+      "region_id": "shahrisabz",
+      "region_name": "Shahrisabz shahri va tumani",
+      "keywords": [
+        "шахрисабз",
+        "шаҳрисабз",
+        "шаҳрисабз шаҳар",
+        "шахрисабз тумани",
+        "шаҳрисабз тумани",
+        "shahrisabz",
+        "shaxrisabz",
+        "shahrisabz shahar",
+        "shahrisabz tumani"
+      ],
+      "admin_name": "Shahrisabz hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 94 299 77 99",
+      "active": true
+    },
+    {
+      "region_id": "kitob",
+      "region_name": "Kitob tumani",
+      "keywords": [
+        "китоб",
+        "китоб тумани",
+        "kitob",
+        "kitob tumani"
+      ],
+      "admin_name": "Kitob hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 90 100 00 03",
+      "active": true
+    },
+    {
+      "region_id": "guzor",
+      "region_name": "G'uzor tumani",
+      "keywords": [
+        "гузор",
+        "ғузор",
+        "ғузор тумани",
+        "гузор тумани",
+        "g'uzor",
+        "guzor",
+        "g'uzor tumani",
+        "guzor tumani"
+      ],
+      "admin_name": "G'uzor hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 04",
+      "active": true
+    },
+    {
+      "region_id": "kasbi",
+      "region_name": "Kasbi tumani",
+      "keywords": [
+        "касби",
+        "касби тумани",
+        "kasbi",
+        "kasbi tumani"
+      ],
+      "admin_name": "Kasbi hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 05",
+      "active": true
+    },
+    {
+      "region_id": "koson",
+      "region_name": "Koson tumani",
+      "keywords": [
+        "косон",
+        "косон тумани",
+        "koson",
+        "koson tumani"
+      ],
+      "admin_name": "Koson hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 06",
+      "active": true
+    },
+    {
+      "region_id": "nishon",
+      "region_name": "Nishon tumani",
+      "keywords": [
+        "нишон",
+        "нишон тумани",
+        "nishon",
+        "nishon tumani"
+      ],
+      "admin_name": "Nishon hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 07",
+      "active": true
+    },
+    {
+      "region_id": "dehqonobod",
+      "region_name": "Dehqonobod tumani",
+      "keywords": [
+        "дехконобод",
+        "деҳқонобод",
+        "деҳқонобод тумани",
+        "дехконобод тумани",
+        "дехконоб",
+        "dehqonobod",
+        "dexqonobod",
+        "dehqonobod tumani"
+      ],
+      "admin_name": "Dehqonobod hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 08",
+      "active": true
+    },
+    {
+      "region_id": "muborak",
+      "region_name": "Muborak tumani",
+      "keywords": [
+        "муборак",
+        "муборак тумани",
+        "muborak",
+        "muborak tumani"
+      ],
+      "admin_name": "Muborak hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 09",
+      "active": true
+    },
+    {
+      "region_id": "yakkabog",
+      "region_name": "Yakkabog' tumani",
+      "keywords": [
+        "яккабог",
+        "яккабоғ",
+        "яккабоғ тумани",
+        "яккабог тумани",
+        "yakkabog'",
+        "yakkabog",
+        "yakkabog' tumani",
+        "yakkabog tumani"
+      ],
+      "admin_name": "Yakkabog' hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 90 100 00 10",
+      "active": true
+    },
+    {
+      "region_id": "qamashi",
+      "region_name": "Qamashi tumani",
+      "keywords": [
+        "камаши",
+        "қамаши",
+        "қамаши тумани",
+        "камаши тумани",
+        "qamashi",
+        "kamashi",
+        "qamashi tumani"
+      ],
+      "admin_name": "Qamashi hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 90 100 00 11",
+      "active": true
+    },
+    {
+      "region_id": "mirishkor",
+      "region_name": "Mirishkor tumani",
+      "keywords": [
+        "миришкор",
+        "миришкор тумани",
+        "mirishkor",
+        "mirishkor tumani"
+      ],
+      "admin_name": "Mirishkor hududiy ustasi (Mock)",
+      "username": "quvonchbek_admin",
+      "telegram_id": 6436610869,
+      "phone": "+998 90 100 00 12",
+      "active": true
+    },
+    {
+      "region_id": "chiroqchi",
+      "region_name": "Chiroqchi tumani",
+      "keywords": [
+        "чирокчи",
+        "чироқчи",
+        "чироқчи тумани",
+        "чирокчи тумани",
+        "chiroqchi",
+        "chirokchi",
+        "chiroqchi tumani"
+      ],
+      "admin_name": "Chiroqchi hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 90 100 00 13",
+      "active": true
+    },
+    {
+      "region_id": "kokdala",
+      "region_name": "Ko'kdala tumani",
+      "keywords": [
+        "кукдала",
+        "кўкдала",
+        "кўкдала тумани",
+        "кукдала туман",
+        "кукдала тумани",
+        "ko'kdala",
+        "kokdala",
+        "kukdala",
+        "ko'kdala tumani"
+      ],
+      "admin_name": "Ko'kdala hududiy ustasi (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 90 100 00 14",
+      "active": true
+    },
+    {
+      "region_id": "other_regions",
+      "region_name": "Boshqa viloyat va tumanlar",
+      "keywords": [
+        "тошкент",
+        "самарканд",
+        "сирдарё",
+        "наманган",
+        "денов",
+        "жиззах",
+        "андижон",
+        "навоий",
+        "сурхандарё",
+        "термиз",
+        "нукус",
+        "фаргона",
+        "хоразм",
+        "урганч"
+      ],
+      "admin_name": "Respublika bo'yicha mas'ul usta (Mock)",
+      "username": "Yashnarbek_butaev",
+      "telegram_id": 1966874161,
+      "phone": "+998 94 299 77 99",
+      "active": true
+    }
+  ]
+}

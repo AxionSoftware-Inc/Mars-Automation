@@ -742,14 +742,11 @@ class CoreEngine:
         org_name = debt_info.get("org_name", "-")
 
         tuman = excel_manager.get_district_for_inn(inn) if (inn and inn != "-") else ""
-        tuman_line = f"📍 <b>Sizning hududingiz:</b> {tuman}\n" if tuman else ""
-
-        contacts_info = admin_manager.get_contacts_display()
+        contacts_info = admin_manager.get_contacts_display(inn=inn if inn != "-" else None, tuman=tuman)
         reply_text = (
-            f"👨‍💻 <b>Murojaatingiz qabul qilindi va bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga (@quvonchbek_admin) yetkazildi!</b>\n\n"
-            f"{tuman_line}"
-            f"Sizning hududingiz bo'yicha mas'ul usta yoki operatorlarimiz tez orada siz bilan bog'lanishadi.\n\n"
-            f"{contacts_info}"
+            f"👨‍💻 <b>Murojaatingiz qabul qilindi va hududingiz bo'yicha mas'ul mutaxassisga yetkazildi!</b>\n\n"
+            f"{contacts_info}\n\n"
+            f"Mas'ul ustamiz tez orada siz bilan bog'lanadi yoki quyidagi tugma orqali to'g'ridan-to'g'ri yozishingiz mumkin:"
         )
 
         return DecisionResult(

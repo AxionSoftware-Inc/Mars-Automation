@@ -90,14 +90,16 @@ class HardwareIntentHandler:
             remembered_id = user_memory.get_last_id(chat_id, user_id) or ""
             org_name = user_memory.get_org_name(chat_id, user_id) or ""
             last_photo = user_memory.get_last_photo(chat_id, user_id)
+            contacts_block = admin_manager.get_contacts_display(inn=remembered_id)
             esc_msg = (
                 "👨‍💻 <b>Tushunarli, apparatda texnik nosozlik mavjud.</b>\n\n"
-                "Barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) uzatildi.\n"
-                "Quyidagi tugmalar orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:\n\n"
+                "Barcha ma'lumotlaringiz hududingiz bo'yicha mas'ul mutaxassisga uzatildi:\n"
+                f"{contacts_block}\n\n"
+                "Quyidagi tugma orqali to'g'ridan-to'g'ri mas'ul mutaxassis bilan bog'lanishingiz mumkin:\n\n"
                 "📸 <i>Iloji bo'lsa, ekranda chiqayotgan xatolik yozuvini rasmga olib tashlang.</i>"
             )
             esc_msg = adapt_to_user_script(esc_msg, user_script)
-            kb = get_admin_contact_keyboard()
+            kb = get_admin_contact_keyboard(inn=remembered_id)
             try:
                 await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
             except Exception:
@@ -290,7 +292,8 @@ class HardwareIntentHandler:
         # 3-BOSQICH: OYLIK VA YILLIK QARZ YO'Q! -> RASM SO'RASH YOKI ADMINGA UZATISH
         # =====================================================================
         last_photo = user_memory.get_last_photo(chat_id, user_id)
-        kb = get_admin_contact_keyboard()
+        kb = get_admin_contact_keyboard(inn=remembered_id)
+        contacts_block = admin_manager.get_contacts_display(inn=remembered_id)
 
         if last_photo:
             # Rasm allaqachon mavjud -> barcha ma'lumotlar bilan birga zudlik bilan adminga uzatish
@@ -300,9 +303,9 @@ class HardwareIntentHandler:
                 f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n"
                 f"✅ <b>Oylik to'lov:</b> To'langan (0 so'm)\n"
                 f"✅ <b>Yillik litsenziya:</b> Faol (Muddati joyida)\n\n"
-                f"👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz (INN, Fiskal modul va apparat rasmi) mas'ul adminga yuborildi!</b>\n\n"
-                f"Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimiz (@quvonchbek_admin, @Yashnarbek_butaev) tez orada ko'rib chiqib siz bilan bog'lanishadi.\n"
-                f"Quyidagi tugmalar orqali ham to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+                f"👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz (INN, Fiskal modul va apparat rasmi) hududingiz bo'yicha mas'ul adminga yuborildi!</b>\n\n"
+                f"{contacts_block}\n\n"
+                f"Mas'ul ustamiz tez orada siz bilan bog'lanadi yoki quyidagi tugma orqali to'g'ridan-to'g'ri yozishingiz mumkin:"
             )
         else:
             # Rasm hali olinmagan -> Ekran rasmini so'rash va internet/soat/reboot bo'yicha ko'rsatma berish
@@ -312,12 +315,13 @@ class HardwareIntentHandler:
                 f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n"
                 f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
                 f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                f"{contacts_block}\n\n"
                 f"📸 <b>Iltimos, apparat ekranidagi xatolik yozuvini rasmga olib yuboring!</b>\n\n"
                 f"📌 <i>Shuningdek tekshirib ko'ring:</i>\n"
                 f"1️⃣ <b>Internet aloqasi:</b> Wi-Fi yoki SIM-karta tarmog'i borligini;\n"
                 f"2️⃣ <b>Soat va sana:</b> Hozirgi aniq vaqt to'g'riligini;\n"
                 f"3️⃣ <b>Qayta yoqish:</b> Kassa apparatini o'chirib qayta yoqishni (Reboot).\n\n"
-                f"👨‍💻 <b>Rasm tashlashingiz bilan barcha ma'lumotlar mas'ul adminga to'liq yetkaziladi. Iltimos, rasm yuboring!</b>"
+                f"👨‍💻 <b>Rasm tashlashingiz bilan barcha ma'lumotlar hududingiz bo'yicha mas'ul adminga to'liq yetkaziladi!</b>"
             )
 
         step3_msg = adapt_to_user_script(step3_msg, user_script)
