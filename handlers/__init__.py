@@ -5,14 +5,10 @@ from aiogram.types import TelegramObject, User
 
 from admin_manager import admin_manager
 from ofd_bridge import ofd_bridge
-from handlers.admin import router as admin_router
-from handlers.commands import router as commands_router
-from handlers.media import router as media_router
-from handlers.debt import router as debt_router
-from handlers.channel import router as channel_router
-from handlers.chat import router as chat_router
+from modules import register_default_modules, module_registry
 
 logger = logging.getLogger(__name__)
+
 
 class AdminAutoRegisterMiddleware(BaseMiddleware):
     """
@@ -42,6 +38,7 @@ class AdminAutoRegisterMiddleware(BaseMiddleware):
 
         return await handler(event, data)
 
+
 main_router = Router(name="main_router")
 main_router.message.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.edited_message.outer_middleware(AdminAutoRegisterMiddleware())
@@ -49,6 +46,7 @@ main_router.callback_query.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.channel_post.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.edited_channel_post.outer_middleware(AdminAutoRegisterMiddleware())
 main_router.my_chat_member.outer_middleware(AdminAutoRegisterMiddleware())
+
 
 @main_router.my_chat_member()
 async def handle_bot_chat_member_update(event: types.ChatMemberUpdated, bot: Bot):
@@ -60,6 +58,7 @@ async def handle_bot_chat_member_update(event: types.ChatMemberUpdated, bot: Bot
         # OFD bot borligini tekshirib avtomatik ulash
         if await ofd_bridge.check_and_bind_chat_if_ofd(chat.id, bot):
             logger.info(f"✅ Bot qo'shilgan {chat.type} ({chat.id}) OFD ko'prigi sifatida avtomatik ulandi!")
+
 
 @main_router.callback_query(F.data == "call_support")
 async def handle_call_support(callback: types.CallbackQuery):
@@ -77,18 +76,19 @@ async def handle_call_support(callback: types.CallbackQuery):
     except Exception as e:
         logger.warning(f"Callback answer xatolik: {e}")
 
-# Routerlar qat'iy ustuvorlik ketma-ketligida ulanadi:
-# 1. Admin buyruqlari (/admin, /statistika, /errors, /admins, /add_admin, /contacts, /ofd)
-# 2. Umumiy bot buyruqlari (/start, /help, /tekshir, /tolov, /tarix)
-# 3. Media fayllar (Kassa rasmlari, to'lov kvitansiyalari, Excel bazasi)
-# 4. Qarz tekshirish va to'lov tarixi so'rovlari (INN/JSHSHIR)
-# 5. Kanal xabarlari (Postlarni uzatish va yangi videolarni avto-indekslash)
-# 6. Erkin matnli suhbat, katalog qidiruvi, operator eskalatsiyasi va AI muloqoti
-main_router.include_router(admin_router)
-main_router.include_router(commands_router)
-main_router.include_router(media_router)
-main_router.include_router(debt_router)
-main_router.include_router(channel_router)
-main_router.include_router(chat_router)
 
-__all__ = ["main_router", "AdminAutoRegisterMiddleware", "handle_bot_chat_member_update"]
+# Standart modullarni ro'yxatga olish va priority bo'yicha ulash:
+# 1. AdminModule (priority=100) — /admin, /statistika, /errors, /admins, /contacts, /ofd, /modules, /patches
+# 2. CommandsModule (priority=90) — /start, /help, /tekshir, /tolov, /tarix
+# 3. MediaModule (priority=80) — Kassa rasmlari, to'lov kvitansiyalari, Excel bazasi
+# 4. BillingModule (priority=70) — Qarz tekshirish va to'lov tarixi so'rovlari (INN/JSHSHIR)
+# 5. ChannelModule (priority=60) — Kanal postlarini uzatish va avto-indekslash
+# 6. GroupSupportModule (priority=50) — Guruh va chatlarda 8-qadamli javob berish orkestratori
+register_default_modules()
+
+for mod in module_registry.get_active_modules():
+    mod_router = mod.get_router()
+    if mod_router is not None:
+        main_router.include_router(mod_router)
+
+__all__ = ["main_router", "AdminAutoRegisterMiddleware", "handle_bot_chat_member_update", "module_registry"]

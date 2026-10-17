@@ -1,0 +1,395 @@
+"""
+core/group_responder.py
+=======================
+GURUHDA VA CHATLARDAGI JAVOB BERISH BO'LIMI (Yagona, Tartibli va Buzilmaydigan Orkestrator).
+
+Bu modul mijoz qaysi qadamdan (1-qadamdanmi, 3-qadamdanmi yoki 6-qadamdanmi) boshlashidan
+qat'i nazar hech qachon yiqilmasdan, barcha shartlarni oddiy inson tilidagi 8 ta qat'iy
+qoida asosida tekshiradi:
+
+1-QADAM: Alifbo (Lotin/Kirill) va xabardagi INN / Fiskal modul / Telefonni darhol xotiraga saqlash.
+         + Agar foydalanuvchi avval INN-siz kvitansiya tashlagan bo'lsa va endi INN yuborsa -> kvitansiyaga ulash!
+2-QADAM: Deklarativ va Dinamik Qoidalar (RuleEngine & data/custom_patches.json) — kodga tegmasdan yangi qoida qo'shish.
+3-QADAM: Usta / Admin chaqirish yoki gapni cho'zib yuborish (Eskalatsiya qoidasi).
+4-QADAM: «Apparat ishlamayapti / Xatolik chiqyapti» (3 bosqichli oltin qoida — istalgan bosqichdan kirsa ham ishlaydi).
+5-QADAM: Qarzni va to'lov tarixini tekshirish (INN, Telefon, Fiskal modul, Oylik, Yillik, Ikkalasi).
+6-QADAM: Hisob raqam (Shot / Rekvizit) va To'lov savollari (Oylik shot, Yillik shot, bitta hisobga to'lash, 6-sana, pul tushishi).
+7-QADAM: Aniq Texnik Yo'riqnomalar (MXIK / Tasnif / Tovar qo'shish va Video Katalog).
+8-QADAM: Erkin suhbat va AI Yordamchi (Gemini AI kontekst bilan).
+"""
+
+import logging
+from typing import Optional, List, Callable, Awaitable
+from aiogram import types, Bot
+
+from user_memory import user_memory
+from translit_manager import adapt_to_user_script
+from core.rule_engine import rule_engine, RuleContext
+from core.models import (
+    extract_clean_inn,
+    extract_fiscal_module,
+    extract_clean_phone,
+    is_incomplete_inn_text
+)
+from admin_manager import admin_manager, get_admin_contact_keyboard
+
+logger = logging.getLogger(__name__)
+
+SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
+
+# Sabrsizlik yoki gapni cho'zish iboralari (3-Qadam uchun)
+PROLONGED_CHAT_PHRASES = [
+    "qachon javob", "qachon qaraysiz", "qachon qaraysilar", "qachon qaraysizlar",
+    "javob bering", "javob bervoring", "javob beringlar", "javob yo'qku", "javob yoqku",
+    "javob bermaysizmi", "javob bermaysanmi", "nega indamaysiz", "nega indamaysan",
+    "nega javob yo'q", "nega javob yoq", "indamaysan", "indamaysiz", "gapirsangchi", "gapiring",
+    "alo", "alo alo", "eshityapsizmi", "eshityapsanmi", "kimdir bormi", "odam bormi",
+    "tirikmisiz", "tirikmisan", "bormisiz", "bormisan",
+    "tezroq bo'l", "tezroq bol", "tezroq qiling", "tezroq qilib bering", "tezroq qib bering",
+    "tezroq yoq", "tezroq yoqing", "tezroq yoqvoring", "tezroq", "bo'laqol", "bolaqol",
+    "qachon yoqiladi", "qachon yoqasiz", "qachon yoqasizlar", "qachon tuzatiladi", "qachon tuzatasiz",
+    "qachon bo'ladi", "qachon boladi", "bo'ladimi o'zi", "boladimi ozi", "bo'ladimi ozi",
+    "kutib qoldim", "qachongacha kutaman", "qachongacha kutish kerak", "jonga tegdi",
+    "e nima bo'ldi", "ee nima boldi", "nima bo'ldi", "nima boldi", "nima qilyapsiz",
+    "admin qani", "admin qayerda", "usta qani", "kim javob beradi", "oxshamadi baribir",
+    "o'zing top", "ozing top", "bilmayman", "qayerdan bilay", "nimaga kerak", "senga nima",
+    "qanaqa bot bu", "tushunarsiz bot", "tushunmayapsan", "axmoq", "jinni", "ha qachon", "qachon endi",
+    "tashladimku boya", "tashladimku", "tashadimku", "hudoga soldim", "hudodan top",
+    "gap qaytarma", "nma qilay endi", "nima qilay endi", "lekin ishlamayabdida",
+    "ishlamayaptida baribir", "ishlamayabdida"
+]
+
+
+class GroupResponseOrchestrator:
+    """
+    Guruh va shaxsiy chatlarda barcha matnli murojaatlarni qabul qiluvchi
+    va 8 qadamli qoida bo'yicha adashmasdan javob beruvchi markaziy sinf.
+
+    Shuningdek, istalgan vaqtda `register_custom_step` orqali yangi qoida/modul ulash mumkin.
+    """
+
+    def __init__(self):
+        # Tashqi modullar o'zlarining maxsus handlerlarini ulashi uchun ro'yxat
+        self._custom_steps: List[Callable[[types.Message, Bot, str], Awaitable[bool]]] = []
+
+    def register_custom_step(self, step_fn: Callable[[types.Message, Bot, str], Awaitable[bool]]):
+        """Yangi qoida yoki tashqi modul qadamini zanjirga ulash"""
+        self._custom_steps.append(step_fn)
+
+    async def process_message(self, message: types.Message, bot: Bot, ai_func=None) -> bool:
+        """
+        Guruh yoki shaxsiy chatdan kelgan xabarni 1 dan 8 gacha qadamlar bo'yicha tahlil qiladi.
+        Mijoz qaysi qadamdan boshlashidan qat'i nazar (1, 3, 5 yoki 6) kontekstni yo'qotmaydi.
+        """
+        from handlers.intents import (
+            billing_intent_handler,
+            hardware_intent_handler,
+            mxik_intent_handler,
+            operator_intent_handler,
+            conversation_intent_handler
+        )
+        from handlers.intents.hardware import is_device_issue, UNRESOLVED_WORDS
+        from handlers.intents.operator import OPERATOR_KEYWORDS
+        from handlers.debt import (
+            is_debt_inquiry,
+            handle_debt_inquiry,
+            is_inn_or_phone_query_message,
+            process_and_send_debt_result
+        )
+
+        user_id = message.from_user.id if message.from_user else 0
+        chat_id = message.chat.id
+        raw_text = message.text or ""
+        clean_text = raw_text.strip()
+        lower_text = clean_text.lower()
+
+        if not clean_text:
+            return False
+
+        # =====================================================================
+        # 1-QADAM: ALIFBO VA KONTEKSTNI DARHOL ESLAB QOLISH (Har qanday qadamdan kirganda ham!)
+        # =====================================================================
+        user_script = user_memory.detect_and_update_script(chat_id, user_id, raw_text)
+
+        found_fm = extract_fiscal_module(clean_text)
+        found_inn = extract_clean_inn(clean_text)
+        if found_fm and found_inn and found_inn in found_fm:
+            found_inn = None
+
+        # Agar mijoz xabar ichida INN yoki FM yozgan bo'lsa (hatto boshqa savol ichida bo'lsa ham),
+        # darhol xotiraga yozib qo'yamiz — shunda keyingi qadamlar hech qachon yiqilmaydi!
+        if found_inn:
+            user_memory.set_last_id(chat_id, user_id, found_inn)
+        if found_fm:
+            user_memory.set_last_fm(chat_id, user_id, found_fm)
+
+        # 1.1 Agar mijoz avval INN-siz to'lov kvitansiyasi tashlagan bo'lsa va endi INN yozsa -> darhol ulash!
+        if found_inn:
+            from core import core_engine
+            pending_res = core_engine.resolve_pending_receipt_if_any(found_inn, chat_id, user_id)
+            if pending_res:
+                reply_m = adapt_to_user_script(pending_res.reply_text, user_script)
+                try:
+                    await message.reply(reply_m, parse_mode="HTML")
+                except Exception:
+                    await message.reply(reply_m)
+
+                user_memory.add_user_message(chat_id, user_id, f"Mening INN raqamim: {found_inn}")
+                user_memory.add_assistant_message(chat_id, user_id, reply_m)
+
+                if pending_res.should_notify_admin and pending_res.receipt_facts:
+                    await admin_manager.notify_receipt_escalation(
+                        bot=bot,
+                        user=message.from_user,
+                        chat_id=chat_id,
+                        receipt_facts=pending_res.receipt_facts,
+                        debt_status_info=pending_res.debt_status_info,
+                        file_id=pending_res.file_id,
+                        is_photo=pending_res.is_photo
+                    )
+                return True
+
+        # =====================================================================
+        # 2-QADAM: PLUG & PLAY QOIDALAR (RuleEngine va data/custom_patches.json)
+        # =====================================================================
+        rule_ctx = RuleContext(
+            text=raw_text,
+            clean_text=clean_text,
+            lower_text=lower_text,
+            chat_id=chat_id,
+            user_id=user_id,
+            user_name=message.from_user.full_name if message.from_user else "Mijoz",
+            user_username=message.from_user.username if message.from_user else "",
+            user_script=user_script,
+            found_inn=found_inn,
+            found_fm=found_fm,
+            remembered_id=user_memory.get_last_id(chat_id, user_id),
+            bot=bot
+        )
+        patch_result = await rule_engine.evaluate(rule_ctx)
+        if patch_result is not None and patch_result.reply_text:
+            resp = adapt_to_user_script(patch_result.reply_text, user_script)
+            try:
+                await message.reply(resp, parse_mode="HTML")
+            except Exception:
+                await message.reply(resp)
+            user_memory.add_user_message(chat_id, user_id, raw_text)
+            user_memory.add_assistant_message(chat_id, user_id, resp)
+            if patch_result.video_id:
+                try:
+                    await bot.copy_message(
+                        chat_id=chat_id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=patch_result.video_id
+                    )
+                except Exception as e:
+                    logger.error(f"Patch video yuborishda xatolik: {e}")
+            if patch_result.should_notify_admin:
+                await admin_manager.notify_user_query_escalation(
+                    bot=bot,
+                    user=message.from_user,
+                    chat_id=chat_id,
+                    query_text=raw_text,
+                    reason=patch_result.admin_alert_text or "Maxsus patch eskalatsiyasi",
+                    inn=patch_result.detected_inn
+                )
+            return True
+
+        # Tashqi ulangan custom modullar qadamlari (agar qo'shilgan bo'lsa)
+        for custom_step in self._custom_steps:
+            if await custom_step(message, bot, user_script):
+                return True
+
+        # =====================================================================
+        # 3-QADAM: USTA / ADMIN CHAQIRISH YOKI GAPNI CHO'ZISH (Eskalatsiya qoidasi)
+        # =====================================================================
+        is_command = clean_text.startswith("/")
+
+        # 3.1 Agar mijoz to'g'ridan-to'g'ri "usta kerak", "admin", "operator" desa (hatto 1-xabarda aytsa ham!):
+        if any(kw in lower_text for kw in OPERATOR_KEYWORDS) and not any(w in lower_text for w in UNRESOLVED_WORDS):
+            if await operator_intent_handler.handle(message, bot, user_script):
+                return True
+
+        # 3.2 Agar mijoz ALLAQACHON adminga topshirilgan bo'lsa va yangi INN/FM yubormasdan gap yozaversa:
+        if not found_inn and not found_fm and not is_command:
+            if user_memory.is_escalated_to_admin(chat_id, user_id):
+                repeats = user_memory.increment_escalation_repeats(chat_id, user_id)
+                esc_ack = (
+                    "👨‍💻 <b>Murojaatingiz mas'ul administratorga yo'naltirilgan. Iltimos, admin javobini kuting!</b>\n\n"
+                    "Apparatingiz va barcha ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazilgan.\n"
+                    "Mutaxassisimiz navbat bo'yicha tez orada siz bilan bog'lanadi.\n\n"
+                    "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+                )
+                esc_ack = adapt_to_user_script(esc_ack, user_script)
+                kb = get_admin_contact_keyboard()
+                try:
+                    await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
+                except Exception:
+                    await message.reply(esc_ack, reply_markup=kb)
+
+                user_memory.add_user_message(chat_id, user_id, raw_text)
+                user_memory.add_assistant_message(chat_id, user_id, esc_ack)
+
+                if repeats in (1, 3, 5):
+                    remembered_id = user_memory.get_last_id(chat_id, user_id)
+                    org_name = user_memory.get_org_name(chat_id, user_id)
+                    last_photo = user_memory.get_last_photo(chat_id, user_id)
+                    await admin_manager.notify_user_query_escalation(
+                        bot=bot,
+                        user=message.from_user,
+                        chat_id=chat_id,
+                        query_text=f"Mijoz admin javobini kutayotgan paytda qo'shimcha xabar yozdi: {raw_text}",
+                        reason="Admin javobini kutayotgan mijozdan xabar",
+                        inn=remembered_id,
+                        org_name=org_name,
+                        photo_file_id=last_photo
+                    )
+                return True
+
+            # 3.3 Agar mijoz aniq sabrsizlik iboralarini yozsa (masalan: "alo", "qachon javob", "tashladimku boya"):
+            is_prolonged = any(p in lower_text for p in PROLONGED_CHAT_PHRASES)
+
+            if is_prolonged:
+                user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / sabrsizlik")
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                org_name = user_memory.get_org_name(chat_id, user_id)
+                last_photo = user_memory.get_last_photo(chat_id, user_id)
+
+                esc_msg = (
+                    "👨‍💻 <b>Sizni mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
+                    "Barcha yozishmalaringiz va ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
+                    "Ular tez orada siz bilan bog'lanib, masalangizni hal qilib berishadi.\n\n"
+                    "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+                )
+                esc_msg = adapt_to_user_script(esc_msg, user_script)
+                kb = get_admin_contact_keyboard()
+                try:
+                    await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
+                except Exception:
+                    await message.reply(esc_msg, reply_markup=kb)
+
+                user_memory.add_user_message(chat_id, user_id, raw_text)
+                user_memory.add_assistant_message(chat_id, user_id, esc_msg)
+
+                await admin_manager.notify_user_query_escalation(
+                    bot=bot,
+                    user=message.from_user,
+                    chat_id=chat_id,
+                    query_text=raw_text,
+                    reason="Mijoz gapni cho'zdi / tezkor admin aralashuvi talab etiladi",
+                    inn=remembered_id,
+                    org_name=org_name,
+                    photo_file_id=last_photo
+                )
+                return True
+
+        # =====================================================================
+        # 4-QADAM: APPARAT NOSOZLIGI PIPELINE'I (3 bosqichli oltin qoida)
+        # Mijoz qaysi qadamdan boshlashidan qat'i nazar:
+        # - Avval INN tashlab, keyin "ishlamayapti" deydimi,
+        # - Avval FM tashlab, keyin "ishlamayapti" deydimi,
+        # - Yoki bitta xabarda hammasini yozadimi — HardwareIntentHandler xotiradagi borini olib,
+        #   faqat yetishmayotganini so'raydi!
+        # =====================================================================
+        # Maxsus istisno: agar mijoz muammo jarayonida "fiskal modul qayerda / nima" deb so'rasa
+        # yoki to'lov rekviziti ("oylik shot", "yillik shot") so'rasa, billing_intent_handler javob berishi uchun
+        # oldin tekshiramiz:
+        is_asking_fm_location = any(p in lower_text for p in [
+            "fiskal modul qayerda", "fiskal modul qayerdan", "fm raqamini qayerdan",
+            "modul raqami qayerda", "fiskal modulni qanday topaman", "fiskal modul nima",
+            "фискал модул қаерда", "фискал модул каерда", "фискал модул нима"
+        ])
+        if is_asking_fm_location:
+            if await billing_intent_handler.handle(message, bot, user_script):
+                return True
+
+        # Agar mijoz muammo rejimida bo'lsa va faqat Fiskal modul (LG/YG) yuborgan bo'lsa ->
+        # billing_intent_handler dagi 2.1 blok (yoki hardware_intent_handler) uni OFD dan tekshiradi.
+        if user_memory.is_issue_mode(chat_id, user_id) or is_device_issue(raw_text):
+            # Agar mijoz muammo ichida turib chala INN yozsa (masalan "12345"), billing uni tutsin:
+            if is_incomplete_inn_text(clean_text) or (clean_text.isdigit() and 1 <= len(clean_text) <= 8 and not found_fm):
+                if await billing_intent_handler.handle(message, bot, user_script):
+                    return True
+            if await hardware_intent_handler.handle(message, bot, user_script):
+                return True
+
+        # =====================================================================
+        # 5-QADAM VA 6-QADAM: QARZ TEKSHIRUVI, TO'LOV TARIXI VA HISOB RAQAMLAR (SHOTLAR)
+        # =====================================================================
+        # 5.1 To'lov tarixi / "Nega qarz?" / "To'laganmanku" e'tirozlari:
+        if is_debt_inquiry(message):
+            await handle_debt_inquiry(message)
+            return True
+
+        # 5.2 va 6-Qadam: Oylik/Yillik/Ikkala qarz tekshiruvi, Fiskal modul, Hisob raqamlar (Post 85 / Post 34),
+        # Bitta hisobga to'lash taqiqi, 6-sana muddati, Pul yechildi lekin yonmadi:
+        if await billing_intent_handler.handle(message, bot, user_script):
+            return True
+
+        # 5.3 Agar ro'yxatdan o'tgan telefon raqami orqali qarz tekshirilayotgan bo'lsa:
+        if is_inn_or_phone_query_message(message):
+            query_num = extract_clean_inn(clean_text) or extract_clean_phone(clean_text)
+            if query_num:
+                await process_and_send_debt_result(message, bot, query_num)
+                return True
+
+        # Qo'shimcha nosozlik va "ishlamadi" so'zlari (agar muammo rejimidan tashqarida yozilsa):
+        if await hardware_intent_handler.handle(message, bot, user_script):
+            return True
+
+        # =====================================================================
+        # 7-QADAM: ANIQ TEXNIK YO'RIQNOMALAR (MXIK / TASNIF / VIDEO KATALOG)
+        # =====================================================================
+        if await mxik_intent_handler.handle(message, bot, user_script):
+            return True
+
+        if await operator_intent_handler.handle(message, bot, user_script):
+            return True
+
+        # =====================================================================
+        # 8-QADAM: VIDEO KATALOG VA ERKIN SUHBAT (GEMINI AI)
+        # =====================================================================
+        # Agar yuqoridagi 1-7 qadamlardagi aniq qoidalarning hech biriga tushmagan bo'lsa
+        # va foydalanuvchi allaqachon 4 martadan ortiq yozishma qilib gapni cho'zayotgan bo'lsa -> Adminga!
+        turn_cnt = user_memory.get_user_turn_count(chat_id, user_id)
+        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not found_inn and not found_fm and not is_command:
+            from catalog_manager import catalog_manager
+            if not catalog_manager.find_post_by_keywords(clean_text):
+                user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / uzoq suhbat")
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                org_name = user_memory.get_org_name(chat_id, user_id)
+                last_photo = user_memory.get_last_photo(chat_id, user_id)
+
+                esc_msg = (
+                    "👨‍💻 <b>Sizni mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
+                    "Barcha yozishmalaringiz va ma'lumotlaringiz Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimlarimizga (@quvonchbek_admin, @Yashnarbek_butaev) yetkazildi.\n"
+                    "Ular tez orada siz bilan bog'lanib, masalangizni hal qilib berishadi.\n\n"
+                    "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+                )
+                esc_msg = adapt_to_user_script(esc_msg, user_script)
+                kb = get_admin_contact_keyboard()
+                try:
+                    await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
+                except Exception:
+                    await message.reply(esc_msg, reply_markup=kb)
+
+                user_memory.add_user_message(chat_id, user_id, raw_text)
+                user_memory.add_assistant_message(chat_id, user_id, esc_msg)
+
+                await admin_manager.notify_user_query_escalation(
+                    bot=bot,
+                    user=message.from_user,
+                    chat_id=chat_id,
+                    query_text=raw_text,
+                    reason="Mijoz gapni cho'zdi / tezkor admin aralashuvi talab etiladi",
+                    inn=remembered_id,
+                    org_name=org_name,
+                    photo_file_id=last_photo
+                )
+                return True
+
+        await conversation_intent_handler.handle(message, bot, user_script, ai_func=ai_func)
+        return True
+
+
+group_responder = GroupResponseOrchestrator()

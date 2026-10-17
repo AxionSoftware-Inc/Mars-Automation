@@ -50,7 +50,11 @@ async def cmd_admin_panel(message: types.Message):
         "🔹 /del_admin <code>&lt;user_id&gt;</code> — Adminni o'chirish\n"
         "🔹 /contacts — Mas'ul xodimlar kontaktlari\n"
         "🔹 /add_contact <code>Ism | Telefon | Lavozim</code> — Yangi kontakt qo'shish\n"
-        "🔹 /del_contact <code>Telefon</code> — Kontaktni o'chirish"
+        "🔹 /del_contact <code>Telefon</code> — Kontaktni o'chirish\n"
+        "🔹 /modules — Ulangan tizim modullari ro'yxati\n"
+        "🔹 /patches — Dinamik qoidalar (Plug & Play) ro'yxati\n"
+        "🔹 /add_patch <code>id | so'z1, so'z2 | Javob | video_id</code> — Yangi qoida qo'shish\n"
+        "🔹 /del_patch <code>id</code> — Dinamik qoidani o'chirish"
     )
     await message.reply(text, parse_mode="HTML")
 
@@ -393,4 +397,99 @@ async def cmd_test_ofd(message: types.Message, bot: Bot):
         await wait_msg.edit_text(resp_text, parse_mode="HTML")
     except Exception:
         await message.reply(resp_text)
+
+
+# =============================================================================
+# MODULLAR VA DINAMIK QOIDALAR (PLUG & PLAY RULE ENGINE) BOSHQARUVI
+# =============================================================================
+
+@router.message(Command("modules"), is_admin_filter)
+async def cmd_list_modules(message: types.Message):
+    """Tizimga ulangan barcha modullar holatini ko'rish"""
+    from core.module_registry import module_registry
+    mods = module_registry.list_modules_info()
+    lines = [f"🧩 <b>Ulangan Tizim Modullari ({len(mods)} ta):</b>\n"]
+    for idx, m in enumerate(mods, 1):
+        status = "🟢 Faol" if m.get("enabled") else "🔴 O'chiq"
+        lines.append(
+            f"<b>{idx}. {m['name']}</b> (v{m['version']}) — {status} [Priority: {m['priority']}]\n"
+            f"   <i>{m.get('description', '')}</i>"
+        )
+    await message.reply("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("patches"), is_admin_filter)
+async def cmd_list_patches(message: types.Message):
+    """data/custom_patches.json dagi barcha dinamik qoidalarni ko'rish"""
+    from core.rule_engine import rule_engine
+    rules = rule_engine.get_rules_summary()
+    if not rules:
+        await message.reply(
+            "📑 Hozircha dinamik patchlar (qoidalar) yo'q.\n\n"
+            "Qo'shish: <code>/add_patch id | kalit1, kalit2 | Javob matni | video_id</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    lines = [f"📑 <b>Faol Dinamik Qoidalar ({len(rules)} ta):</b>\n"]
+    for idx, r in enumerate(rules, 1):
+        lines.append(f"{idx}. <code>{r['name']}</code> (priority={r['priority']}, enabled={r['enabled']})")
+
+    lines.append("\nQo'shish: <code>/add_patch id | kalit1, kalit2 | Javob matni | video_id</code>")
+    lines.append("O'chirish: <code>/del_patch id</code>")
+    await message.reply("\n".join(lines), parse_mode="HTML")
+
+
+@router.message(Command("add_patch"), is_admin_filter)
+async def cmd_add_patch(message: types.Message):
+    """
+    Kodga tegmasdan yangi qoida qo'shish:
+    /add_patch id | kalit1, kalit2 | Javob matni | video_id
+    """
+    from core.rule_engine import rule_engine
+    raw_args = message.text[len("/add_patch"):].strip()
+    parts = [p.strip() for p in raw_args.split("|")]
+    if len(parts) < 3:
+        await message.reply(
+            "Format: <code>/add_patch id | kalit1, kalit2 | Javob matni | [video_id]</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    patch_id = parts[0]
+    keywords = [k.strip() for k in parts[1].split(",") if k.strip()]
+    reply_text = parts[2]
+    video_id = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None
+
+    ok = rule_engine.add_patch(
+        patch_id=patch_id,
+        keywords=keywords,
+        reply_text=reply_text,
+        video_id=video_id
+    )
+    if ok:
+        await message.reply(
+            f"✅ <b>Yangi dinamik qoida qo'shildi va darhol ishga tushdi!</b>\n"
+            f"🆔 ID: <code>{patch_id}</code>\n"
+            f"🔑 Kalit so'zlar: <code>{', '.join(keywords)}</code>",
+            parse_mode="HTML"
+        )
+    else:
+        await message.reply("❌ Qoidani saqlashda xatolik yuz berdi.")
+
+
+@router.message(Command("del_patch"), is_admin_filter)
+async def cmd_del_patch(message: types.Message):
+    """Dinamik qoidani o'chirish: /del_patch id"""
+    from core.rule_engine import rule_engine
+    patch_id = message.text[len("/del_patch"):].strip()
+    if not patch_id:
+        await message.reply("Format: <code>/del_patch id</code>", parse_mode="HTML")
+        return
+
+    if rule_engine.remove_patch(patch_id):
+        await message.reply(f"✅ Qoida o'chirildi: <code>{patch_id}</code>", parse_mode="HTML")
+    else:
+        await message.reply(f"❌ Qoida topilmadi: <code>{patch_id}</code>", parse_mode="HTML")
+
 

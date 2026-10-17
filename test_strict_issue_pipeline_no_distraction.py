@@ -90,7 +90,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Internet aloqasi", reply5)
             self.assertIn("Soat va sana", reply5)
             self.assertIn("Qayta yoqish", reply5)
-            self.assertIn("mutaxassislarga", reply5)
+            self.assertIn("adminga", reply5.lower())
 
             # VA ADMINGA ZUDLIK BILAN ESKALATSIYA QILINGAN BO'LISHI SHART!
             admin_manager.notify_admins.assert_called_once()
@@ -126,7 +126,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
         await handle_user_chat(msg, self.bot)
 
         reply = msg.reply.call_args[0][0]
-        self.assertIn("mutaxassislarimizga", reply)
+        self.assertIn("mas'ul xodimlarimizga", reply.lower())
 
         # Adminga eskalatsiya
         admin_manager.notify_admins.assert_called_once()

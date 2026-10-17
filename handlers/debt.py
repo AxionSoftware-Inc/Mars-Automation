@@ -294,9 +294,12 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
     if not query_num:
         return False
 
-    # 2. Agar mijoz texnik yoki yo'riqnoma savol berayotgan bo'lsa (masalan "chek qanday uriladi", "zaryad olmayapti")
-    # INNni eslab qolamiz, lekin qarz qopqoniga tushirmasdan texnik javob berish uchun chat_router ga o'tkazamiz!
+    # 2. Agar mijoz texnik savol, apparat nosozligi, yillik tekshiruv yoki hisob raqam so'rayotgan bo'lsa
+    # INNni eslab qolamiz va yagona 8-qadamli GroupResponseOrchestrator (chat_router) ga o'tkazamiz!
     lower = message.text.lower()
+    from handlers.intents.hardware import is_device_issue
+    from payment_accounts import is_annual_check_intent, is_both_check_intent, classify_payment_intent
+
     TECH_QUESTION_WORDS = [
         "qanday", "qanaqa", "qilish kerak", "qo'yish", "urish", "bekor qilish",
         "vozvrat", "qaytaring", "qaytarish", "zaryad", "zaryatka", "qog'oz", "qogoz",
@@ -304,7 +307,13 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
         "parol", "ulanish", "ochish", "yoqish", "ulash", "tushuntiring", "yo'riqnoma",
         "как", "как пробить", "возврат", "зарядка", "бумага", "инкассация"
     ]
-    if any(tw in lower for tw in TECH_QUESTION_WORDS):
+    if (
+        any(tw in lower for tw in TECH_QUESTION_WORDS)
+        or is_device_issue(message.text)
+        or is_annual_check_intent(message.text)
+        or is_both_check_intent(message.text)
+        or bool(classify_payment_intent(message.text))
+    ):
         user_id = message.from_user.id if message.from_user else 0
         user_memory.set_last_id(message.chat.id, user_id, query_num)
         return False

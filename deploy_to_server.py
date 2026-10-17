@@ -42,6 +42,9 @@ def deploy():
         'core/models.py',
         'core/engine.py',
         'core/rule_engine.py',
+        'core/module_registry.py',
+        'core/group_responder.py',
+        'modules/__init__.py',
         'data/custom_patches.json'
     ]
 
@@ -66,7 +69,7 @@ def deploy():
     print("Archive uploaded to /tmp/deploy_mars.tar.gz")
 
     # Remote papkalarni yaratish va tar ochish
-    ssh.exec_command(f"mkdir -p {remote_dir}/handlers/intents {remote_dir}/core {remote_dir}/data")
+    ssh.exec_command(f"mkdir -p {remote_dir}/handlers/intents {remote_dir}/core {remote_dir}/modules {remote_dir}/data")
     _, stdout, stderr = ssh.exec_command(f"tar -xzf {remote_tar} -C {remote_dir} && rm -f {remote_tar}")
     exit_status = stdout.channel.recv_exit_status()
     err_msg = stderr.read().decode().strip()
