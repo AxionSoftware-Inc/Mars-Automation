@@ -3,6 +3,7 @@ from typing import Optional
 from aiogram import types, Bot
 
 from user_memory import user_memory
+from excel_manager import excel_manager
 from translit_manager import adapt_to_user_script
 from core.models import extract_clean_inn, extract_fiscal_module, is_incomplete_inn_text
 from ofd_bridge import ofd_bridge
@@ -470,12 +471,16 @@ class BillingIntentHandler:
         # va keyingi gapida "yillikchi", "yillik-chi", "oylikchi" desa — u yillik/oylik SHOT (hisob raqam) so'rayapti!
         is_contextual_ann_shot = is_in_payment_card_context and any(w in lower_text for w in [
             "yillikchi", "yilikchi", "yillik-chi", "yillikkachi", "yillikdanchi", "fiskalchi", "soliqchi", "ofdchi",
-            "yillik", "fiskal", "soliq", "ofd", "йилликчи", "йилликкачи", "йилликданчи", "фискалчи", "солиқчи", "йиллик"
+            "yillikch", "yillikcha",
+            "yillik", "fiskal", "soliq", "ofd", "йилликчи", "йилликкачи", "йилликданчи", "фискалчи", "солиқчи", "йиллик",
+            "йилликч", "йилликча"
         ]) and not any(w in lower_text for w in ["qarz", "bormi", "tekshir", "қарз", "борми", "текшир"])
 
         is_contextual_mon_shot = is_in_payment_card_context and any(w in lower_text for w in [
             "oylikchi", "oylik-chi", "oylikkachi", "oylikdanchi", "marschi", "abonentchi",
-            "oylik", "mars", "abonent", "ойликчи", "ойликкачи", "ойликданчи", "марсчи", "ойлик"
+            "oylikch", "oylikcha",
+            "oylik", "mars", "abonent", "ойликчи", "ойликкачи", "ойликданчи", "марсчи", "ойлик",
+            "ойликч", "ойликча"
         ]) and not any(w in lower_text for w in ["qarz", "bormi", "tekshir", "қарз", "борми", "текшир"])
 
         is_ann_check = is_annual_check_intent(text) and not is_contextual_ann_shot
@@ -517,29 +522,49 @@ class BillingIntentHandler:
                 return True
 
             elif is_mon_pay:
-                remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+                explicit_inn = extract_clean_inn(text)
+                checked_inns = user_memory.get_checked_inns(chat_id, user_id)
                 status_header = ""
-                if remembered_id:
-                    excel_res = excel_manager.search(remembered_id)
-                    if excel_res:
-                        real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res)
-                        org_name = excel_res[0].get("name", "")
-                        user_memory.set_last_id(chat_id, user_id, remembered_id, org_name=org_name, debt=real_monthly_debt)
-                        if real_monthly_debt > 0:
-                            debt_formatted = f"{real_monthly_debt:,.0f}".replace(",", " ")
-                            status_header = (
-                                f"🔴 <b>«Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_formatted} so'm</b>\n"
-                                f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
-                                f"💳 <i>To'lov uchun rasmiy hisob raqam va video yo'riqnoma quyida keltirilgan:</i>"
-                            )
-                            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+
+                if not explicit_inn and len(checked_inns) > 1:
+                    lines = ["📊 <b>Siz tekshirgan korxonalar bo'yicha «Mars» oylik abonent to'lovi holati:</b>\n"]
+                    has_any_debt = False
+                    for c_inn in checked_inns.keys():
+                        c_res = excel_manager.search(c_inn)
+                        c_debt = sum(item.get("debt", 0.0) for item in c_res) if c_res else 0.0
+                        c_name = c_res[0].get("name", "") if c_res else checked_inns[c_inn].get("org_name", "")
+                        if c_debt > 0:
+                            has_any_debt = True
+                            c_fmt = f"{c_debt:,.0f}".replace(",", " ")
+                            lines.append(f"🔴 🏢 <b>{c_name}</b> (СТИР: <code>{c_inn}</code>):\n   👉 <b>Qarzdorlik: {c_fmt} so'm</b>")
                         else:
-                            status_header = (
-                                f"🟢 <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (To'langan).</b>\n"
-                                f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
-                                f"💳 <i>To'lov rekvizitlari quyida keltirilgan:</i>"
-                            )
-                            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
+                            lines.append(f"🟢 🏢 <b>{c_name}</b> (СТИР: <code>{c_inn}</code>):\n   👉 <b>Qarzdorlik yo'q (0 so'm)</b>")
+                    lines.append("💳 <i>To'lov uchun rasmiy hisob raqam va video yo'riqnoma quyida keltirilgan:</i>")
+                    status_header = "\n\n".join(lines)
+                    user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists" if has_any_debt else "monthly_debt_clear")
+                else:
+                    remembered_id = explicit_inn or user_memory.get_last_id(chat_id, user_id)
+                    if remembered_id:
+                        excel_res = excel_manager.search(remembered_id)
+                        if excel_res:
+                            real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res)
+                            org_name = excel_res[0].get("name", "")
+                            user_memory.set_last_id(chat_id, user_id, remembered_id, org_name=org_name, debt=real_monthly_debt)
+                            if real_monthly_debt > 0:
+                                debt_formatted = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                                status_header = (
+                                    f"🔴 <b>«Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_formatted} so'm</b>\n"
+                                    f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                                    f"💳 <i>To'lov uchun rasmiy hisob raqam va video yo'riqnoma quyida keltirilgan:</i>"
+                                )
+                                user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+                            else:
+                                status_header = (
+                                    f"🟢 <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (To'langan).</b>\n"
+                                    f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                                    f"💳 <i>To'lov rekvizitlari quyida keltirilgan:</i>"
+                                )
+                                user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
 
                 if status_header:
                     status_header = adapt_to_user_script(status_header, user_script)
@@ -652,6 +677,17 @@ class BillingIntentHandler:
             # Agar xotirada yillikdan qarz yo'qligi allaqachon ma'lum bo'lsa va yangi FM kiritilmagan bo'lsa:
             if ann_st and not ann_st.get("has_debt") and not found_fm:
                 clear_msg = "🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol)"
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                if remembered_id:
+                    excel_res = excel_manager.search(remembered_id)
+                    real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res) if excel_res else 0.0
+                    if real_monthly_debt > 0:
+                        debt_f = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                        org_n = excel_res[0].get("name", "") if excel_res else ""
+                        clear_msg += (
+                            f"\n\n🔴 <b>Lekin «Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_f} so'm</b>\n"
+                            f"🏢 <b>Korxona:</b> {org_n} (СТИР: <code>{remembered_id}</code>)"
+                        )
                 clear_msg = adapt_to_user_script(clear_msg, user_script)
                 try:
                     await message.reply(clear_msg, parse_mode="HTML")
@@ -833,9 +869,51 @@ class BillingIntentHandler:
                 user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
                 return True
 
-        # 4. Oylik qarz tekshiruvi ("oylik qarzim bormi", "oylikdanchi", "marsdan qarz")
+        # 4. Oylik qarz tekshiruvi ("oylik qarzim bormi", "oylikdanchi", "marsdan qarz", "oylikchi")
         if is_monthly_check_intent(text):
-            remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+            explicit_inn = extract_clean_inn(text)
+            checked_inns = user_memory.get_checked_inns(chat_id, user_id)
+            if not explicit_inn and len(checked_inns) > 1:
+                # Bir nechta korxona tekshirilgan bo'lsa, barchasining qarz holatini chiqarish
+                lines = ["📊 <b>Siz tekshirgan korxonalar bo'yicha «Mars» oylik abonent to'lovi holati:</b>\n"]
+                has_any_debt = False
+                for c_inn in checked_inns.keys():
+                    c_res = excel_manager.search(c_inn)
+                    c_debt = sum(item.get("debt", 0.0) for item in c_res) if c_res else 0.0
+                    c_name = c_res[0].get("name", "") if c_res else checked_inns[c_inn].get("org_name", "")
+                    if c_debt > 0:
+                        has_any_debt = True
+                        c_fmt = f"{c_debt:,.0f}".replace(",", " ")
+                        lines.append(f"🔴 🏢 <b>{c_name}</b> (СТИР: <code>{c_inn}</code>):\n   👉 <b>Qarzdorlik: {c_fmt} so'm</b>")
+                    else:
+                        lines.append(f"🟢 🏢 <b>{c_name}</b> (СТИР: <code>{c_inn}</code>):\n   👉 <b>Qarzdorlik yo'q (0 so'm)</b>")
+                lines.append("💳 <i>To'lov uchun rasmiy hisob raqam va video yo'riqnoma quyida keltirilgan:</i>")
+                multi_text = adapt_to_user_script("\n\n".join(lines), user_script)
+                try:
+                    await message.reply(multi_text, parse_mode="HTML")
+                except Exception:
+                    await message.reply(multi_text)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, multi_text)
+                user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists" if has_any_debt else "monthly_debt_clear")
+                if has_any_debt:
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=MARS_POST_ID,
+                            reply_to_message_id=message.message_id
+                        )
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=MARS_VIDEO_ID
+                        )
+                    except Exception as e:
+                        logger.warning(f"Oylik shot postini uzatishda xatolik: {e}")
+                return True
+
+            remembered_id = explicit_inn or user_memory.get_last_id(chat_id, user_id)
             if remembered_id:
                 from handlers.debt import process_and_send_debt_result
                 await process_and_send_debt_result(message, bot, remembered_id)

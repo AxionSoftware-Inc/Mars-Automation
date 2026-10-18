@@ -307,9 +307,12 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "qachongacha", "qachon", "vaqti", "vaqt", "kemaganmi", "kelmaganmi", "kemadimi", "kelmadimi",
         "kelganmi", "keldimi", "keldikmi", "chiqmadimi", "chiqmaganmi", "tugaganmi", "tugamaganmi",
         "nima boldi", "nima bo'ldi", "nima gap", "qanaqa", "qanday",
-        "yillikkachi", "yilikkachi", "oylikkachi", "yillikdanchi", "oylikdanchi", "yillikchi", "oylikchi",
+        "yillikkachi", "yilikkachi", "oylikkachi", "yillikdanchi", "oylikdanchi",
+        "yillikchi", "oylikchi", "yillikch", "oylikch", "yillikcha", "oylikcha",
+        "yillikchi?", "oylikchi?", "yillikch?", "oylikch?", "yillik-ch", "oylik-ch",
         "fiskalchi", "soliqchi", "ofdchi", "fmochi",
         "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи", "йилликчи", "ойликчи",
+        "йилликч", "ойликч", "йилликча", "ойликча",
         "кемаганми", "келмаганми", "келмадими", "кемадими", "вақти", "қачонгача", "қачон", "муддат",
         "қайси сана", "санагача", "қарз", "борми", "текшир", "тугаганми", "тугамаганми"
     ]):
@@ -317,7 +320,16 @@ def classify_payment_intent(text: str) -> Optional[str]:
             return None
 
     # Standalone holat so'rovlari: "yillik", "yillik?", "oylik", "oylik?", "fiskal", "ofd" -> bular rekvizit emas, holat intenti
-    if t in ("yillik", "yillik?", "yilik", "yilik?", "oylik", "oylik?", "fiskal", "fiskal?", "ofd", "ofd?", "йиллик", "йиллик?", "ойлик", "ойлик?", "фискал", "офд"):
+    if t in (
+        "yillik", "yillik?", "yilik", "yilik?", "oylik", "oylik?",
+        "yillikchi", "yillikchi?", "yillikch", "yillikch?", "yillikcha", "yillikcha?",
+        "oylikchi", "oylikchi?", "oylikch", "oylikch?", "oylikcha", "oylikcha?",
+        "fiskal", "fiskal?", "ofd", "ofd?",
+        "йиллик", "йиллик?", "ойлик", "ойлик?",
+        "йилликчи", "йилликчи?", "йилликч", "йилликч?", "йилликча",
+        "ойликчи", "ойликчи?", "ойликч", "ойликч?", "ойликча",
+        "фискал", "офд"
+    ):
         return None
 
     # Agar savol qayerdaligi, topish, qayerda yozilgani haqida bo'lsa va to'lov/shot so'ralmagan bo'lsa -> rekvizit intenti emas!
@@ -496,17 +508,25 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
             return False
 
-    # Standalone yillik so'rovi: "yillik", "yillik?", "fiskal", "ofd" -> mijoz yillik holatini bilmoqchi
-    if t in ("yillik", "yillik?", "yilik", "yilik?", "fiskal", "fiskal?", "ofd", "ofd?", "йиллик", "йиллик?", "фискал", "офд"):
+    # Standalone yillik so'rovi: "yillik", "yillik?", "yillikch", "yillikchi" -> mijoz yillik holatini bilmoqchi
+    if t in (
+        "yillik", "yillik?", "yilik", "yilik?",
+        "yillikchi", "yillikchi?", "yillikch", "yillikch?", "yillikcha", "yillikcha?",
+        "fiskal", "fiskal?", "ofd", "ofd?", "fiskalchi", "soliqchi", "ofdchi",
+        "йиллик", "йиллик?", "йилликчи", "йилликчи?", "йилликч", "йилликч?", "йилликча",
+        "фискал", "офд", "фискалчи", "солиқчи", "офдчи"
+    ):
         return True
     
     # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "yillikchi?", "fiskaldanchi?")
     followup_words = [
         "yillikdanchi", "yilikdanchi", "yillikkachi", "yilikkachi", "yillikgachi",
-        "yillikchi", "yilikchi", "yillik-chi", "yilik-chi",
+        "yillikchi", "yilikchi", "yillik-chi", "yilik-chi", "yillikch", "yillikcha",
+        "yillikch?", "yillikchi?", "yillikcha?",
         "fiskaldanchi", "soliqdanchi", "fiskalgachi", "soliqgachi",
         "ofddanchi", "fmodanchi",
-        "йилликданчи", "йилликкачи", "йилликчи", "фискалданчи", "солиқданчи", "офдданчи"
+        "йилликданчи", "йилликкачи", "йилликчи", "йилликч", "йилликча",
+        "фискалданчи", "солиқданчи", "офдданчи"
     ]
     if any(w in t for w in followup_words):
         return True
@@ -565,12 +585,23 @@ def is_monthly_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
             return False
 
+    # Standalone oylik so'rovi: "oylik", "oylik?", "oylikch", "oylikchi" -> mijoz oylik holatini bilmoqchi
+    if t in (
+        "oylik", "oylik?", "oylikchi", "oylikchi?", "oylikch", "oylikch?", "oylikcha", "oylikcha?",
+        "mars", "marschi", "abonent", "abonentchi",
+        "ойлик", "ойлик?", "ойликчи", "ойликчи?", "ойликч", "ойликч?", "ойликча",
+        "марс", "марсчи", "абонент", "абонентчи"
+    ):
+        return True
+
     # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "oylikchi?", "marsdanchi?")
     followup_words = [
         "oylikdanchi", "oylikdanam", "oylikdan-chi", "oylikkachi", "oylikgachi",
-        "oylikchi", "oylik-chi",
+        "oylikchi", "oylik-chi", "oylikch", "oylikcha", "oylich",
+        "oylikch?", "oylikchi?", "oylikcha?",
         "marsdanchi", "abonentdanchi",
-        "ойликданчи", "ойликкачи", "ойликчи", "ойликданам", "марсданчи", "абонентданчи"
+        "ойликданчи", "ойликкачи", "ойликчи", "ойликч", "ойликча", "ойликданам",
+        "марсданчи", "абонентданчи"
     ]
     if any(w in t for w in followup_words):
         return True

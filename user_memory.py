@@ -360,7 +360,52 @@ class UserMemoryManager:
             parts.append("• Ushbu mijoz tizimga hali o'z korxona INN/JSHSHIR raqamini kiritmagan va to'lov kvitansiyasini yubormagan.")
             parts.append("• Uning qaysi korxonaga tegishliligi noma'lum. Shaxsiy qarz, apparat holati yoki qo'shilish vaqti so'ralsa, avval korxona INN raqamini so'rang.")
 
-        if debt_info:
+        checked_inns = session.get("checked_inns", {})
+        if len(checked_inns) > 1:
+            parts.append("=== MIJOZ TEKSHIRGAN BARCHA KORXONALAR RO'YXATI ===")
+            for c_id, c_data in checked_inns.items():
+                try:
+                    from excel_manager import excel_manager
+                    live_res = excel_manager.search(c_id)
+                    c_d = sum(item.get("debt", 0.0) for item in live_res) if live_res else c_data.get("debt", 0.0)
+                    c_n = live_res[0].get("name", "") if live_res else c_data.get("org_name", "")
+                except Exception:
+                    c_d = c_data.get("debt", 0.0)
+                    c_n = c_data.get("org_name", "")
+                if c_d > 0:
+                    parts.append(f"• Korxona: {c_n} (INN: {c_id}) -> QARZDORLIK: {c_d:,.0f} so'm MAVJUD")
+                else:
+                    parts.append(f"• Korxona: {c_n} (INN: {c_id}) -> Qarzdorlik yo'q (0 so'm)")
+        elif last_id:
+            try:
+                from excel_manager import excel_manager
+                live_res = excel_manager.search(last_id)
+                if live_res:
+                    live_debt = sum(item.get("debt", 0.0) for item in live_res)
+                    if live_debt > 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovidan joriy qarzdorlik: {live_debt:,.0f} so'm mavjud.")
+                    elif live_debt < 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovi: Qarzdorlik YO'Q (ortiqcha to'lov: {abs(live_debt):,.0f} so'm).")
+                    else:
+                        parts.append("• «Mars» oylik abonent to'lovidan joriy qarzdorlik: 0 so'm (Qarzdorlik yo'q).")
+                elif debt_info:
+                    d_val = debt_info.get("debt", 0.0)
+                    if d_val > 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovidan joriy qarzdorlik: {d_val:,.0f} so'm mavjud.")
+                    elif d_val < 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovi: Qarzdorlik YO'Q (ortiqcha to'lov: {abs(d_val):,.0f} so'm).")
+                    else:
+                        parts.append("• «Mars» oylik abonent to'lovidan joriy qarzdorlik: 0 so'm (Qarzdorlik yo'q).")
+            except Exception:
+                if debt_info:
+                    d_val = debt_info.get("debt", 0.0)
+                    if d_val > 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovidan joriy qarzdorlik: {d_val:,.0f} so'm mavjud.")
+                    elif d_val < 0:
+                        parts.append(f"• «Mars» oylik abonent to'lovi: Qarzdorlik YO'Q (ortiqcha to'lov: {abs(d_val):,.0f} so'm).")
+                    else:
+                        parts.append("• «Mars» oylik abonent to'lovidan joriy qarzdorlik: 0 so'm (Qarzdorlik yo'q).")
+        elif debt_info:
             d_val = debt_info.get("debt", 0.0)
             if d_val > 0:
                 parts.append(f"• «Mars» oylik abonent to'lovidan joriy qarzdorlik: {d_val:,.0f} so'm mavjud.")
