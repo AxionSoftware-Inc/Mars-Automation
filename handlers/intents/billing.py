@@ -294,7 +294,43 @@ class BillingIntentHandler:
                 user_memory.add_assistant_message(chat_id, user_id, ofd_text)
                 return True
             else:
-                if is_issue:
+                # Yillik Soliq litsenziyasi faol (qarz yo'q). Endi oylik qarzni Excel'dan tekshiramiz!
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                excel_res = excel_manager.search(remembered_id) if remembered_id else []
+                real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res) if excel_res else 0.0
+                if not org_name and excel_res:
+                    org_name = excel_res[0].get("name", "")
+                if remembered_id and excel_res:
+                    user_memory.set_last_id(chat_id, user_id, remembered_id, org_name=org_name, debt=real_monthly_debt)
+
+                if real_monthly_debt > 0:
+                    debt_formatted = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                    monthly_debt_msg = (
+                        f"🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol, FM: <code>{found_fm}</code>)\n\n"
+                        f"🔴 <b>Lekin «Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_formatted} so'm</b>\n"
+                        f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                    )
+                    if is_issue:
+                        monthly_debt_msg += (
+                            "⚠️ <b>Apparat to'xtab qolishining sababi:</b> «Mars» oylik abonent to'lovidan qarzdorlik.\n"
+                            "Quyidagi hisob raqamga to'lov qilingandan so'ng apparat avtomatik faollashadi.\n\n"
+                        )
+                    monthly_debt_msg += "💳 <i>To'lov rekvizitlari va video yo'riqnoma quyida keltirilgan:</i>"
+                    monthly_debt_msg = adapt_to_user_script(monthly_debt_msg, user_script)
+                    try:
+                        await message.reply(monthly_debt_msg, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(monthly_debt_msg)
+                    try:
+                        await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
+                        await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_VIDEO_ID)
+                    except Exception as e:
+                        logger.warning(f"Post 85 yuborishda xatolik: {e}")
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, monthly_debt_msg)
+                    user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+                    return True
+                elif is_issue:
                     # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
                     from admin_manager import admin_manager, get_admin_contact_keyboard
                     last_photo = user_memory.get_last_photo(chat_id, user_id)
@@ -481,6 +517,38 @@ class BillingIntentHandler:
                 return True
 
             elif is_mon_pay:
+                remembered_id = extract_clean_inn(text) or user_memory.get_last_id(chat_id, user_id)
+                status_header = ""
+                if remembered_id:
+                    excel_res = excel_manager.search(remembered_id)
+                    if excel_res:
+                        real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res)
+                        org_name = excel_res[0].get("name", "")
+                        user_memory.set_last_id(chat_id, user_id, remembered_id, org_name=org_name, debt=real_monthly_debt)
+                        if real_monthly_debt > 0:
+                            debt_formatted = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                            status_header = (
+                                f"🔴 <b>«Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_formatted} so'm</b>\n"
+                                f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                                f"💳 <i>To'lov uchun rasmiy hisob raqam va video yo'riqnoma quyida keltirilgan:</i>"
+                            )
+                            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+                        else:
+                            status_header = (
+                                f"🟢 <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (To'langan).</b>\n"
+                                f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                                f"💳 <i>To'lov rekvizitlari quyida keltirilgan:</i>"
+                            )
+                            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
+
+                if status_header:
+                    status_header = adapt_to_user_script(status_header, user_script)
+                    try:
+                        await message.reply(status_header, parse_mode="HTML")
+                    except Exception:
+                        await message.reply(status_header)
+                    user_memory.add_assistant_message(chat_id, user_id, status_header)
+
                 try:
                     await bot.copy_message(
                         chat_id=message.chat.id,
@@ -490,8 +558,9 @@ class BillingIntentHandler:
                     )
                 except Exception as e:
                     logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
-                    monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
-                    await message.reply(monthly_card, parse_mode="HTML")
+                    if not status_header:
+                        monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
+                        await message.reply(monthly_card, parse_mode="HTML")
 
                 try:
                     await bot.copy_message(
@@ -504,11 +573,15 @@ class BillingIntentHandler:
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
-                user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")
                 return True
 
             elif is_ann_pay:
                 ann_st = user_memory.get_annual_status(chat_id, user_id)
+                target_fm = user_memory.get_last_fm(chat_id, user_id)
+                remembered_id = user_memory.get_last_id(chat_id, user_id)
+                excel_res = excel_manager.search(remembered_id) if remembered_id else []
+                real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res) if excel_res else 0.0
+
                 is_explicit_acc_ask = is_contextual_ann_shot or any(w in lower_text for w in [
                     "shot", "rekvizit", "hisob", "xisob", "kartasi", "karta", "to'lash uchun", "tolash uchun",
                     "to'lashga", "tolashga", "шот", "реквизит", "ҳисоб", "счёт", "счет"
@@ -516,6 +589,9 @@ class BillingIntentHandler:
                 # Agar mijoz shunchaki "yillikchi" yoki "yillik" deb so'ragan bo'lsa va xotirada yillikdan qarz yo'qligi ma'lum bo'lsa (va hisob raqam kontekstida bo'lmasa):
                 if ann_st and not ann_st.get("has_debt") and not is_explicit_acc_ask:
                     clear_msg = "🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol)"
+                    if real_monthly_debt > 0:
+                        debt_f = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                        clear_msg += f"\n🔴 <b>«Mars» oylik abonent to'lovidan qarzdorlik: {debt_f} so'm</b>"
                     clear_msg = adapt_to_user_script(clear_msg, user_script)
                     try:
                         await message.reply(clear_msg, parse_mode="HTML")
@@ -637,7 +713,42 @@ class BillingIntentHandler:
                         logger.warning(f"Post 34 nusxalashda xatolik: {e}")
                     return True
                 else:
-                    if is_issue:
+                    remembered_id = user_memory.get_last_id(chat_id, user_id)
+                    excel_res = excel_manager.search(remembered_id) if remembered_id else []
+                    real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res) if excel_res else 0.0
+                    if not org_name and excel_res:
+                        org_name = excel_res[0].get("name", "")
+                    if remembered_id and excel_res:
+                        user_memory.set_last_id(chat_id, user_id, remembered_id, org_name=org_name, debt=real_monthly_debt)
+
+                    if real_monthly_debt > 0:
+                        debt_formatted = f"{real_monthly_debt:,.0f}".replace(",", " ")
+                        monthly_debt_msg = (
+                            f"🟢 <b>Yillik Soliq (OFD) to'lovidan qarzdorlik yo'q!</b> (Litsenziya faol, FM: <code>{target_fm}</code>)\n\n"
+                            f"🔴 <b>Lekin «Mars» oylik abonent to'lovidan QARZDORLIK MAVJUD: {debt_formatted} so'm</b>\n"
+                            f"🏢 <b>Korxona:</b> {org_name} (СТИР: <code>{remembered_id}</code>)\n\n"
+                        )
+                        if is_issue:
+                            monthly_debt_msg += (
+                                "⚠️ <b>Apparat to'xtab qolishining sababi:</b> «Mars» oylik abonent to'lovidan qarzdorlik.\n"
+                                "Quyidagi hisob raqamga to'lov qilingandan so'ng apparat avtomatik faollashadi.\n\n"
+                            )
+                        monthly_debt_msg += "💳 <i>«Mars» oylik to'lovi rekvizitlari quyida kanaldan uzatildi:</i>"
+                        monthly_debt_msg = adapt_to_user_script(monthly_debt_msg, user_script)
+                        try:
+                            await message.reply(monthly_debt_msg, parse_mode="HTML")
+                        except Exception:
+                            await message.reply(monthly_debt_msg)
+                        try:
+                            await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
+                            await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_VIDEO_ID)
+                        except Exception as e:
+                            logger.warning(f"Post 85 uzatishda xatolik: {e}")
+                        user_memory.add_user_message(chat_id, user_id, text)
+                        user_memory.add_assistant_message(chat_id, user_id, monthly_debt_msg)
+                        user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+                        return True
+                    elif is_issue:
                         # 3-BOSQICH (ESKALATSIYA): Oylik va Yillik to'langan, lekin apparat ishlamayapti!
                         from admin_manager import admin_manager, get_admin_contact_keyboard
                         last_photo = user_memory.get_last_photo(chat_id, user_id)

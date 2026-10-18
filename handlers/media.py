@@ -280,21 +280,21 @@ async def _process_fiscal_receipt_content(
     model_summary = ""
 
     if inn:
-        debt_res = excel_manager.check_debt(inn)
-        record = debt_res.get("record") if debt_res else None
-        if record:
-            org_from_rec = record.get("org_name")
-            if org_from_rec and not org_name:
-                org_name = org_from_rec
-            status = record.get("status", "")
-            debt_amount = float(record.get("debt_amount", 0.0) or 0.0)
-            paid_to = record.get("paid_up_to", "") or record.get("payment_date", "")
-
-            if status == "qarzdor" or debt_amount > 0:
-                has_monthly_debt = True
         results = excel_manager.search(inn)
         if results:
+            if not org_name:
+                org_name = results[0].get("name", "")
+            debt_amount = sum(item.get("debt", 0.0) for item in results)
+            has_monthly_debt = (debt_amount > 0)
             model_summary = excel_manager.get_device_model_summary(results)
+        else:
+            debt_res = excel_manager.check_debt(inn)
+            record = debt_res.get("record") if debt_res else None
+            if record:
+                if not org_name:
+                    org_name = record.get("org_name", "")
+                debt_amount = float(record.get("debt_amount", 0.0) or 0.0)
+                has_monthly_debt = (record.get("status") == "qarzdor" or debt_amount > 0)
 
     # 2. Davlat Soliq (OFD) yillik litsenziyasi holati (440 000 so'm/yil)
     has_annual_debt = False
