@@ -353,9 +353,13 @@ class BillingIntentHandler:
             "fiskal modul qayerda boladi", "fiskal modul qayerda bo'ladi", "modul raqami qayerda",
             "fiskal modulni qanday topaman", "fiskal modul topish", "modul topish",
             "fiskal modul nima", "fiskal modul raqami nima", "fiskal modul haqida",
+            "fiskal raqam nima", "fiskal raqam qayerda", "fiskal qayerda", "fiskal raqamni qayerdan",
             "fiskal modulni bilish", "fiskal modul qayeri", "fiskal modul qayerida",
+            "chek yo'q", "chek yoq", "chekim yo'q", "chekim yoq", "chek chiqmayapti", "chek chiqmayapdi",
+            "chek chiqara olmay", "chek chiqarolmay", "chek urmayapti", "chek yo'qku", "chek yoqku",
+            "чек чиқмаяпти", "чек чикмаяпти", "чек йўқ", "чек йук",
             "фискал модул қаерда", "фискал модул каерда", "фискал модул қаердан", "модул рақами қаерда",
-            "фискал модул нима"
+            "фискал модул нима", "фискал рақам нима", "фискал рақам қаерда"
         ]
         if any(p in lower_text for p in fm_where_phrases):
             fm_guide = get_fiscal_module_request_prompt(user_script)

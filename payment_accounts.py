@@ -155,11 +155,13 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va uning nimaligini tushuntirish"""
     from translit_manager import adapt_to_user_script
     text = (
-        "🏛 <b>Fiskal modul (FM) haqida:</b>\n\n"
-        "Fiskal modul — bu kassa apparatingiz ichidagi Davlat Soliq tizimi bilan ishlaydigan maxsus xavfsizlik chipi.\n\n"
+        "🏛 <b>Fiskal modul (FM) seriya raqami haqida:</b>\n\n"
+        "Fiskal modul — bu kassa apparatingiz ichidagi Davlat Soliq tizimi bilan ishlaydigan maxsus xavfsizlik chipi bo'lib, uning seriya raqami <b>LG...</b> yoki <b>YG...</b> bilan boshlanadi.\n\n"
         "📌 <b>Uning seriya raqamini qayerdan topasiz:</b>\n"
-        "Kassa apparatidan chiqqan har qanday chekning <b>eng pastki qismida</b> seriya raqami bo'ladi (masalan: <code>LG420210630789</code>, <code>YG...</code>, <code>UZ...</code>).\n\n"
-        "📸 <i>Agar raqamni topolmasangiz, chekning pastki qismini rasmga olib shu yerga tashlang, botimiz o'zi aniqlab oladi (namuna quyidagi postda uzatildi).</i>"
+        "1️⃣ <b>Kassa chekidan:</b> Apparatdan chiqqan istalgan (hatto eski) chekning <b>eng pastki qismida</b> (masalan: <code>LG420210630789</code>);\n"
+        "2️⃣ <b>Apparat korpusidan:</b> Kassa apparatining <b>orqa qismidagi oq nakleyka (yorliq)</b> yoki batareya uyasi ostidagi seriya raqamida;\n"
+        "3️⃣ <b>Fotosurat:</b> Agar topolmasangiz, chekning pastki qismini yoki apparat ekranini rasmga olib yuborsangiz, botimiz o'zi aniqlab oladi.\n\n"
+        "👇 <i>Quyida kassa chekidan Fiskal modulni topish namunasi uzatildi:</i>"
     )
     return adapt_to_user_script(text, script)
 
@@ -331,13 +333,15 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "yillik to'lash", "yillik tolash",
         "yillik to'lamoqchiman", "yillik tolamoqchiman", "yillik tulamoqchiman",
         "yillik to'layman", "yillik tolayman", "yillik tulayman",
-        "yangi texnologiyalar", "yillik qancha", "440000", "440 000",
+        "yangi texnologiyalar", "yillik qancha", "yillikka qancha", "yillik to'lov qancha", "yillik tolov qancha",
+        "yillik narxi", "yillik narxi qancha", "yillik necha pul", "yillik summa", "440000", "440 000",
         "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
         "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
         "йиллик тўлов шот", "йиллик толов шот", "янги технологиялар",
         "йиллик тўламоқчиман", "йиллик толамокчиман", "йиллик туламокчиман",
         "йиллик тўлайман", "йиллик толайман", "йиллик тўлаш", "йиллик толаш",
-        "йиллик қанча", "йиллик канча"
+        "йиллик қанча", "йиллик канча", "йилликка қанча", "йиллик тўлов қанча", "йиллик толов қанча",
+        "йиллик неча пул", "йиллик нархи", "йиллик нархи қанча"
     ])
 
     # Oylik to'lov alomatlari (Lotin va Kirill)
@@ -345,7 +349,8 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "oylik shot", "oylik hisob", "oylik rekvizit", "mars hisob", "mars shot",
         "abonent to'lov shot", "abonent tolov shot", "marsga to'lov shot",
         "oylik to'lov shot", "oylik tolov shot", "oylik to'lov kartasi",
-        "100000", "100 000",
+        "oylik qancha", "oylikka qancha", "oylik to'lov qancha", "oylik tolov qancha",
+        "oylik narxi", "oylik narxi qancha", "oylik necha pul", "oylik summa", "100000", "100 000",
         "oylik to'lash", "oylik tolash",
         "oylik to'lamoqchiman", "oylik tolamoqchiman", "oylik tulamoqchiman",
         "oylik to'layman", "oylik tolayman", "oylik tulayman",
@@ -354,7 +359,9 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "марс ҳисоб", "марс хисоб", "марс шот", "абонент тўлов шот",
         "ойлик тўламоқчиман", "ойлик толамокчиман", "ойлик туламокчиман",
         "ойлик тўлайман", "ойлик толайман", "ойлик тулайман",
-        "ойлик тўлаш", "ойлик толаш"
+        "ойлик тўлаш", "ойлик толаш",
+        "ойлик қанча", "ойликка қанча", "ойлик тўлов қанча", "ойлик толов қанча",
+        "ойлик неча пул", "ойлик нархи", "ойлик нархи қанча"
     ])
 
     has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])

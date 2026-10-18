@@ -381,6 +381,9 @@ class GroupResponseOrchestrator:
         is_asking_fm_location = any(p in lower_text for p in [
             "fiskal modul qayerda", "fiskal modul qayerdan", "fm raqamini qayerdan",
             "modul raqami qayerda", "fiskal modulni qanday topaman", "fiskal modul nima",
+            "fiskal raqam nima", "fiskal raqam qayerda", "fiskal qayerda", "fiskal raqamni qayerdan",
+            "chek yo'q", "chek yoq", "chekim yo'q", "chekim yoq", "chek chiqmayapti", "chek chiqmayapdi",
+            "чек чиқмаяпти", "чек чикмаяпти", "чек йўқ", "чек йук",
             "фискал модул қаерда", "фискал модул каерда", "фискал модул нима"
         ])
         is_billing_or_payment_intent = (
