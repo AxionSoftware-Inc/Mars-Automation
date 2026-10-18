@@ -82,6 +82,10 @@ class ConversationIntentHandler:
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
+            is_casual_or_polite = any(w in lower_text for w in ["salom", "rahmat", "xop", "ok", "yaxshi", "tushundim", "arzimaydi", "xayr", "privet", "рахмат", "салом"])
+            if is_casual_or_polite:
+                needs_admin = False
+
             if needs_admin:
                 user_memory.mark_escalated_to_admin(chat_id, user_id, reason="AI bilmadi va adminga yo'naltirdi")
                 last_id = user_memory.get_last_id(chat_id, user_id)
@@ -149,6 +153,10 @@ class ConversationIntentHandler:
 
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, reply_text)
+
+        is_casual_or_polite = any(w in lower_text for w in ["salom", "rahmat", "xop", "ok", "yaxshi", "tushundim", "arzimaydi", "xayr", "privet", "рахмат", "салом"])
+        if is_casual_or_polite:
+            needs_admin = False
 
         if needs_admin:
             user_memory.mark_escalated_to_admin(chat_id, user_id, reason="AI bilmadi va adminga yo'naltirdi")

@@ -1,6 +1,14 @@
 {
   "default_super_admins": [
     {
+      "name": "Akmal (Super Admin)",
+      "username": "BIM_Project_Manager",
+      "telegram_id": 1914856786,
+      "phone": "+998 90 045 54 85",
+      "role": "Bosh administrator / Loyiha rahbari",
+      "receive_all_escalations": true
+    },
+    {
       "name": "Yashnarbek Butaev",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
@@ -53,10 +61,10 @@
         "shahrisabz shahar",
         "shahrisabz tumani"
       ],
-      "admin_name": "Shahrisabz hududiy ustasi (Mock)",
-      "username": "Yashnarbek_butaev",
-      "telegram_id": 1966874161,
-      "phone": "+998 94 299 77 99",
+      "admin_name": "Akmal (Shahrisabz mas'uli)",
+      "username": "BIM_Project_Manager",
+      "telegram_id": 1914856786,
+      "phone": "+998 90 045 54 85",
       "active": true
     },
     {

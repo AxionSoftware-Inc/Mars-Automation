@@ -81,6 +81,18 @@ class HardwareIntentHandler:
         if not is_in_issue and not has_issue_phrase:
             return False
 
+        # Agar foydalanuvchi minnatdorchilik bildirsa ("rahmat", "katta rahmat", "tushundim", "tushunarli", "yaxshi"):
+        if any(w in lower_text for w in ["rahmat", "katta rahmat", "tushundim", "tushunarli", "рахмат", "тушундим"]):
+            user_memory.clear_issue_mode(chat_id, user_id)
+            thx_msg = adapt_to_user_script(
+                "Arzimaydi! Yana qandaydir savollaringiz yoki kassa apparati bilan muammo bo'lsa, bemalol murojaat qilishingiz mumkin. Xizmatingizdamiz! 🤝",
+                user_script
+            )
+            await message.reply(thx_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, thx_msg)
+            return True
+
         # Muammo rejimini faollashtirish va saqlash
         if has_issue_phrase and not is_in_issue:
             user_memory.set_issue_mode(chat_id, user_id, True, initial_query=text)

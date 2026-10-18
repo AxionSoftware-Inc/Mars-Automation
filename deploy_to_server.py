@@ -82,8 +82,8 @@ def deploy():
         return
     print("Files successfully unpacked on remote server!")
 
-    print("\nEnsuring dependencies (httpx, pypdf) on remote server...")
-    _, stdout, stderr = ssh.exec_command(f"{remote_dir}/venv/bin/pip install httpx pypdf")
+    print("\nEnsuring dependencies (httpx, pypdf, Pillow) on remote server...")
+    _, stdout, stderr = ssh.exec_command(f"{remote_dir}/venv/bin/pip install httpx pypdf Pillow")
     pip_status = stdout.channel.recv_exit_status()
     print(f"Pip install status: {pip_status}")
 

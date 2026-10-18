@@ -201,6 +201,46 @@ class GroupResponseOrchestrator:
                 return True
 
         # =====================================================================
+        # 2.5-QADAM: SALOMLASHISH / GREETINGS (Mutlaqo xavfsiz, adminga yo'naltirmaydi)
+        # =====================================================================
+        PURE_GREETINGS = {
+            "salom", "assalomu alaykum", "assalomu aleykum", "assalom alaykum", "assalom aleykum",
+            "salom alaykum", "salomalaykum", "salom hammaga", "salomlar",
+            "privet", "привет", "салом", "ассалому алайкум", "ассалому алейкум",
+            "здравствуйте", "добрый день", "доброе утро", "добрый вечер",
+            "hayrli kun", "xayrli kun", "hayrli tong", "xayrli tong", "hayrli kech", "xayrli kech"
+        }
+        words = lower_text.split()
+        is_pure_greeting = (
+            lower_text in PURE_GREETINGS
+            or (len(words) <= 4 and any(lower_text.startswith(w) for w in ["salom", "assalomu alaykum", "assalomu aleykum", "салом", "ассалому алайкум", "привет", "здравствуйте"])
+                and not any(action_kw in lower_text for action_kw in [
+                    "ishlamay", "ishlamayapti", "qarz", "shot", "hisob", "chek", "kvitansiya", "video", "admin", "usta",
+                    "inn", "fm", "fiskal", "yillik", "oylik", "operat", "tuzat", "blok", "och", "yoq", "tolash", "to'lash"
+                ]))
+        )
+        if is_pure_greeting:
+            user_memory.clear_issue_mode(chat_id, user_id)
+            user_memory.clear_escalation(chat_id, user_id)
+            user_memory.set_last_topic(chat_id, user_id, "greeting")
+            welcome_msg = (
+                "👋 <b>Assalomu alaykum! «Mars» elektron xizmat ko'rsatish markazining rasmiy yordamchi botiga xush kelibsiz.</b>\n\n"
+                "Sizga qanday yordam bera olaman?\n"
+                "🔹 <b>Qarzdorlikni tekshirish:</b> Korxona <b>СТИР (INN)</b> yoki <b>Fiskal modul (LG..., YG...)</b> raqamini yuboring;\n"
+                "🔹 <b>To'lov rekvizitlari:</b> «Oylik shot» yoki «Yillik shot» deb yozing;\n"
+                "🔹 <b>Apparat nosozligi:</b> Muammo haqida yozing yoki ekran fotosuratini tashlang;\n"
+                "🔹 <b>Kassa bo'yicha yo'riqnoma:</b> Qiziqtirgan mavzuni yozing (masalan: <i>X-hisobot</i>, <i>Tovar qo'shish</i>, <i>Vozvrat</i>)."
+            )
+            welcome_msg = adapt_to_user_script(welcome_msg, user_script)
+            try:
+                await message.reply(welcome_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(welcome_msg)
+            user_memory.add_user_message(chat_id, user_id, raw_text)
+            user_memory.add_assistant_message(chat_id, user_id, welcome_msg)
+            return True
+
+        # =====================================================================
         # 3-QADAM: USTA / ADMIN CHAQIRISH YOKI GAPNI CHO'ZISH (Eskalatsiya qoidasi)
         # =====================================================================
         is_command = clean_text.startswith("/")
@@ -211,13 +251,11 @@ class GroupResponseOrchestrator:
                 return True
 
         # 3.2 Agar mijoz ALLAQACHON adminga topshirilgan bo'lsa:
-        # MUHIM: Agar mijoz yangi mavzu boshlasa ("salom", "aparatim ishlamay qoldi", "qarzim bormi", "oylik shot", "mxik" va h.k.),
+        # MUHIM: Agar mijoz yangi mavzu boshlasa ("aparatim ishlamay qoldi", "qarzim bormi", "oylik shot", "mxik" va h.k.),
         # eskalatsiya qulfini ochamiz va unga normal javob beramiz!
         # Faqat sabrsizlik/noo'rin davomiy gaplarda ("tashladimku boya", "qachon javob", "hudoga soldim", "gap qaytarma") "Admin javobini kuting" deymiz.
-        is_greeting = lower_text in ("salom", "assalomu alaykum", "assalomu aleykum", "привет", "салом", "ассалому алайкум")
         is_new_meaningful_intent = (
-            is_greeting
-            or bool(found_inn)
+            bool(found_inn)
             or bool(found_fm)
             or is_command
             or is_device_issue(clean_text)
@@ -330,25 +368,37 @@ class GroupResponseOrchestrator:
         # - Yoki bitta xabarda hammasini yozadimi — HardwareIntentHandler xotiradagi borini olib,
         #   faqat yetishmayotganini so'raydi!
         # =====================================================================
-        # Maxsus istisno: agar mijoz muammo jarayonida "fiskal modul qayerda / nima" deb so'rasa
-        # yoki to'lov rekviziti ("oylik shot", "yillik shot") so'rasa, billing_intent_handler javob berishi uchun
-        # oldin tekshiramiz:
+        # Maxsus istisno: agar mijoz yillik tekshiruv ("yillik", "fiskal"), hisob raqam ("oylik shot", "yillik shot"),
+        # yoki fiskal modul yuborayotgan bo'lsa — buni AVVAL billing_intent_handler tekshiradi!
+        # Chunki yillik tekshiruv uchun INN emas, aynan Fiskal Modul (LG/YG) talab qilinadi.
+        # =====================================================================
+        from payment_accounts import (
+            is_annual_check_intent,
+            is_monthly_check_intent,
+            is_both_check_intent,
+            classify_payment_intent
+        )
         is_asking_fm_location = any(p in lower_text for p in [
             "fiskal modul qayerda", "fiskal modul qayerdan", "fm raqamini qayerdan",
             "modul raqami qayerda", "fiskal modulni qanday topaman", "fiskal modul nima",
             "фискал модул қаерда", "фискал модул каерда", "фискал модул нима"
         ])
-        if is_asking_fm_location:
+        is_billing_or_payment_intent = (
+            bool(found_fm)
+            or is_annual_check_intent(clean_text)
+            or is_monthly_check_intent(clean_text)
+            or is_both_check_intent(clean_text)
+            or bool(classify_payment_intent(clean_text))
+            or is_asking_fm_location
+            or is_incomplete_inn_text(clean_text)
+            or (clean_text.isdigit() and 1 <= len(clean_text) <= 8 and not found_fm)
+        )
+        if is_billing_or_payment_intent:
             if await billing_intent_handler.handle(message, bot, user_script):
                 return True
 
-        # Agar mijoz muammo rejimida bo'lsa va faqat Fiskal modul (LG/YG) yuborgan bo'lsa ->
-        # billing_intent_handler dagi 2.1 blok (yoki hardware_intent_handler) uni OFD dan tekshiradi.
+        # Agar mijoz muammo rejimida bo'lsa yoki apparat nosozligi iborasini yozsa:
         if user_memory.is_issue_mode(chat_id, user_id) or is_device_issue(raw_text):
-            # Agar mijoz muammo ichida turib chala INN yozsa (masalan "12345"), billing uni tutsin:
-            if is_incomplete_inn_text(clean_text) or (clean_text.isdigit() and 1 <= len(clean_text) <= 8 and not found_fm):
-                if await billing_intent_handler.handle(message, bot, user_script):
-                    return True
             if await hardware_intent_handler.handle(message, bot, user_script):
                 return True
 

@@ -5,3 +5,6 @@ __pycache__/
 .env
 data/user_sessions.json
 data/pending_receipts.json
+*.session
+data/*.session
+data/test_images/
