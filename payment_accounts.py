@@ -489,6 +489,11 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
             return False
 
+    # Agar narx yoki summa so'ralayotgan bo'lsa ("qancha", "necha pul", "narxi") va qarz/tekshir so'zi bo'lmasa -> bu to'lov summasi/kartasi so'rovi!
+    if any(w in t for w in ["qancha", "necha pul", "narxi", "summa", "қанча", "неча пул", "нархи", "сумма"]):
+        if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
+            return False
+
     # Standalone yillik so'rovi: "yillik", "yillik?", "fiskal", "ofd" -> mijoz yillik holatini bilmoqchi
     if t in ("yillik", "yillik?", "yilik", "yilik?", "fiskal", "fiskal?", "ofd", "ofd?", "йиллик", "йиллик?", "фискал", "офд"):
         return True
@@ -551,6 +556,11 @@ def is_monthly_check_intent(text: str) -> bool:
     # Agar aniq hisob raqam / shot / karta so'ralayotgan bo'lsa va tekshirish/qarz so'zi bo'lmasa -> bu to'lov kartasi so'rovi!
     if any(w in t for w in ["shot", "shotini", "rekvizit", "hisob raqam", "xisob", "karta", "kartasi", "шот", "реквизит", "ҳисоб", "карта"]):
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "holat", "қарз", "борми", "текшир"]):
+            return False
+
+    # Agar narx yoki summa so'ralayotgan bo'lsa ("qancha", "necha pul", "narxi") va qarz/tekshir so'zi bo'lmasa -> bu to'lov summasi/kartasi so'rovi!
+    if any(w in t for w in ["qancha", "necha pul", "narxi", "summa", "қанча", "неча пул", "нархи", "сумма"]):
+        if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
             return False
 
     # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "oylikchi?", "marsdanchi?")

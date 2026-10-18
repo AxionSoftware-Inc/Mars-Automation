@@ -241,6 +241,36 @@ class GroupResponseOrchestrator:
             return True
 
         # =====================================================================
+        # 2.6-QADAM: MINNATDORCHILIK / RAHMAT / TUSHUNDIM (Mutlaqo xavfsiz, adminga o'tkazmaydi)
+        # =====================================================================
+        GRATITUDE_WORDS = [
+            "rahmat", "katta rahmat", "raxmat", "katta raxmat", "tashakkur", "tushundim",
+            "tushunarli", "boldi tushundim", "bo'ldi tushundim", "ha tushundim",
+            "yordamingiz uchun rahmat", "spasibo", "спасибо", "раҳмат", "катта раҳмат", "тушундим", "тушунарли"
+        ]
+        is_gratitude = (
+            lower_text in GRATITUDE_WORDS
+            or any(w in lower_text for w in ["rahmat", "raxmat", "tashakkur", "раҳмат", "спасибо"])
+        ) and not any(w in lower_text for w in ["lekin", "ammo", "ishlamadi", "ishlamayapti", "qarz", "xato"])
+
+        if is_gratitude:
+            user_memory.clear_issue_mode(chat_id, user_id)
+            user_memory.clear_escalation(chat_id, user_id)
+            user_memory.set_last_topic(chat_id, user_id, "resolved")
+            gratitude_msg = (
+                "😊 <b>Arzimaydi! Sizga yordam bera olganimizdan xursandmiz.</b>\n\n"
+                "«Mars» elektron xizmat ko'rsatish markazi doimo xizmatingizda. Yana savollaringiz yoki kassa apparatingiz bo'yicha yordam kerak bo'lsa, bemalol murojaat qiling! Salomat bo'ling! 🤝"
+            )
+            gratitude_msg = adapt_to_user_script(gratitude_msg, user_script)
+            try:
+                await message.reply(gratitude_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(gratitude_msg)
+            user_memory.add_user_message(chat_id, user_id, raw_text)
+            user_memory.add_assistant_message(chat_id, user_id, gratitude_msg)
+            return True
+
+        # =====================================================================
         # 3-QADAM: USTA / ADMIN CHAQIRISH YOKI GAPNI CHO'ZISH (Eskalatsiya qoidasi)
         # =====================================================================
         is_command = clean_text.startswith("/")
@@ -444,7 +474,7 @@ class GroupResponseOrchestrator:
         # Agar yuqoridagi 1-7 qadamlardagi aniq qoidalarning hech biriga tushmagan bo'lsa
         # va foydalanuvchi allaqachon 4 martadan ortiq yozishma qilib gapni cho'zayotgan bo'lsa -> Adminga!
         turn_cnt = user_memory.get_user_turn_count(chat_id, user_id)
-        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not is_greeting and not found_inn and not found_fm and not is_command:
+        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not is_pure_greeting and not is_gratitude and not found_inn and not found_fm and not is_command:
             from catalog_manager import catalog_manager
             if not catalog_manager.find_post_by_keywords(clean_text):
                 user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / uzoq suhbat")

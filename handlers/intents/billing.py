@@ -381,6 +381,47 @@ class BillingIntentHandler:
             user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
             return True
 
+        # 2.2.1 Yangi Texnologiyalar DUK nimaligi haqidagi savollar
+        if any(p in lower_text for p in [
+            "yangi texnologiyalar nima", "yangi texnologiyalar u nima", "yangi texnologiyalar kim",
+            "yangi texnologiyalar haqida", "qanaqa yangi texnologiyalar", "yangi texnologiya nima",
+            "янги технологиялар нима", "янги технологиялар ким", "янги технологиялар ҳақида", "қанақа янги технологиялар"
+        ]):
+            yt_text = (
+                "🏛 <b>«Yangi Texnologiyalar» Ilmiy-axborot markazi DUK haqida:</b>\n\n"
+                "Bu — Oʻzbekiston Respublikasi <b>Davlat soliq qoʻmitasi huzuridagi davlat unitar korxonasi</b> (OFD operatori) hisoblanadi.\n\n"
+                "📌 <b>Vazifasi:</b> Barcha Onlayn-NKM va virtual kassalarning Fiskal modul litsenziyasi va cheklarini Soliq bazasiga uzatilishini taʼminlaydi.\n"
+                "💰 <b>Yillik litsenziya toʻlovi:</b> 440 000 soʻm (Har yili toʻgʻridan-toʻgʻri ushbu davlat korxonasi hisobiga toʻlanadi).\n\n"
+                "👇 <i>Quyida Davlat Soliq Qoʻmitasi huzuridagi «Yangi Texnologiyalar» DUK hisobiga toʻlash tartibi va video yoʻriqnoma keltirilgan:</i>"
+            )
+            yt_text = adapt_to_user_script(yt_text, user_script)
+            try:
+                await message.reply(yt_text, parse_mode="HTML")
+            except Exception:
+                await message.reply(yt_text)
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=SOLIQ_POST_ID,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"Soliq postini yuborishda xatolik: {e}")
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=VIDEO_YILLIK_ID,
+                    reply_to_message_id=message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"Yillik videoni yuborishda xatolik: {e}")
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, yt_text)
+            user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
+            return True
+
         # 2.3 Hisob raqamlar postini kanaldan uzatish / to'lov intentlari ("oylikchi", "yillikchi", "to'layman", "shot tashla")
         is_in_payment_card_context = last_topic in (
             "payment_info_both",
