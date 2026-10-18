@@ -335,13 +335,14 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "yillik to'layman", "yillik tolayman", "yillik tulayman",
         "yangi texnologiyalar", "yillik qancha", "yillikka qancha", "yillik to'lov qancha", "yillik tolov qancha",
         "yillik narxi", "yillik narxi qancha", "yillik necha pul", "yillik summa", "440000", "440 000",
+        "yillikka qancha to'layman", "yillikka qancha tolayman", "yillik qancha to'layman", "yillik qancha tolayman",
         "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
         "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
         "йиллик тўлов шот", "йиллик толов шот", "янги технологиялар",
         "йиллик тўламоқчиман", "йиллик толамокчиман", "йиллик туламокчиман",
         "йиллик тўлайман", "йиллик толайман", "йиллик тўлаш", "йиллик толаш",
         "йиллик қанча", "йиллик канча", "йилликка қанча", "йиллик тўлов қанча", "йиллик толов қанча",
-        "йиллик неча пул", "йиллик нархи", "йиллик нархи қанча"
+        "йиллик неча пул", "йиллик нархи", "йиллик нархи қанча", "йилликка қанча тўлайман", "йилликка қанча толайман"
     ])
 
     # Oylik to'lov alomatlari (Lotin va Kirill)
@@ -351,6 +352,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "oylik to'lov shot", "oylik tolov shot", "oylik to'lov kartasi",
         "oylik qancha", "oylikka qancha", "oylik to'lov qancha", "oylik tolov qancha",
         "oylik narxi", "oylik narxi qancha", "oylik necha pul", "oylik summa", "100000", "100 000",
+        "oylikka qancha to'layman", "oylikka qancha tolayman", "oylik qancha to'layman", "oylik qancha tolayman",
         "oylik to'lash", "oylik tolash",
         "oylik to'lamoqchiman", "oylik tolamoqchiman", "oylik tulamoqchiman",
         "oylik to'layman", "oylik tolayman", "oylik tulayman",
@@ -361,7 +363,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "ойлик тўлайман", "ойлик толайман", "ойлик тулайман",
         "ойлик тўлаш", "ойлик толаш",
         "ойлик қанча", "ойликка қанча", "ойлик тўлов қанча", "ойлик толов қанча",
-        "ойлик неча пул", "ойлик нархи", "ойлик нархи қанча"
+        "ойлик неча пул", "ойлик нархи", "ойлик нархи қанча", "ойликка қанча тўлайман", "ойликка қанча толайман"
     ])
 
     has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
