@@ -412,7 +412,7 @@ async def _process_fiscal_receipt_content(
 
     # Qarz bo'lsa hisob raqamni matnda yozmasdan, kanaldan rasmiy post uzatiladi
     if has_monthly_debt:
-        from payment_accounts import MARS_POST_ID, MARS_VIDEO_ID
+        from payment_accounts import MARS_POST_ID
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
@@ -420,26 +420,16 @@ async def _process_fiscal_receipt_content(
                 message_id=MARS_POST_ID,
                 reply_to_message_id=message.message_id
             )
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=MARS_VIDEO_ID
-            )
         except Exception as e:
             logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
 
     if has_annual_debt:
-        from payment_accounts import YANGI_TEXNOLOGIYALAR_POST_ID, YANGI_TEXNOLOGIYALAR_VIDEO_ID
+        from payment_accounts import YANGI_TEXNOLOGIYALAR_POST_ID
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=SOURCE_CHANNEL_ID,
                 message_id=YANGI_TEXNOLOGIYALAR_POST_ID
-            )
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
             )
         except Exception as e:
             logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")

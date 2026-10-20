@@ -787,14 +787,19 @@ class BillingIntentHandler:
                         monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
                         await message.reply(monthly_card, parse_mode="HTML")
 
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Video 148 nusxalashda xatolik: {e}")
+                wants_video = any(w in lower_text for w in [
+                    "video", "videosi", "qanday", "qanaqa", "tartibi", "o'rgating", "orgating", "ko'rsating", "korsating",
+                    "видео", "қандай", "кандай", "ўргатинг", "ургатинг"
+                ])
+                if wants_video:
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=MARS_VIDEO_ID
+                        )
+                    except Exception as e:
+                        logger.warning(f"Video 148 nusxalashda xatolik: {e}")
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
@@ -855,14 +860,19 @@ class BillingIntentHandler:
                     annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
                     await message.reply(annual_card, parse_mode="HTML")
 
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Video 145 nusxalashda xatolik: {e}")
+                wants_video = any(w in lower_text for w in [
+                    "video", "videosi", "qanday", "qanaqa", "tartibi", "o'rgating", "orgating", "ko'rsating", "korsating",
+                    "видео", "қандай", "кандай", "ўргатинг", "ургатинг"
+                ])
+                if wants_video:
+                    try:
+                        await bot.copy_message(
+                            chat_id=message.chat.id,
+                            from_chat_id=SOURCE_CHANNEL_ID,
+                            message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
+                        )
+                    except Exception as e:
+                        logger.warning(f"Video 145 nusxalashda xatolik: {e}")
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot posti (34) kanaldan uzatildi]")
@@ -937,11 +947,6 @@ class BillingIntentHandler:
                             from_chat_id=SOURCE_CHANNEL_ID,
                             message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
                             reply_to_message_id=message.message_id
-                        )
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
                         )
                     except Exception as e:
                         logger.warning(f"Post 34 nusxalashda xatolik: {e}")
@@ -1114,11 +1119,6 @@ class BillingIntentHandler:
                             from_chat_id=SOURCE_CHANNEL_ID,
                             message_id=MARS_POST_ID,
                             reply_to_message_id=message.message_id
-                        )
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=MARS_VIDEO_ID
                         )
                     except Exception as e:
                         logger.warning(f"Oylik shot postini uzatishda xatolik: {e}")

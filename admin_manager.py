@@ -178,9 +178,7 @@ class AdminManager:
     ):
         """Hududiy mas'ul adminga, bosh adminlarga va bildirishnoma kanaliga xabar (rasmi bilan) yuborish"""
         from modules.admin_module import regional_admin_service
-        caption_text = short_caption or text
-        if len(caption_text) > 1024:
-            caption_text = caption_text[:1020] + "..."
+        raw_caption = short_caption or text
 
         targets = regional_admin_service.get_target_admin_ids_for_escalation(
             inn=inn,
@@ -192,21 +190,40 @@ class AdminManager:
         for target_id in targets:
             try:
                 if photo_file_id:
-                    await bot.send_photo(
-                        chat_id=target_id,
-                        photo=photo_file_id,
-                        caption=caption_text,
-                        parse_mode="HTML",
-                        reply_markup=reply_markup
-                    )
+                    if len(raw_caption) <= 1000:
+                        await bot.send_photo(
+                            chat_id=target_id,
+                            photo=photo_file_id,
+                            caption=raw_caption,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
+                        )
+                    else:
+                        # Rasm va uzun matnni ajratib yuborish (HTML buzilmasligi uchun)
+                        await bot.send_photo(chat_id=target_id, photo=photo_file_id)
+                        await bot.send_message(
+                            chat_id=target_id,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
+                        )
                 elif document_file_id:
-                    await bot.send_document(
-                        chat_id=target_id,
-                        document=document_file_id,
-                        caption=caption_text,
-                        parse_mode="HTML",
-                        reply_markup=reply_markup
-                    )
+                    if len(raw_caption) <= 1000:
+                        await bot.send_document(
+                            chat_id=target_id,
+                            document=document_file_id,
+                            caption=raw_caption,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
+                        )
+                    else:
+                        await bot.send_document(chat_id=target_id, document=document_file_id)
+                        await bot.send_message(
+                            chat_id=target_id,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup
+                        )
                 else:
                     await bot.send_message(
                         chat_id=target_id,
@@ -215,7 +232,17 @@ class AdminManager:
                         reply_markup=reply_markup
                     )
             except Exception as e:
-                logger.warning(f"Adminga ({target_id}) xabarnoma yuborishda xatolik: {e}")
+                logger.warning(f"Adminga ({target_id}) xabarnoma yuborishda xatolik: {e}. Qayta urinish (plain text)...")
+                try:
+                    # Agar HTML entity parsing xatolik bersa, oddiy matn sifatida yuborish
+                    clean_text = text.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
+                    await bot.send_message(
+                        chat_id=target_id,
+                        text=clean_text[:4000],
+                        reply_markup=reply_markup
+                    )
+                except Exception as e2:
+                    logger.error(f"Adminga ({target_id}) xabar umuman yetib bormadi: {e2}")
 
     async def notify_receipt_escalation(
         self,
@@ -298,118 +325,93 @@ class AdminManager:
                 f"<i>(Chekda INN ko'rsatilmagan yoki '000' bo'sh qoldirilgan. Mijozdan INN so'ralmoqda)</i>"
             )
 
+        import html
+        user_name_esc = html.escape(user_name)
+        org_name_esc = html.escape(org_name)
+        session_org_esc = html.escape(session_org_name)
+        comment_esc = html.escape(user_comment) if user_comment else ""
+
         target_fm = debt_status_info.get("fiscal_module")
-        fm_admin_line = f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n" if target_fm else ""
-        bank_caution = "\n⚠️ <i>Apparatni yoqishdan oldin pul bank hisobiga tushganini tekshiring!</i>\n" if not is_old and debt_covered else ""
+        fm_admin_line = f"🏛 <b>FM:</b> <code>{target_fm}</code>\n" if target_fm else ""
+        bank_caution = "⚠️ <i>Apparatni yoqishdan oldin bank hisobini tekshiring!</i>\n" if (not is_old and debt_covered) else ""
+
+        fraud_header = ""
+        if is_dup:
+            tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
+            fraud_header += f"🚨 <b>DUBLIKAT CHEK (ID: <code>{tx_id}</code>)</b>\n"
+        if is_old:
+            fraud_header += f"⚠️ <b>ESKI KVITANSIYA ({warn})</b>\n"
+        if inn_mismatch:
+            fraud_header += f"🚨 <b>INN MOS EMAS:</b> Suhbatda <code>{session_inn}</code> ({session_debt:,.0f} so'm), chekda <code>{inn}</code>\n"
+
+        pay_date = getattr(receipt_facts, "payment_date", "")
+        date_line = f"📅 <b>Sana:</b> {pay_date}{' (ESKI)' if is_old else ''}\n" if pay_date else ""
+        user_comment_str = f"💬 <b>Izoh:</b> <i>{comment_esc}</i>\n" if comment_esc else ""
+
+        if inn and inn != "000":
+            inn_line = f"<code>{inn}</code>"
+            bottom_inn_block = f"📋 <code>{session_inn if (inn_mismatch and session_inn) else inn}</code>"
+        else:
+            inn_line = "❌ Topilmadi"
+            bottom_inn_block = "⚠️ <i>INN topilmadi, mijozdan so'ralmoqda</i>"
 
         if is_annual:
-            status_emoji = "⚠️" if is_old else "🏛"
-            status_text = (
-                f"<b>ESKI KVITANSIYA — YILLIK FISKAL MODUL TO'LOVI ({warn})</b>"
-                if is_old else
-                "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
-            )
-            header_title = "⚠️ <b>ESKI YILLIK TO'LOV KVITANSIYASI!</b>" if is_old else "🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>"
-            text = (
-                f"{header_title}\n\n"
+            status_text = f"ESKI ({warn})" if is_old else "YILLIK TO'LOV"
+            title = "⚠️ <b>ESKI YILLIK TO'LOV!</b>" if is_old else "🏛 <b>YILLIK TO'LOV KVITANSIYASI!</b>"
+            
+            compact_msg = (
+                f"{title}\n"
                 f"{fraud_header}"
-                f"{summa_line}"
-                f"{date_line}"
-                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
-                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"👤 {user_name_esc} ({user_username})\n"
+                f"💵 <b>{paid_amount:,.0f} so'm</b> | {date_line}"
+                f"🏢 <b>{org_name_esc}</b> (INN: {inn_line})\n"
                 f"{fm_admin_line}"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
-                f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
-                f"────────────────────\n"
-                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
-                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-                f"{user_comment_str}\n"
-                f"{bottom_inn_block}"
+                f"📌 <b>Holat:</b> {status_text}\n"
+                f"🔢 <b>Chek:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code> ({getattr(receipt_facts, 'payment_system', '') or 'Bank'})\n"
+                f"{user_comment_str}"
+                f"📋 <b>INN:</b> {bottom_inn_block}"
             )
-            short_caption = (
-                f"{header_title}\n\n"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"{summa_line}"
-                f"{date_line}"
-                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
-                f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
-                f"{fm_admin_line}"
-                f"{tuman_line}"
-                f"{reg_admin_line}"
-                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
-                f"{bottom_inn_block}"
-            )
+            text = compact_msg
+            short_caption = compact_msg
         else:
             if is_inn_missing:
-                status_emoji = "⚠️"
-                status_text = "<b>KVITANSIYADA INN TOPILMADI (Mijozdan INN so'ralmoqda)</b>"
+                status_text = "⚠️ INN TOPILMADI (so'ralmoqda)"
                 if is_old:
-                    status_text += f" | <b>ESKI KVITANSIYA ({warn})</b>"
+                    status_text += f" | ESKI ({warn})"
             elif is_old:
-                status_emoji = "⚠️"
-                status_text = f"<b>ESKI KVITANSIYA!</b> ({warn} — Bazadagi joriy qarz: <b>{prev_debt:,.0f} so'm</b>)"
+                status_text = f"⚠️ ESKI (Qarz: {prev_debt:,.0f} so'm)"
             elif inn_mismatch:
-                status_emoji = "🚨"
-                status_text = f"<b>INN MOS EMAS!</b> (Suhbatdagi INN: <code>{session_inn}</code>, qarzi: <b>{session_debt:,.0f} so'm</b>)"
+                status_text = f"🚨 INN MOS EMAS (Suhbatda: {session_inn})"
             elif not inn_in_db:
-                status_emoji = "⚠️"
-                status_text = f"<b>INN (<code>{inn}</code>) EXCEL BAZADAN TOPILMADI</b>"
+                status_text = "⚠️ INN BAZADA YO'Q"
             elif debt_covered and prev_debt > 0:
-                status_emoji = "✅"
-                status_text = f"<b>BUGUNGI TO'LOV — QARZNI TO'LIQ YOPADI</b> (Avvalgi qarz: {prev_debt:,.0f} so'm)"
+                status_text = f"✅ QARZNI YOPADI (Qarz: {prev_debt:,.0f} so'm)"
             elif prev_debt > 0 and paid_amount < prev_debt:
-                status_emoji = "⚠️"
-                status_text = f"<b>BUGUNGI TO'LOV — QARZNI TO'LIQ YOPMAYDI</b> (Qolgan qarz: {remaining_debt:,.0f} so'm)"
+                status_text = f"⚠️ QARZNI YOPMAYDI (Qoldiq: {remaining_debt:,.0f} so'm)"
             else:
-                status_emoji = "🟢"
-                status_text = "<b>BUGUNGI TO'LOV — BAZADA AVVAL QARZ BO'LMAGAN (0 so'm)</b>"
+                status_text = "🟢 BAZADA QARZ YO'Q (0 so'm)"
 
-            header_title = "⚠️ <b>ESKI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>" if is_old else "🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>"
-            short_title = "⚠️ <b>ESKI TO'LOV KVITANSIYASI!</b>" if is_old else "🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>"
-            mismatch_short = f"⚠️ <b>Suhbatdagi INN:</b> <code>{session_inn}</code> ({session_debt:,.0f} so'm qarz)\n" if inn_mismatch else ""
+            title = "⚠️ <b>ESKI TO'LOV!</b>" if is_old else "🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>"
 
-            text = (
-                f"{header_title}\n\n"
+            compact_msg = (
+                f"{title}\n"
                 f"{fraud_header}"
-                f"{summa_line}"
+                f"👤 {user_name_esc} ({user_username})\n"
+                f"💵 <b>To'langan:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"{date_line}"
-                f"🔢 <b>Kvitansiyadagi INN:</b> {inn_line}\n"
-                f"🏢 <b>Kvitansiyadagi korxona:</b> <b>{org_name}</b>\n"
+                f"🏢 <b>{org_name_esc}</b> (INN: {inn_line})\n"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
-                f"{purpose_line}"
-                f"────────────────────\n"
-                f"📊 <b>Qarz bilan solishtiruv:</b>\n"
-                f"▫️ Kunlik bazadagi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
-                f"▫️ Holat: {status_emoji} {status_text}\n"
+                f"📊 <b>Qarz:</b> <b>{prev_debt:,.0f} so'm</b> | <b>Xulosa:</b> {status_text}\n"
                 f"{bank_caution}"
-                f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
-                f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
-                f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-                f"{user_comment_str}\n"
-                f"{bottom_inn_block}"
+                f"🔢 <b>Chek ID:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code> ({getattr(receipt_facts, 'payment_system', '') or 'Bank'})\n"
+                f"{user_comment_str}"
+                f"📋 <b>INN nusxa:</b> {bottom_inn_block}"
             )
-            short_caption = (
-                f"{short_title}\n\n"
-                f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-                f"{summa_line}"
-                f"{date_line}"
-                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"{mismatch_short}"
-                f"{tuman_line}"
-                f"{reg_admin_line}"
-                f"📊 <b>Bazadagi qarz:</b> <b>{prev_debt:,.0f} so'm</b>\n"
-                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
-                f"{bank_caution}\n"
-                f"{bottom_inn_block}"
-            )
+            text = compact_msg
+            short_caption = compact_msg
 
         photo_id = file_id if is_photo else None
         doc_id = file_id if not is_photo else None

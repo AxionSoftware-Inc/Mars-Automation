@@ -74,27 +74,17 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
         monthly_rate = 100000.0 * device_count
         pay_year_end = total_debt + (remaining_months * monthly_rate)
 
-        text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
-        text += "⚠️ <i>Apparat ishlamay qolganining sababi oylik abonent to'lovidagi qarzdorlik!</i>\n\n"
-        text += "💡 <b>Apparat uzluksiz ishlashi uchun to'lov miqdori:</b>\n"
-        text += f"🔹 <b>Shu oy ({current_month_name}) ishlashi uchun:</b> <code>{total_debt:,.0f}</code> so'm\n"
+        text += f"🔴 <b>Qarzdorlik: {total_debt:,.0f} so'm</b>\n\n"
         if remaining_months > 0:
-            text += f"🔹 <b>Yil oxirigacha (Dekabrgacha) ishlashi uchun:</b> <code>{pay_year_end:,.0f}</code> so'm\n"
-        text += (
-            "💳 <b>To'lov uchun rasmiy hisob raqam va video-qo'llanma quyida kanaldan uzatildi:</b>\n"
-            "👇 <i>To'lov qilgach kvitansiyani shu yerga yuborishingiz mumkin.</i>\n\n"
-        )
-        # Agar aynan shu mijoz yaqinda kvitansiya yuborgan bo'lsa
+            text += f"▫️ <b>Hozirgi qarz ({current_month_name}):</b> <code>{total_debt:,.0f}</code> so'm\n"
+            text += f"▫️ <b>Yil oxirigacha (Dekabr):</b> <code>{pay_year_end:,.0f}</code> so'm\n\n"
+        text += "💳 <i>To'lov uchun hisob raqam quyida keltirildi. To'lov qilgach kvitansiyani yuborishingiz mumkin.</i>"
+        
         last_rec = user_memory.get_last_receipt(chat_id=chat_id, user_id=user_id) if (chat_id and user_id) else None
         if last_rec and (not last_rec.get("inn") or last_rec.get("inn") == inn):
             text += (
-                "💡 <b>Eslatma:</b> <i>To'lov kvitansiyangiz avval mas'ul adminga yetkazilgan. "
-                "Kunlik hisobot yangilanishi sababli, apparat admin tomonidan yoqiladi va to'lov keyingi kunlik hisobotda aks etadi.</i>"
-            )
-        else:
-            text += (
-                "💡 <i>Agar to'lovni yaqinda (bugun) amalga oshirgan bo'lsangiz, "
-                "to'lov chekini (kvitansiyasini) shu yerga yuboring — mas'ul adminimiz ko'rib, apparatingizni yoqib beradi.</i>"
+                "\n\n💡 <b>Eslatma:</b> <i>Kvitansiyangiz adminga yetkazilgan. Baza har kuni yangilanishi sababli, "
+                "apparat admin tomonidan yoqiladi va to'lov keyingi hisobotda aks etadi.</i>"
             )
     elif total_debt < 0:
         text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
@@ -291,15 +281,6 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
             )
         except Exception as e:
             logger.error(f"Oylik hisob raqam postini (85) nusxalashda xatolik: {e}")
-
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=MARS_VIDEO_ID
-            )
-        except Exception as e:
-            logger.error(f"To'lov videosini (148) nusxalashda xatolik: {e}")
     elif is_in_issue:
         from payment_accounts import FISKAL_MODUL_SAMPLE_POST_ID
         try:
