@@ -40,5 +40,40 @@
     "amount": 100000.0,
     "user_id": 778899,
     "payment_date": ""
+  },
+  "txnoinn777": {
+    "recorded_at": "2026-10-19 23:21:38",
+    "inn": "302568138",
+    "amount": 100000.0,
+    "user_id": 800007,
+    "payment_date": ""
+  },
+  "txpartial001": {
+    "recorded_at": "2026-10-20 12:11:51",
+    "inn": "307314860",
+    "amount": 100000.0,
+    "user_id": 99887766,
+    "payment_date": "20.10.2026"
+  },
+  "txfull002": {
+    "recorded_at": "2026-10-20 12:11:51",
+    "inn": "307314860",
+    "amount": 2100000.0,
+    "user_id": 99887766,
+    "payment_date": "20.10.2026"
+  },
+  "txparta": {
+    "recorded_at": "2026-10-20 13:03:06",
+    "inn": "307314860",
+    "amount": 1000000.0,
+    "user_id": 99887766,
+    "payment_date": "20.10.2026"
+  },
+  "txpartb": {
+    "recorded_at": "2026-10-20 13:03:06",
+    "inn": "307314860",
+    "amount": 1100000.0,
+    "user_id": 99887766,
+    "payment_date": "20.10.2026"
   }
 }

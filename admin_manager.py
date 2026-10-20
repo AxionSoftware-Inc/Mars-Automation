@@ -240,14 +240,20 @@ class AdminManager:
         org_name = debt_status_info.get("org_name") or getattr(receipt_facts, "payer_name", "") or "Aniqlanmadi"
         inn = getattr(receipt_facts, "payer_inn", "") or debt_status_info.get("inn", "")
         debt_covered = debt_status_info.get("debt_covered", False)
-        is_inn_missing = debt_status_info.get("is_inn_missing", False)
+        is_inn_missing = bool(debt_status_info.get("is_inn_missing", False) or debt_status_info.get("inn_missing", False))
         is_annual = getattr(receipt_facts, "is_annual_fiscal_fee", False) or debt_status_info.get("is_annual", False)
         is_old = getattr(receipt_facts, "is_old_receipt", False) or debt_status_info.get("is_old_receipt", False)
         is_dup = getattr(receipt_facts, "is_duplicate", False) or debt_status_info.get("is_duplicate", False)
 
+        inn_mismatch = bool(debt_status_info.get("inn_mismatch", False))
+        session_inn = debt_status_info.get("session_inn") or ""
+        session_org_name = debt_status_info.get("session_org_name") or ""
+        session_debt = float(debt_status_info.get("session_debt", 0.0) or 0.0)
+        inn_in_db = bool(debt_status_info.get("inn_in_db", True))
+
         from excel_manager import excel_manager
         tuman = debt_status_info.get("tuman") or (excel_manager.get_district_for_inn(inn) if inn else "")
-        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
+        reg_admin = self.get_region_admin_info(inn=session_inn or inn, tuman=tuman)
         reg_admin_line = ""
         if reg_admin:
             ra_user = (reg_admin.get("username") or "").replace("@", "")
@@ -259,24 +265,31 @@ class AdminManager:
         payment_purpose = getattr(receipt_facts, "payment_purpose", None) or debt_status_info.get("payment_purpose", "monthly_subscription")
         purpose_line = f"🎯 <b>To'lov maqsadi:</b> <b>{purpose_label}</b>\n" if (purpose_label and payment_purpose != "monthly_subscription") else ""
 
+        warn = getattr(receipt_facts, "old_receipt_warning", "") or debt_status_info.get("old_receipt_warning", "") or "Kvitansiya sanasi bugungi emas"
         fraud_header = ""
         if is_dup:
             tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
             fraud_header += f"🚨 <b>OGOHLANTIRISH: DUBLIKAT TRANZAKSIYA!</b>\nUshbu chek (ID: <code>{tx_id}</code>) avval ham tizimga yuborilgan!\n\n"
         if is_old:
-            warn = getattr(receipt_facts, "old_receipt_warning", "") or debt_status_info.get("old_receipt_warning", "") or "Eski sana"
-            fraud_header += f"⚠️ <b>DIQQAT: KVITANSIYA SANASI ESKI ({warn})!</b>\n\n"
+            fraud_header += f"⚠️ <b>DIQQAT: ESKI KVITANSIYA! ({warn})</b>\n\n"
+        if inn_mismatch:
+            fraud_header += (
+                f"🚨 <b>DIQQAT: INN MOS EMAS!</b>\n"
+                f"Mijoz suhbatda <b>{session_org_name or 'Korxona'}</b> (INN: <code>{session_inn}</code>, qarzi: <b>{session_debt:,.0f} so'm</b>) bo'yicha yozayotgan edi, "
+                f"lekin kvitansiyada boshqa INN (<code>{inn}</code>) ko'rsatilgan!\n\n"
+            )
 
         summa_line = f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
         pay_date = getattr(receipt_facts, "payment_date", "")
-        date_line = f"📅 <b>To'lov vaqti:</b> {pay_date}\n" if pay_date else ""
+        date_tag = " <i>(ESKI SANA)</i>" if is_old else " <i>(Bugungi)</i>"
+        date_line = f"📅 <b>Kvitansiya sanasi:</b> {pay_date}{date_tag}\n" if pay_date else "📅 <b>Kvitansiya sanasi:</b> Ko'rsatilmagan\n"
         user_comment_str = f"💬 <b>Mijoz izohi:</b> <i>{user_comment}</i>\n" if user_comment else ""
 
         if inn and inn != "000":
             inn_line = f"<code>{inn}</code>"
             bottom_inn_block = (
                 f"📋 <b>INN (nusxa olish uchun):</b>\n"
-                f"<code>{inn}</code>"
+                f"<code>{session_inn if (inn_mismatch and session_inn) else inn}</code>"
             )
         else:
             inn_line = "❌ Topilmadi (Chekda yo'q yoki 000)"
@@ -285,16 +298,26 @@ class AdminManager:
                 f"<i>(Chekda INN ko'rsatilmagan yoki '000' bo'sh qoldirilgan. Mijozdan INN so'ralmoqda)</i>"
             )
 
+        target_fm = debt_status_info.get("fiscal_module")
+        fm_admin_line = f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n" if target_fm else ""
+        bank_caution = "\n⚠️ <i>Apparatni yoqishdan oldin pul bank hisobiga tushganini tekshiring!</i>\n" if not is_old and debt_covered else ""
+
         if is_annual:
-            status_emoji = "🏛"
-            status_text = "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
+            status_emoji = "⚠️" if is_old else "🏛"
+            status_text = (
+                f"<b>ESKI KVITANSIYA — YILLIK FISKAL MODUL TO'LOVI ({warn})</b>"
+                if is_old else
+                "<b>YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)</b>"
+            )
+            header_title = "⚠️ <b>ESKI YILLIK TO'LOV KVITANSIYASI!</b>" if is_old else "🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>"
             text = (
-                f"🏛 <b>YANGI YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
+                f"{header_title}\n\n"
                 f"{fraud_header}"
                 f"{summa_line}"
                 f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"{fm_admin_line}"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
                 f"🏦 <b>Qabul qiluvchi:</b> «Yangi Texnologiyalar» DUK (<code>20210000100431200010</code>)\n"
@@ -304,17 +327,17 @@ class AdminManager:
                 f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-                f"{user_comment_str}"
-                f"⏳ <i>Eslatma: Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) to'lovni 2-24 soat ichida faollashtiradi.</i>\n\n"
+                f"{user_comment_str}\n"
                 f"{bottom_inn_block}"
             )
             short_caption = (
-                f"🏛 <b>YILLIK FISKAL MODUL TO'LOVI KVITANSIYASI!</b>\n\n"
+                f"{header_title}\n\n"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"{summa_line}"
                 f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>To'lovchi:</b> <b>{org_name}</b>\n"
+                f"{fm_admin_line}"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
                 f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
@@ -324,49 +347,67 @@ class AdminManager:
             if is_inn_missing:
                 status_emoji = "⚠️"
                 status_text = "<b>KVITANSIYADA INN TOPILMADI (Mijozdan INN so'ralmoqda)</b>"
-            elif debt_covered:
+                if is_old:
+                    status_text += f" | <b>ESKI KVITANSIYA ({warn})</b>"
+            elif is_old:
+                status_emoji = "⚠️"
+                status_text = f"<b>ESKI KVITANSIYA!</b> ({warn} — Bazadagi joriy qarz: <b>{prev_debt:,.0f} so'm</b>)"
+            elif inn_mismatch:
+                status_emoji = "🚨"
+                status_text = f"<b>INN MOS EMAS!</b> (Suhbatdagi INN: <code>{session_inn}</code>, qarzi: <b>{session_debt:,.0f} so'm</b>)"
+            elif not inn_in_db:
+                status_emoji = "⚠️"
+                status_text = f"<b>INN (<code>{inn}</code>) EXCEL BAZADAN TOPILMADI</b>"
+            elif debt_covered and prev_debt > 0:
                 status_emoji = "✅"
-                status_text = "<b>QARZ TO'LIQ YOPILDI (Apparatni yoqish mumkin!)</b>"
+                status_text = f"<b>BUGUNGI TO'LOV — QARZNI TO'LIQ YOPADI</b> (Avvalgi qarz: {prev_debt:,.0f} so'm)"
             elif prev_debt > 0 and paid_amount < prev_debt:
                 status_emoji = "⚠️"
-                status_text = f"<b>QISMAN TO'LANDI</b> (Qolgan qarz: {remaining_debt:,.0f} so'm)"
+                status_text = f"<b>BUGUNGI TO'LOV — QARZNI TO'LIQ YOPMAYDI</b> (Qolgan qarz: {remaining_debt:,.0f} so'm)"
             else:
                 status_emoji = "🟢"
-                status_text = "<b>AVANS / QARZSIZ TO'LOV</b> (Avval qarz bo'lmagan)"
+                status_text = "<b>BUGUNGI TO'LOV — BAZADA AVVAL QARZ BO'LMAGAN (0 so'm)</b>"
+
+            header_title = "⚠️ <b>ESKI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>" if is_old else "🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>"
+            short_title = "⚠️ <b>ESKI TO'LOV KVITANSIYASI!</b>" if is_old else "🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>"
+            mismatch_short = f"⚠️ <b>Suhbatdagi INN:</b> <code>{session_inn}</code> ({session_debt:,.0f} so'm qarz)\n" if inn_mismatch else ""
 
             text = (
-                f"🧾 <b>YANGI TO'LOV KVITANSIYASI KELIB TUSHDI!</b>\n\n"
+                f"{header_title}\n\n"
                 f"{fraud_header}"
                 f"{summa_line}"
                 f"{date_line}"
-                f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"🔢 <b>Kvitansiyadagi INN:</b> {inn_line}\n"
+                f"🏢 <b>Kvitansiyadagi korxona:</b> <b>{org_name}</b>\n"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
                 f"{purpose_line}"
                 f"────────────────────\n"
-                f"📊 <b>Qarz tahlili:</b>\n"
-                f"▫️ Avvalgi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
+                f"📊 <b>Qarz bilan solishtiruv:</b>\n"
+                f"▫️ Kunlik bazadagi qarz: <b>{prev_debt:,.0f} so'm</b>\n"
                 f"▫️ Holat: {status_emoji} {status_text}\n"
+                f"{bank_caution}"
                 f"🏦 <b>Qabul qiluvchi:</b> {getattr(receipt_facts, 'recipient_account', '') or '«Mars Elektron Texnika»'}\n"
                 f"💳 <b>To'lov tizimi:</b> {getattr(receipt_facts, 'payment_system', '') or 'Elektron tolov'}\n"
                 f"🔢 <b>Chek / Tranzaksiya:</b> <code>{getattr(receipt_facts, 'transaction_id', '') or '-'}</code>\n"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
                 f"{user_comment_str}\n"
-                f"{bottom_inn_block}\n\n"
-                f"⚡️ <i>Iltimos, to'lovni tasdiqlang va tizimni yangilang.</i>"
+                f"{bottom_inn_block}"
             )
             short_caption = (
-                f"🧾 <b>YANGI TO'LOV KVITANSIYASI!</b>\n\n"
+                f"{short_title}\n\n"
                 f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
                 f"{summa_line}"
                 f"{date_line}"
                 f"🔢 <b>INN / JSHSHIR:</b> {inn_line}\n"
                 f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
+                f"{mismatch_short}"
                 f"{tuman_line}"
                 f"{reg_admin_line}"
-                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n\n"
+                f"📊 <b>Bazadagi qarz:</b> <b>{prev_debt:,.0f} so'm</b>\n"
+                f"📌 <b>Holat:</b> {status_emoji} {status_text}\n"
+                f"{bank_caution}\n"
                 f"{bottom_inn_block}"
             )
 
@@ -380,7 +421,7 @@ class AdminManager:
             photo_file_id=photo_id,
             document_file_id=doc_id,
             short_caption=short_caption,
-            inn=inn,
+            inn=session_inn if (inn_mismatch and session_inn) else inn,
             tuman=tuman,
             reply_markup=admin_kb
         )

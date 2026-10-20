@@ -14,7 +14,7 @@ router = Router(name="debt_router")
 
 SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
-def format_debt_response(results: list, checked_fm: str = None, annual_status: dict = None) -> str:
+def format_debt_response(results: list, checked_fm: str = None, annual_status: dict = None, chat_id: int = 0, user_id: int = 0) -> str:
     """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
     if not results:
         return (
@@ -82,13 +82,27 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
             text += f"🔹 <b>Yil oxirigacha (Dekabrgacha) ishlashi uchun:</b> <code>{pay_year_end:,.0f}</code> so'm\n"
         text += (
             "💳 <b>To'lov uchun rasmiy hisob raqam va video-qo'llanma quyida kanaldan uzatildi:</b>\n"
-            "👇 <i>To'lov qilgach kvitansiyani shu yerga yuborishingiz mumkin.</i>"
+            "👇 <i>To'lov qilgach kvitansiyani shu yerga yuborishingiz mumkin.</i>\n\n"
         )
+        # Agar aynan shu mijoz yaqinda kvitansiya yuborgan bo'lsa
+        last_rec = user_memory.get_last_receipt(chat_id=chat_id, user_id=user_id) if (chat_id and user_id) else None
+        if last_rec and (not last_rec.get("inn") or last_rec.get("inn") == inn):
+            text += (
+                "💡 <b>Eslatma:</b> <i>To'lov kvitansiyangiz avval mas'ul adminga yetkazilgan. "
+                "Kunlik hisobot yangilanishi sababli, apparat admin tomonidan yoqiladi va to'lov keyingi kunlik hisobotda aks etadi.</i>"
+            )
+        else:
+            text += (
+                "💡 <i>Agar to'lovni yaqinda (bugun) amalga oshirgan bo'lsangiz, "
+                "to'lov chekini (kvitansiyasini) shu yerga yuboring — mas'ul adminimiz ko'rib, apparatingizni yoqib beradi.</i>"
+            )
     elif total_debt < 0:
         text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
         text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>"
         if checked_fm and annual_status is not None:
-            if annual_status.get("has_debt"):
+            if annual_status.get("unavailable"):
+                text += f"\n⏳ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Tizim vaqtincha javob bermadi (birozdan so'ng qayta tekshiring)."
+            elif annual_status.get("has_debt"):
                 text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
             else:
                 text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
@@ -100,7 +114,9 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
     else:
         text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>"
         if checked_fm and annual_status is not None:
-            if annual_status.get("has_debt"):
+            if annual_status.get("unavailable"):
+                text += f"\n⏳ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Tizim vaqtincha javob bermadi (birozdan so'ng qayta tekshiring)."
+            elif annual_status.get("has_debt"):
                 text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
             else:
                 text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
@@ -109,6 +125,12 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
                 "\n\n🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
                 "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
             )
+
+    if inn == "302568138":
+        text += (
+            "\n\n💡 <i>Eslatma: <code>302568138</code> — «Mars Elektron Texnika» MCHJ ning o'z STIR raqami hisoblanadi. "
+            "Agar o'z korxonangiz qarzini tekshirmoqchi bo'lsangiz, korxonangizning 9 xonali STIR raqamini yuboring.</i>"
+        )
 
     return text
 
@@ -123,6 +145,24 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         if sc in ("cyrillic", "latin"):
             user_script = sc
             user_memory.detect_and_update_script(chat_id, user_id, message.text)
+
+    # 0.05 Agar mijoz «Yangi Texnologiyalar» DUK STIR raqamini (201589463) yuborgan bo'lsa
+    from payment_accounts import YANGI_TEXNOLOGIYALAR_INN
+    if query_num == YANGI_TEXNOLOGIYALAR_INN:
+        yt_inn_msg = (
+            f"⚠️ <b>Diqqat! Kiritilgan СТИР (<code>{YANGI_TEXNOLOGIYALAR_INN}</code>) — Davlat Soliq Qo'mitasi huzuridagi «Yangi Texnologiyalar» DUK ning STIR raqami hisoblanadi!</b>\n\n"
+            "Bu sizning korxonangiz STIR raqami emas (bu raqam to'lov rekvizitlarida qabul qiluvchi tashkilot STIRi sifatida yozilgan).\n\n"
+            "👉 <b>O'zingizning korxonangiz qarzini tekshirish uchun:</b> Korxonangiz guvohnomasidagi yoki kassa cheki yuqorisidagi <b>9 xonali STIR (INN)</b> raqamingizni yuboring.\n"
+            "👉 <b>Yillik Soliq (OFD) litsenziyasini tekshirish uchun:</b> Kassa chekining eng pastki qismidagi <b>Fiskal modul (LG..., YG...)</b> raqamini yuboring."
+        )
+        yt_inn_msg = adapt_to_user_script(yt_inn_msg, user_script)
+        try:
+            await message.reply(yt_inn_msg, parse_mode="HTML")
+        except Exception:
+            await message.reply(yt_inn_msg)
+        user_memory.add_user_message(chat_id, user_id, f"Mening qidiruv raqamim (INN/Tel): {query_num}")
+        user_memory.add_assistant_message(chat_id, user_id, yt_inn_msg)
+        return
 
     # 0. Agar foydalanuvchi avval kvitansiya yuklagan bo'lsa, uni avtomatik bog'lash
     from core import core_engine
@@ -183,24 +223,25 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     org_name = results[0].get("name", "") if results else ""
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
 
-    # Xotiraga korxona va qarz ma'lumotlarini eslab qolish:
-    # Agar telefon orqali qidirilgan bo'lsa, asosiy INN/STIR ni ham bog'lash, aks holda kiritilgan raqamni saqlash
-    clean_p = extract_clean_phone(query_num)
-    if clean_p and query_num not in excel_manager.stir_index and query_num not in excel_manager.jshshir_index:
-        primary_id = (results[0].get("stir") if results else "") or query_num
-    else:
-        primary_id = query_num
+    # Xotiraga korxona va qarz ma'lumotlarini eslab qolish (FAQAT bazada topilgan korxonalar uchun!):
+    # Agar bazada topilmagan bo'lsa, xotiradagi eski to'g'ri INN ni buzib yubormaslik uchun saqlamaymiz.
+    if results:
+        clean_p = extract_clean_phone(query_num)
+        if clean_p and query_num not in excel_manager.stir_index and query_num not in excel_manager.jshshir_index:
+            primary_id = (results[0].get("stir") if results else "") or query_num
+        else:
+            primary_id = query_num
 
-    model_summary = excel_manager.get_device_model_summary(results)
-    user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt, device_models=model_summary)
-    if total_debt > 0:
-        user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
-    else:
-        user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
+        model_summary = excel_manager.get_device_model_summary(results)
+        user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt, device_models=model_summary)
+        if total_debt > 0:
+            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
+        else:
+            user_memory.set_last_topic(chat_id, user_id, "monthly_debt_clear")
 
     checked_fm = user_memory.get_last_fm(chat_id, user_id)
     annual_status = user_memory.get_annual_status(chat_id, user_id)
-    resp = format_debt_response(results, checked_fm=checked_fm, annual_status=annual_status)
+    resp = format_debt_response(results, checked_fm=checked_fm, annual_status=annual_status, chat_id=chat_id, user_id=user_id)
     pending_screen = user_memory.get_pending_device_screen(chat_id, user_id)
     if pending_screen:
         user_memory.clear_pending_device_screen(chat_id, user_id)
@@ -323,7 +364,8 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
         or bool(classify_payment_intent(message.text))
     ):
         user_id = message.from_user.id if message.from_user else 0
-        user_memory.set_last_id(message.chat.id, user_id, query_num)
+        if excel_manager.search(query_num) or excel_manager.is_decommissioned(query_num):
+            user_memory.set_last_id(message.chat.id, user_id, query_num)
         return False
 
     # Shaxsiy chatda har doim qabul qilinadi

@@ -182,13 +182,15 @@ async def handle_document(message: types.Message, bot: Bot):
                 return
 
             if decision.reply_text:
+                user_script = user_memory.get_preferred_script(chat_id, user_id)
+                reply_text = adapt_to_user_script(decision.reply_text, user_script)
                 try:
-                    await message.reply(decision.reply_text, parse_mode="HTML")
+                    await message.reply(reply_text, parse_mode="HTML")
                 except Exception:
-                    await message.reply(decision.reply_text)
+                    await message.reply(reply_text)
 
                 user_memory.add_user_message(chat_id, user_id, f"[PDF Kvitansiya] {caption}".strip())
-                user_memory.add_assistant_message(chat_id, user_id, decision.reply_text)
+                user_memory.add_assistant_message(chat_id, user_id, reply_text)
 
             # Adminga hisobot yuborish
             if decision.should_notify_admin and decision.receipt_facts:
@@ -278,44 +280,54 @@ async def _process_fiscal_receipt_content(
     has_monthly_debt = False
     debt_amount = 0.0
     model_summary = ""
+    inn_found_in_db = False
 
     if inn:
         results = excel_manager.search(inn)
         if results:
+            inn_found_in_db = True
             if not org_name:
                 org_name = results[0].get("name", "")
             debt_amount = sum(item.get("debt", 0.0) for item in results)
             has_monthly_debt = (debt_amount > 0)
             model_summary = excel_manager.get_device_model_summary(results)
+        elif excel_manager.is_decommissioned(inn):
+            inn_found_in_db = True
         else:
             debt_res = excel_manager.check_debt(inn)
             record = debt_res.get("record") if debt_res else None
-            if record:
+            if record and record.get("status") != "not_found":
+                inn_found_in_db = True
                 if not org_name:
                     org_name = record.get("org_name", "")
                 debt_amount = float(record.get("debt_amount", 0.0) or 0.0)
                 has_monthly_debt = (record.get("status") == "qarzdor" or debt_amount > 0)
 
     # 2. Davlat Soliq (OFD) yillik litsenziyasi holati (440 000 so'm/yil)
+    from payment_accounts import parse_ofd_reply_status
     has_annual_debt = False
-    ofd_details = "To'langan va faol"
+    ofd_status = "not_checked"
+    ofd_details = ""
     if fm:
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, fm)
-        if ofd_reply:
-            lower_ofd = ofd_reply.lower()
-            has_no_debt = any(w in lower_ofd for w in ["qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"])
-            if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan"]):
-                has_annual_debt = True
-                ofd_details = "Qarzdorlik mavjud"
-            else:
-                ofd_details = "Faol"
+        ofd_status = parse_ofd_reply_status(ofd_reply)
+        if ofd_status == "unavailable":
+            ofd_details = "OFD tizimi vaqtincha javob bermadi"
+        elif ofd_status == "not_found":
+            ofd_details = "Fiskal modul topilmadi"
+        elif ofd_status == "debt":
+            has_annual_debt = True
+            ofd_details = "Qarzdorlik mavjud"
+        else:
+            ofd_details = "Faol"
 
     # Xotiraga to'liq saqlash (qarz, apparat modeli va yillik holat bilan)
-    if inn:
+    if inn and inn_found_in_db:
         user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=debt_amount, device_models=model_summary)
-    if fm:
+    if fm and ofd_status != "not_found":
         user_memory.set_last_fm(chat_id, user_id, fm)
-    user_memory.set_annual_status(chat_id, user_id, has_debt=has_annual_debt, details=ofd_details)
+    if ofd_status in ("debt", "active", "unavailable"):
+        user_memory.set_annual_status(chat_id, user_id, has_debt=has_annual_debt, details=ofd_details, unavailable=(ofd_status == "unavailable"))
     user_memory.set_last_photo(chat_id, user_id, file_id)
     user_memory.set_last_topic(chat_id, user_id, "fiscal_receipt_checked")
 
@@ -336,7 +348,9 @@ async def _process_fiscal_receipt_content(
 
     # 1. Oylik abonent holati
     if inn:
-        if has_monthly_debt:
+        if not inn_found_in_db:
+            lines.append(f"1️⃣ <b>«Mars» oylik abonent to'lovi:</b>\nℹ️ <b>СТИР (<code>{inn}</code>) bazadan topilmadi</b> (Iltimos, korxonangizning 9 xonali STIR raqamini yozib yuboring)")
+        elif has_monthly_debt:
             debt_formatted = f"{debt_amount:,.0f}".replace(",", " ")
             lines.append(f"1️⃣ <b>«Mars» oylik abonent to'lovi:</b>\n🔴 <b>Qarzdorlik: {debt_formatted} so'm</b>")
         else:
@@ -348,17 +362,21 @@ async def _process_fiscal_receipt_content(
 
     # 2. Yillik Soliq (OFD) holati
     if fm:
-        if has_annual_debt:
+        if ofd_status == "debt":
             lines.append("2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n🔴 <b>Qarzdorlik mavjud: 440 000 so'm</b>")
-        else:
+        elif ofd_status == "active":
             lines.append("2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n🟢 <b>Qarzdorlik yo'q (Litsenziya muddati faol)</b>")
+        elif ofd_status == "not_found":
+            lines.append(f"2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n❌ <b>Fiskal modul (<code>{fm}</code>) Soliq bazasidan topilmadi</b> (Chekdagi seriya raqamini tekshiring)")
+        else:
+            lines.append("2️⃣ <b>Davlat Soliq (OFD) yillik to'lovi:</b>\n⏳ <b>Davlat Soliq (OFD) tizimi vaqtincha javob bermayapti</b> (Birozdan so'ng qayta tekshiring)")
     else:
         lines.append("2️⃣ <b>Davlat Soliq (OFD) to'lovi:</b>\n<i>Fiskal modul seriya raqami aniqlanmadi. Yillik to'lovni tekshirish uchun Fiskal modul seriya raqamini (LG..., YG...) yuboring.</i>")
 
     final_text = adapt_to_user_script("\n".join(lines), user_script)
 
     is_issue = user_memory.is_issue_mode(chat_id, user_id)
-    if not has_monthly_debt and not has_annual_debt and fm and is_issue:
+    if inn_found_in_db and not has_monthly_debt and not has_annual_debt and ofd_status == "active" and fm and is_issue:
         final_text += adapt_to_user_script(
             f"\n\n🟢 <b>To'lovlar bo'yicha qarzdorlik yo'q!</b>\n"
             f"{admin_manager.get_contacts_display(inn=inn)}\n\n"
@@ -464,6 +482,14 @@ async def _process_image_content(
         mime_type=mime_type
     )
 
+    mg_id = getattr(message, "media_group_id", None)
+    if mg_id and media_type in ("pos_device", "fiscal_receipt", "other"):
+        if not _check_and_register_media_group(f"{mg_id}:{media_type}"):
+            logger.info(f"Media group {mg_id} ichidagi takroriy '{media_type}' rasmi o'tkazib yuborildi.")
+            if media_type == "pos_device" and file_id:
+                user_memory.set_last_photo(chat_id, user_id, file_id)
+            return
+
     # 1. KASSA CHEKI (FISKAL CHEK / SAVDO CHEKI / ONLAYN-NKM)
     if media_type == "fiscal_receipt" or (receipt_facts and receipt_facts.is_fiscal_chek):
         await _process_fiscal_receipt_content(
@@ -530,12 +556,12 @@ async def _process_image_content(
         alert_text = decision.admin_alert_text or (device_facts.screen_text_summary if device_facts else "") or "Ekrandagi nosozlik"
         
         ann_st = user_memory.get_annual_status(chat_id, user_id)
-        has_ann_debt = ann_st.get("has_debt", False) if ann_st else False
-        total_debt = decision.debt_amount if decision.debt_amount is not None else (user_memory.get_debt_info(chat_id, user_id) or {}).get("debt", 0.0)
+        target_fm = user_memory.get_last_fm(chat_id, user_id)
+        ann_verified_clear = bool(target_fm and ann_st and not ann_st.get("has_debt", False) and not ann_st.get("unavailable", False))
+        monthly_verified_clear = (decision.debt_amount is not None and decision.debt_amount <= 0)
 
-        # AGAR OYLIK VA YILLIK QARZDORLIK BO'LMASA -> USERGA "ILTIMOS KUTING MA'LUMOTLAR ADMINGA YUBORILDI" DEYISH:
-        if total_debt <= 0 and not has_ann_debt and (is_escalation_target or inn_to_use):
-            target_fm = user_memory.get_last_fm(chat_id, user_id)
+        # AGAR OYLIK VA YILLIK QARZDORLIK TEKSHIRILGAN VA YO'Q BO'LSA (yoki 3-bosqich rasm kutilayotgan bo'lsa) -> ADMINGA YUBORISH:
+        if monthly_verified_clear and (ann_verified_clear or is_awaiting_photo) and inn_to_use:
             await admin_manager.notify_debt_free_device_issue(
                 bot=bot,
                 user=message.from_user,
@@ -690,16 +716,6 @@ async def handle_photo(message: types.Message, bot: Bot):
     3. Agar begona narsa bo'lsa -> Jim turish (Guardrail)
     """
     caption = message.caption or ""
-    if message.media_group_id and not _check_and_register_media_group(message.media_group_id):
-        logger.info(f"Media group {message.media_group_id} ning keyingi rasmi o'tkazib yuborildi.")
-        if message.photo:
-            try:
-                user_id = message.from_user.id if message.from_user else 0
-                user_memory.set_last_photo(message.chat.id, user_id, message.photo[-1].file_id)
-            except Exception:
-                pass
-        return
-
     try:
         photo = message.photo[-1]
         file_io = io.BytesIO()

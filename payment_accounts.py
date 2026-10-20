@@ -815,6 +815,37 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     return False
 
 
+def parse_ofd_reply_status(ofd_text: Optional[str]) -> str:
+    """
+    @ofd943_bot javobini 4 ta aniq holatdan biriga ajratadi:
+    - "unavailable": javob yo'q (None yoki bo'sh)
+    - "not_found": fiskal modul soliq bazasidan topilmadi / mavjud emas
+    - "debt": yillik to'lovdan qarzdorlik mavjud
+    - "active": yillik to'lovdan qarzdorlik yo'q / litsenziya faol
+    """
+    if not ofd_text or not str(ofd_text).strip():
+        return "unavailable"
+    lower = str(ofd_text).lower()
+    if any(nf in lower for nf in [
+        "bunday fiskal modul", "fiskal modul mavjud emas", "modul mavjud emas",
+        "ma'lumot mavjud emas", "malumot mavjud emas", "topilmadi",
+        "ro'yxatda yo'q", "ro‘yxatda yo‘q", "royxatda yoq", "не найден"
+    ]):
+        return "not_found"
+
+    has_no_debt = any(w in lower for w in [
+        "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q"
+    ]) or ("mavjud emas" in lower and "fiskal modul" not in lower)
+
+    is_debt = (not has_no_debt) and any(w in lower for w in [
+        "qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik bor", "qarzdorlik",
+        "to‘lov qilish muddati", "to'lov qilish muddati", "muddati o‘tgan", "muddati o'tgan"
+    ])
+    if is_debt:
+        return "debt"
+    return "active"
+
+
 def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str = "latin") -> str:
     """@ofd943_bot javobini tahlil qilib, qisqa va aniq qarz bor/yo'qligini xabar qilish"""
     from translit_manager import adapt_to_user_script
@@ -823,7 +854,9 @@ def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str 
     is_inn = len(clean_code) in (9, 14) and clean_code.isdigit()
     code_label = f"🔢 <b>СТИР (INN):</b> <code>{clean_code}</code> (Fiskal modul)" if is_inn else f"🏛 <b>Fiskal modul:</b> <code>{clean_code}</code>"
 
-    if not ofd_text:
+    status = parse_ofd_reply_status(ofd_text)
+
+    if status == "unavailable":
         res = (
             f"{code_label}\n\n"
             f"ℹ️ <b>Yillik Davlat Soliq (OFD) litsenziyasi bo'yicha ma'lumot:</b>\n\n"
@@ -837,9 +870,7 @@ def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str 
         )
         return adapt_to_user_script(res, script)
 
-    lower = ofd_text.lower()
-
-    if "bunday fiskal modul" in lower or ("mavjud emas" in lower and "bunday" in lower) or "topilmadi" in lower:
+    if status == "not_found":
         res = (
             f"❌ <b>Fiskal modul topilmadi:</b> <code>{fm_code}</code>\n\n"
             f"Soliq (OFD) tizimida bunday fiskal modul raqami ro'yxatda yo'q. "
@@ -848,18 +879,7 @@ def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str 
         )
         return adapt_to_user_script(res, script)
 
-    has_no_debt = any(w in lower for w in [
-        "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q"
-    ]) or ("mavjud emas" in lower and "fiskal modul" not in lower)
-
-    is_debt = (not has_no_debt) and any(w in lower for w in [
-        "qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik bor", "qarzdorlik",
-        "to‘lov qilish muddati", "to'lov qilish muddati", "muddati o‘tgan", "muddati o'tgan"
-    ])
-
-    clean_summary = ofd_text.strip()
-
-    if is_debt:
+    if status == "debt":
         res = (
             f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
             f"{code_label}\n"
@@ -874,3 +894,4 @@ def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str 
         )
 
     return adapt_to_user_script(res, script)
+

@@ -363,16 +363,10 @@ class CoreEngine:
         # A) YILLIK FISKAL MODUL TO'LOVI («Yangi Texnologiyalar» DUK)
         if category == "annual" or facts.is_annual_fiscal_fee:
             logger.info("Kvitansiya tahlili: Yillik fiskal modul to'lovi («Yangi Texnologiyalar» DUK) aniqlandi.")
+            # Xotiradagi Fiskal modul (FM) ni tekshirish
+            user_fm = user_memory.get_last_fm(chat_id, user_id)
             annual_reply = (
-                f"🧾 <b>Fiskal modulning yillik to'lov kvitansiyasi qabul qilindi!</b>\n\n"
-                f"🏢 <b>Qabul qiluvchi:</b> {YANGI_TEXNOLOGIYALAR_ORG_NAME} (Davlat Soliq Qo'mitasi)\n"
-                f"🏦 <b>Hisob raqam:</b> <code>{YANGI_TEXNOLOGIYALAR_ACCOUNT}</code>\n"
-                f"💰 <b>To'langan summa:</b> <b>{facts.amount:,.0f} so'm</b>\n"
-                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
-                f"ℹ️ <b>MUHIM MA'LUMOT:</b>\n"
-                f"Ushbu to'lov kassa apparatingizdagi Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun Davlat Soliq Qo'mitasiga («Yangi Texnologiyalar» DUK) to'landi.\n"
-                f"⏳ Soliq tizimi to'lovni <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda avtomatik tasdiqlaydi va fiskal modul muddati uzaytiriladi.\n\n"
-                f"⚠️ <b>Eslatma:</b> «Mars Elektron Texnika» apparatiga har oylik servis xizmati (oylik abonent to'lovi: 100 000 so'm) alohida to'lanadi va ularni adashtirmaslik lozim."
+                "🧾 <b>Kvitansiyangiz qabul qilindi va tekshirish uchun mas'ul adminga yuborildi.</b>"
             )
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
@@ -391,11 +385,13 @@ class CoreEngine:
                 debt_status_info={
                     "is_annual": True,
                     "org_name": facts.payer_name or "Yillik to'lov",
-                    "inn": facts.payer_inn or "",
+                    "inn": facts.payer_inn or user_memory.get_last_id(chat_id, user_id) or "",
+                    "fiscal_module": user_fm,
                     "paid_amount": facts.amount,
                     "recipient": YANGI_TEXNOLOGIYALAR_ORG_NAME,
                     "is_duplicate": facts.is_duplicate,
                     "is_old_receipt": facts.is_old_receipt,
+                    "old_receipt_warning": facts.old_receipt_warning,
                     "payment_purpose": "annual_fiscal_fee"
                 },
                 log_reason="Annual fiscal fee receipt processed"
@@ -428,7 +424,7 @@ class CoreEngine:
             inn = extract_clean_inn(user_comment)
 
         if not inn:
-            raw_last_id = user_memory.get_last_id(chat_id, user_id)
+            raw_last_id = user_memory._get_or_create_session(chat_id, user_id).get("last_id")
             if raw_last_id:
                 inn = extract_clean_inn(raw_last_id)
 
@@ -456,26 +452,9 @@ class CoreEngine:
             }
             user_memory.set_pending_receipt(chat_id, user_id, receipt_dict)
 
-            warning_notes = []
-            if facts.is_duplicate:
-                warning_notes.append(
-                    f"⚠️ <b>DIQQAT: Ushbu to'lov cheki (Tranzaksiya ID: <code>{facts.transaction_id or '-'}</code>) "
-                    f"avval ham tizimga yuborilgan! Takroriy yuborilgan kvitansiya adminga tekshiruv uchun uzatildi.</b>"
-                )
-            if facts.is_old_receipt and facts.old_receipt_warning:
-                warning_notes.append(
-                    f"⚠️ <b>DIQQAT: {facts.old_receipt_warning}</b>"
-                )
-            warn_extra = ("\n\n" + "\n\n".join(warning_notes)) if warning_notes else ""
-
             ask_inn_reply = (
-                f"🧾 <b>To'lov kvitansiyasi qabul qilindi!</b>\n\n"
-                f"💰 <b>O'tkazilgan summa:</b> <b>{facts.amount:,.0f} so'm</b>\n"
-                f"🏦 <b>Qabul qiluvchi:</b> {facts.recipient_account or '«Mars Elektron Texnika»'}\n"
-                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
-                f"❓ <b>Iltimos, ushbu to'lov aynan qaysi korxona hisobiga kiritilishini bilishimiz uchun, "
-                f"korxonangizning INN (9 xonali) yoki JSHSHIR (14 xonali) raqamini yozib yuboring.</b>"
-                f"{warn_extra}"
+                "🧾 <b>Kvitansiyangiz qabul qilindi va mas'ul adminga yuborildi.</b>\n\n"
+                "❓ <i>Iltimos, ushbu to'lov qaysi korxona uchun ekanini bilishimiz uchun СТИР (INN) raqamingizni ham yozib yuboring.</i>"
             )
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
@@ -495,6 +474,7 @@ class CoreEngine:
                     "org_name": facts.payer_name or "Noma'lum korxona",
                     "inn": None,
                     "inn_missing": True,
+                    "is_inn_missing": True,
                     "paid_amount": facts.amount,
                     "prev_debt": 0.0,
                     "remaining_debt": 0.0,
@@ -521,19 +501,44 @@ class CoreEngine:
         file_id: Optional[str] = None,
         is_photo: bool = True
     ) -> DecisionResult:
-        """Kvitansiya summasini Exceldagi qarz bilan solishtirish va adminga hisobot tayyorlash"""
+        """
+        Kvitansiyani yuzaki tahlil qilib, INN va sanasiga ko'ra (eski vs bugungi)
+        Exceldagi qarzdorlik bilan solishtirib adminga hisobot tayyorlash.
+        Mijozga esa faqat kvitansiya adminga yuborilgani haqida oddiy, qisqa javob qaytariladi.
+        """
+        session_data = user_memory._get_or_create_session(chat_id, user_id)
+        session_inn = session_data.get("last_id")
+        inn_mismatch = bool(session_inn and inn and session_inn != inn)
+
+        session_org_name = ""
+        session_debt = 0.0
+        if session_inn:
+            s_res = excel_manager.search(session_inn)
+            if s_res:
+                session_org_name = s_res[0].get("name", "")
+                session_debt = sum(item.get("debt", 0.0) for item in s_res)
+            elif session_data.get("debt_info"):
+                session_org_name = session_data["debt_info"].get("org_name", "")
+                session_debt = float(session_data["debt_info"].get("debt", 0.0) or 0.0)
+
         results = excel_manager.search(inn)
         org_name = ""
         prev_debt = 0.0
+        inn_in_db = False
 
         if results:
+            inn_in_db = True
             org_name = results[0].get("name", "")
             prev_debt = sum(item.get("debt", 0.0) for item in results)
         else:
-            org_name = facts.payer_name or "Yangi / Noma'lum korxona"
+            org_name = facts.payer_name or "Bazadan topilmadi"
+
+        # Agar mijoz suhbatda o'zining qarzdor INNsini (masalan 307314860 -> 2,100,000) tekshirib turib,
+        # boshqa INN (masalan 32108755590021) kvitansiyasini tashlagan bo'lsa, solishtirish uchun mijozning haqiqiy qarzini ham hisobga olamiz!
+        effective_prev_debt = session_debt if (inn_mismatch and session_debt > 0 and prev_debt == 0) else prev_debt
 
         paid_amount = facts.amount
-        remaining_debt = 0.0
+        remaining_debt = effective_prev_debt
         debt_covered = False
 
         # Tranzaksiyani ro'yxatga olish (agar dublikat bo'lmasa)
@@ -547,116 +552,67 @@ class CoreEngine:
                 payment_date=facts.payment_date
             )
 
-        tuman = excel_manager.get_district_for_inn(inn)
+        # 3.4 Takroriy kvitansiya spamidan himoya (oxirgi 1 soat ichida yuborilgan bo'lsa)
+        is_recent_dup = user_memory.is_recent_duplicate_receipt(
+            chat_id=chat_id,
+            user_id=user_id,
+            tx_id=facts.transaction_id,
+            amount=facts.amount,
+            p_date=facts.payment_date
+        )
 
-        # Ogohlantirish xabarlari (Dublikat yoki Eski kvitansiya)
-        warning_notes = []
-        if facts.is_duplicate:
-            warning_notes.append(
-                f"⚠️ <b>DIQQAT: Ushbu to'lov cheki (Tranzaksiya ID: <code>{facts.transaction_id or '-'}</code>) "
-                f"avval ham tizimga yuborilgan! Takroriy yuborilgan kvitansiya adminga tekshiruv uchun uzatildi.</b>"
-            )
-        if facts.is_old_receipt and facts.old_receipt_warning:
-            warning_notes.append(
-                f"⚠️ <b>DIQQAT: {facts.old_receipt_warning}</b>"
-            )
-        warning_block = ("\n\n" + "\n\n".join(warning_notes)) if warning_notes else ""
+        tuman = excel_manager.get_district_for_inn(session_inn if (inn_mismatch and session_inn) else inn)
 
-        # To'lov maqsadiga ko'ra xabarni shakllantirish
-        if facts.payment_purpose == "repair":
-            debt_covered = True
-            user_reply = (
-                f"🔧 <b>Kassa apparati ta'miri (remont) uchun to'lov qabul qilindi!</b>\n\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
-                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
-                f"👨‍🔧 <i>Ushbu to'lov oylik abonent to'lovi emas, balki apparat ta'miri / ehtiyot qismlari xizmati uchun hisoblanadi. "
-                f"Ma'lumotlar servis ustaxonamiz va adminga yetkazildi.</i>"
-                f"{warning_block}"
-            )
-        elif facts.payment_purpose == "hardware_purchase":
-            debt_covered = True
-            user_reply = (
-                f"📦 <b>Yangi kassa apparati xaridi uchun to'lov qabul qilindi!</b>\n\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
-                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
-                f"📋 <i>Yangi apparat xaridi to'lovi bo'yicha ma'lumotlar sotuv va rasmiylashtirish bo'limiga yetkazildi. "
-                f"Mutaxassislarimiz apparatni tayyorlash uchun siz bilan bog'lanishadi.</i>"
-                f"{warning_block}"
-            )
-        elif facts.payment_purpose == "registration":
-            debt_covered = True
-            user_reply = (
-                f"📋 <b>Kassani qayta ro'yxatdan o'tkazish (pere-registratsiya) to'lovi qabul qilindi!</b>\n\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🎯 <b>To'lov turi:</b> {facts.purpose_label}\n"
-                f"🆔 <b>Chek / Tranzaksiya:</b> <code>{facts.transaction_id or '-'}</code>\n\n"
-                f"📑 <i>Kassa apparatini soliq ro'yxatidan o'tkazish bo'yicha mas'ul xodimga ma'lumotlar yetkazildi.</i>"
-                f"{warning_block}"
-            )
-        elif prev_debt > 0:
-            if paid_amount >= prev_debt:
-                debt_covered = True
-                overpayment = max(0.0, paid_amount - prev_debt)
-                remaining_debt = -overpayment if overpayment > 0 else 0.0
-                overpay_line = f"🟢 <b>Ortiqcha to'lov (avans):</b> <code>{overpayment:,.0f}</code> so'm kelgusi oylar uchun hisobga o'tdi.\n" if overpayment > 0 else ""
-                user_reply = (
-                    f"✅ <b>To'lov muvaffaqiyatli qabul qilindi!</b>\n\n"
-                    f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                    f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                    f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                    f"📉 <b>Avvalgi qarz:</b> {prev_debt:,.0f} so'm\n"
-                    f"🎉 <b>Qarzdorlik to'liq bartaraf etildi!</b>\n"
-                    f"{overpay_line}\n"
-                    f"📩 <i>To'lov ma'lumotlari kassa apparatingizni tizimda faollashtirish uchun "
-                    f"mas'ul operator va adminga yuborildi. Tez orada apparatingiz ishga tushirib beriladi.</i>"
-                    f"{warning_block}"
-                )
+        # Qarz bilan solishtirish:
+        # Agar mijoz bir necha kvitansiya yuborayotgan bo'lsa (masalan 100k + 100k),
+        # bugungi barcha yuborilgan kvitansiyalar yig'indisini hisobga olamiz!
+        prior_todays_paid = user_memory.get_todays_paid_total(chat_id, user_id, inn=inn)
+        cumulative_paid = prior_todays_paid + paid_amount
+
+        # Qarz bilan solishtirish FAQAT bugungi (eski bo'lmagan) va INN mos kelgan kvitansiyalar uchun bajariladi!
+        if not facts.is_old_receipt and not inn_mismatch:
+            if effective_prev_debt > 0:
+                if cumulative_paid >= effective_prev_debt:
+                    debt_covered = True
+                    remaining_debt = 0.0
+                else:
+                    debt_covered = False
+                    remaining_debt = max(0.0, effective_prev_debt - cumulative_paid)
             else:
-                debt_covered = False
-                remaining_debt = prev_debt - paid_amount
-                user_reply = (
-                    f"⚠️ <b>To'lov qabul qilindi, ammo qarz to'liq yopilmadi.</b>\n\n"
-                    f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                    f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                    f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                    f"📉 <b>Avvalgi qarz:</b> {prev_debt:,.0f} so'm\n"
-                    f"🔴 <b>Qolgan qarzdorlik:</b> <b>{remaining_debt:,.0f} so'm</b>\n\n"
-                    f"📩 <i>Kvitansiya adminga yuborildi. Apparat to'siqsiz ishlashi uchun "
-                    f"qolgan summani ham to'lashingiz lozim.</i>"
-                    f"{warning_block}"
-                )
+                debt_covered = (inn_in_db and paid_amount > 0)
+                remaining_debt = 0.0
         else:
-            debt_covered = True
-            remaining_debt = prev_debt - paid_amount
+            # Eski kvitansiya yoki boshqa INN kvitansiyasi joriy qarzni yopmaydi!
+            debt_covered = False
+            remaining_debt = effective_prev_debt
+
+        # Foydalanuvchiga oddiy, sodda va qisqa javob qaytarish:
+        if is_recent_dup:
             user_reply = (
-                f"✅ <b>To'lov muvaffaqiyatli qabul qilindi!</b>\n\n"
-                f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n"
-                f"🔢 <b>INN:</b> <code>{inn}</code>\n"
-                f"💵 <b>To'langan summa:</b> <b>{paid_amount:,.0f} so'm</b>\n"
-                f"🟢 <b>Qarzdorlik mavjud emas edi (Oldindan to'lov).</b>\n\n"
-                f"📩 <i>Ushbu mablag' kelgusi oylar abonent to'lovi hisobiga kiritiladi. "
-                f"Kvitansiya adminga yetkazildi.</i>"
-                f"{warning_block}"
+                "ℹ️ <b>Ushbu to'lov kvitansiyangiz avval qabul qilingan va tekshirish uchun mas'ul adminga yuborilgan.</b>\n"
+                "<i>Iltimos kuting, admin tez orada apparatingiz holatini tekshirib aloqaga chiqadi.</i>"
+            )
+        else:
+            user_reply = (
+                "🧾 <b>Kvitansiyangiz qabul qilindi va tekshirish uchun mas'ul adminga yuborildi.</b>"
             )
 
-        # Xotiraga saqlash va pending receiptni tozalash
+        # Xotirada pending receiptni tozalash (MUHIM: mijozning kunlik Exceldagi qarzini va avvalgi INNsini buzmaslik!)
         user_memory.clear_pending_receipt(chat_id, user_id)
-        user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=remaining_debt)
+        if not session_inn and inn_in_db:
+            user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=prev_debt)
+
         user_memory.set_last_receipt(chat_id, user_id, {
+            "inn": inn,
             "amount": paid_amount,
+            "cumulative_paid": cumulative_paid,
             "date": facts.payment_date,
             "transaction_id": facts.transaction_id,
-            "prev_debt": prev_debt,
+            "prev_debt": effective_prev_debt,
             "remaining_debt": remaining_debt,
             "debt_covered": debt_covered,
+            "is_old_receipt": facts.is_old_receipt,
+            "inn_mismatch": inn_mismatch,
             "payment_purpose": facts.payment_purpose,
             "purpose_label": facts.purpose_label,
             "tuman": tuman,
@@ -667,8 +623,15 @@ class CoreEngine:
         debt_status_info = {
             "org_name": org_name,
             "inn": inn,
+            "inn_in_db": inn_in_db,
             "inn_missing": False,
-            "prev_debt": prev_debt,
+            "is_inn_missing": False,
+            "inn_mismatch": inn_mismatch,
+            "session_inn": session_inn,
+            "session_org_name": session_org_name,
+            "session_debt": session_debt,
+            "prev_debt": effective_prev_debt,
+            "receipt_inn_debt": prev_debt,
             "remaining_debt": remaining_debt,
             "debt_covered": debt_covered,
             "tuman": tuman,
@@ -683,11 +646,11 @@ class CoreEngine:
             action=ActionType.RECEIPT_PROCESSED,
             reply_text=user_reply,
             detected_inn=inn,
-            debt_amount=prev_debt,
+            debt_amount=effective_prev_debt,
             paid_amount=paid_amount,
             remaining_debt=remaining_debt,
             org_name=org_name,
-            should_notify_admin=True,
+            should_notify_admin=not is_recent_dup,
             admin_alert_type="receipt",
             receipt_facts=facts,
             debt_status_info=debt_status_info,
@@ -698,7 +661,7 @@ class CoreEngine:
             is_old_receipt=facts.is_old_receipt,
             is_duplicate=facts.is_duplicate,
             tuman=tuman,
-            log_reason="Receipt successfully verified against Excel debt and prepared for admin"
+            log_reason="Receipt surface-analyzed and prepared for admin"
         )
 
     def resolve_pending_receipt_if_any(self, inn: str, chat_id: int, user_id: int) -> Optional[DecisionResult]:

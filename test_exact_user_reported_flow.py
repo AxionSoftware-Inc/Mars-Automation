@@ -129,15 +129,15 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
             print(f"🤖 Bot: {reply3[:140]}...")
             self.assertIn("QARZDORLIK YO'Q", reply3.upper())
 
-        # 3.1-QADAM: "yillikchi" -> Yillikdan qarz yo'q bo'lsa, XR uzatilmaydi! Faqat qarz yo'q deyiladi!
-        print("\n🔹 [Turn 3.1] Mijoz: 'yillikchi'")
-        bot.copy_message.reset_mock()
-        self.assertTrue(is_annual_check_intent("yillikchi"))
-        msg3_1 = await self._send_msg(bot, "yillikchi")
-        reply3_1 = msg3_1.reply.call_args[0][0]
-        print(f"🤖 Bot: {reply3_1}")
-        self.assertIn("QARZDORLIK YO'Q", reply3_1.upper())
-        self.assertEqual(bot.copy_message.call_count, 0, "Yillikdan qarz yo'q bo'lsa, aslo XR posti uzatilmasligi shart!")
+            # 3.1-QADAM: "yillikchi" -> Yillikdan qarz yo'q bo'lsa, XR uzatilmaydi! Faqat qarz yo'q deyiladi!
+            print("\n🔹 [Turn 3.1] Mijoz: 'yillikchi'")
+            bot.copy_message.reset_mock()
+            self.assertTrue(is_annual_check_intent("yillikchi"))
+            msg3_1 = await self._send_msg(bot, "yillikchi")
+            reply3_1 = msg3_1.reply.call_args[0][0]
+            print(f"🤖 Bot: {reply3_1}")
+            self.assertIn("QARZDORLIK YO'Q", reply3_1.upper())
+            self.assertEqual(bot.copy_message.call_count, 0, "Yillikdan qarz yo'q bo'lsa, aslo XR posti uzatilmasligi shart!")
 
         # 4-QADAM: "oylikchi"
         print("\n🔹 [Turn 4] Mijoz: 'oylikchi'")

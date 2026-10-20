@@ -56,7 +56,25 @@ class ConversationIntentHandler:
             "видео", "видеоси", "видеосини", "ролик", "қўлланма", "кулланма"
         ])
 
-        # 1. Agar aniq video so'ralmagan bo'lsa va bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
+        # 1. Texnik video katalogdan qidirish (agar mijoz davomiy suhbat savolini bermayotgan bo'lsa yoki aniq video so'ragan bo'lsa)
+        if not is_conversational or explicit_video_request:
+            video_id = catalog_manager.find_matching_post(text)
+            if video_id:
+                try:
+                    await bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=SOURCE_CHANNEL_ID,
+                        message_id=video_id,
+                        reply_to_message_id=message.message_id
+                    )
+                    user_memory.add_user_message(chat_id, user_id, text)
+                    user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
+                    user_memory.set_last_topic(chat_id, user_id, f"video_{video_id}")
+                    return True
+                except Exception as e:
+                    logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
+
+        # 2. Agar bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
         if is_conversational or (has_active_context and not explicit_video_request):
             context_summary = user_memory.get_context_summary(chat_id, user_id)
             ai_res = ai_func(text, context_history=context_summary, target_script=user_script)
@@ -111,23 +129,6 @@ class ConversationIntentHandler:
                 except Exception as e:
                     logger.error(f"AI tavsiya qilgan videoni yuborishda xatolik (ID: {ai_video_id}): {e}")
             return True
-
-        # 2. Texnik video katalogdan qidirish (faqat aniq texnik amallar uchun)
-        video_id = catalog_manager.find_matching_post(text)
-        if video_id:
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=video_id,
-                    reply_to_message_id=message.message_id
-                )
-                user_memory.add_user_message(chat_id, user_id, text)
-                user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
-                user_memory.set_last_topic(chat_id, user_id, f"video_{video_id}")
-                return True
-            except Exception as e:
-                logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
 
         # 3. Boshqalari bo'yicha umumiy AI javobi
         context_summary = user_memory.get_context_summary(chat_id, user_id)

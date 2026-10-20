@@ -201,56 +201,93 @@ class UserMemoryManager:
     def get_checked_inns(self, chat_id: int, user_id: int) -> Dict[str, Dict[str, Any]]:
         """Sessiyada tekshirilgan barcha INNlar va ularning qarz ma'lumotlarini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("checked_inns", {})
+        inns = session.get("checked_inns", {})
+        if not inns and chat_id < 0:
+            fb_inns = self._fallback_from_group(chat_id, "checked_inns")
+            if fb_inns and isinstance(fb_inns, dict):
+                return fb_inns
+        return inns
 
-    def set_annual_status(self, chat_id: int, user_id: int, has_debt: bool, details: str = ""):
+    def set_annual_status(self, chat_id: int, user_id: int, has_debt: bool, details: str = "", unavailable: bool = False):
         """Yillik Davlat Soliq (OFD) to'lovi holatini xotiraga saqlash"""
         session = self._get_or_create_session(chat_id, user_id)
         session["annual_status"] = {
             "has_debt": has_debt,
-            "details": details
+            "details": details,
+            "unavailable": unavailable
         }
         self.save_sessions()
 
     def get_annual_status(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Yillik Davlat Soliq (OFD) to'lovi holatini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("annual_status")
+        return session.get("annual_status") or self._fallback_from_group(chat_id, "annual_status")
 
     def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
         """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_id")
+        return session.get("last_id") or self._fallback_from_group(chat_id, "last_id")
 
     def get_org_name(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("org_name")
+        return session.get("org_name") or self._fallback_from_group(chat_id, "org_name")
 
     def set_last_receipt(self, chat_id: int, user_id: int, receipt_info: Dict[str, Any]):
-        """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash"""
+        """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash (kunlik Excel qarzini o'zgartirmasdan!)"""
         session = self._get_or_create_session(chat_id, user_id)
         session["last_receipt"] = receipt_info
-        # Agar qoldiq qarz ko'rsatilgan bo'lsa, joriy qarzni yangilash
-        rem = receipt_info.get("remaining_debt")
-        if rem is not None:
-            if session.get("debt_info"):
-                session["debt_info"]["debt"] = rem
-            else:
-                session["debt_info"] = {
-                    "identifier": session.get("last_id") or "",
-                    "org_name": session.get("org_name") or "",
-                    "debt": rem
-                }
+        if "receipt_history" not in session or not isinstance(session["receipt_history"], list):
+            session["receipt_history"] = []
+        session["receipt_history"].append({
+            "time": time.time(),
+            "info": receipt_info
+        })
+        # Faqat oxirgi 10 ta kvitansiyani saqlash
+        session["receipt_history"] = session["receipt_history"][-10:]
         self.save_sessions()
+
+    def get_todays_paid_total(self, chat_id: int, user_id: int, inn: Optional[str] = None) -> float:
+        """Foydalanuvchi bugun shu INN bo'yicha yuborgan kvitansiyalar summasi yig'indisi"""
+        session = self._get_or_create_session(chat_id, user_id)
+        rec_hist = session.get("receipt_history") or []
+        now = time.time()
+        total = 0.0
+        for item in rec_hist:
+            # Oxirgi 12 soat ichidagi va eski deb topilmagan kvitansiyalar
+            if now - item.get("time", 0) <= 12 * 3600:
+                inf = item.get("info") or {}
+                if not inf.get("is_old_receipt"):
+                    item_inn = inf.get("inn")
+                    if not inn or not item_inn or item_inn == inn:
+                        total += float(inf.get("amount", 0) or 0)
+        return total
+
+    def is_recent_duplicate_receipt(self, chat_id: int, user_id: int, tx_id: Optional[str], amount: float, p_date: Optional[str] = None) -> bool:
+        """Oxirgi 1 soat ichida aynan shu tranzaksiya yoki bir xil summa/sana yuborilganmi?"""
+        if not tx_id and amount <= 0:
+            return False
+        session = self._get_or_create_session(chat_id, user_id)
+        rec_hist = session.get("receipt_history") or []
+        now = time.time()
+        for item in rec_hist:
+            if now - item.get("time", 0) <= 3600:  # 1 soat ichida
+                inf = item.get("info") or {}
+                # 1) Tranzaksiya raqami mos kelsa
+                if tx_id and inf.get("transaction_id") and str(inf.get("transaction_id")) == str(tx_id):
+                    return True
+                # 2) Bir xil summa va bir xil to'lov sanasi bo'lsa
+                if amount > 0 and inf.get("amount") == amount and p_date and inf.get("date") == p_date:
+                    return True
+        return False
 
     def get_last_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_receipt")
+        return session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt")
 
     def get_debt_info(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Oxirgi tekshirilgan qarz ma'lumotlarini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("debt_info")
+        return session.get("debt_info") or self._fallback_from_group(chat_id, "debt_info")
 
     def set_last_topic(self, chat_id: int, user_id: int, topic: str):
         """Oxirgi mavzuni saqlash (masalan: 'receipt_submitted', 'debt_checked', 'time_error')"""
@@ -416,7 +453,9 @@ class UserMemoryManager:
 
         ann_st = self.get_annual_status(chat_id, user_id)
         if ann_st:
-            if ann_st.get("has_debt"):
+            if ann_st.get("unavailable"):
+                parts.append("• Davlat Soliq (OFD) yillik to'lovi: Tizim vaqtincha javob bermadi (aniqlanmagan).")
+            elif ann_st.get("has_debt"):
                 parts.append("• Davlat Soliq (OFD) yillik to'lovi: QARZDORLIK MAVJUD (440 000 so'm, Yangi Texnologiyalar DUK).")
             else:
                 det = ann_st.get("details", "")
@@ -424,16 +463,9 @@ class UserMemoryManager:
 
         if last_receipt:
             amt = last_receipt.get("amount", 0.0)
-            rem = last_receipt.get("remaining_debt", 0.0)
-            covered = last_receipt.get("debt_covered", False)
             parts.append("=== YAQINDAGI TO'LOV KVITANSIYASI HOLATI ===")
             parts.append(f"• Mijoz yaqinda to'lov kvitansiyasini yubordi (Summa: {amt:,.0f} so'm).")
-            parts.append("• Kvitansiya mas'ul adminga yetkazildi.")
-            if covered:
-                parts.append("• To'lov mavjud barcha qarzni TO'LIQ yopdi! Tizimda apparat tez orada (15-30 daqiqa ichida) yoqiladi.")
-                parts.append("• Keyingi abonent to'lovi muddati: Kelgusi oyning 6-sanasigacha.")
-            else:
-                parts.append(f"• To'lov qisman qabul qilindi. Qolgan qarzdorlik: {rem:,.0f} so'm.")
+            parts.append("• Kvitansiya tekshirish uchun mas'ul adminga yetkazilgan. Qarzdorlik holati faqat kunlik Excel bazasi bo'yicha hisoblanadi.")
 
         parts.append("• Tizim qoidasi: Abonent to'lovi har oyning 6-sanasigacha to'lanadi. 6-sanada to'lanmasa avtomatik to'xtaydi.")
 
@@ -512,9 +544,15 @@ class UserMemoryManager:
         session["last_fm"] = str(fm_code).strip().upper()
         self.save_sessions()
 
+    def clear_last_fm(self, chat_id: int, user_id: int):
+        """Xato yoki topilmagan Fiskal modul raqamini xotiradan tozalash"""
+        session = self._get_or_create_session(chat_id, user_id)
+        session["last_fm"] = None
+        self.save_sessions()
+
     def get_last_fm(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_fm")
+        return session.get("last_fm") or self._fallback_from_group(chat_id, "last_fm")
 
     def set_last_photo(self, chat_id: int, user_id: int, file_id: str):
         """Oxirgi yuborilgan kassa rasmi file_id sini saqlash"""
@@ -524,7 +562,7 @@ class UserMemoryManager:
 
     def get_last_photo(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_photo")
+        return session.get("last_photo") or self._fallback_from_group(chat_id, "last_photo")
 
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""

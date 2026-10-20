@@ -65,16 +65,60 @@ def extract_clean_inn(text: str) -> Optional[str]:
 
 def is_incomplete_inn_text(text: str) -> bool:
     """
-    Matnda 'inn' yoki 'stir' prefiksi bilan 1 tadan 8 tagacha raqam yuborilgan bo'lsa
+    Matnda 'inn' yoki 'stir' prefiksi bilan yoki sof 1..8 ta raqam kiritilgan bo'lsa
     (lekin to'liq 9 xonali INN yoki 14 xonali JSHSHIR bo'lmasa).
     """
     if not text:
         return False
     t = text.strip()
-    if extract_clean_inn(t):
+    if extract_clean_inn(t) or extract_fiscal_module(t):
         return False
     match = re.search(r"\b(?:inn|stir|стир|инн|jshshir|жшшир)\b[:\s#№]*\d{1,8}\b", t, re.IGNORECASE)
-    return bool(match)
+    if match:
+        return True
+    pure_d = re.sub(r"[\s\.\-_]", "", t)
+    if pure_d.isdigit() and 1 <= len(pure_d) <= 8:
+        return True
+    return False
+
+def extract_bank_card_number(text: str) -> Optional[str]:
+    """16 xonali bank plastik karta raqamini ajratib olish (8600, 9860, 5614, 6440, 4xxx, 5xxx)"""
+    if not text:
+        return None
+    m = re.search(r"\b((?:8600|9860|5614|6440|4\d{3}|5\d{3})[\s\-]?(?:\d{4}[\s\-]?){2}\d{4})\b", text)
+    if m:
+        clean = re.sub(r"\D", "", m.group(1))
+        if len(clean) == 16:
+            return clean
+    pure = re.sub(r"[\s\.\-_]", "", text.strip())
+    if pure.isdigit() and len(pure) == 16:
+        return pure
+    return None
+
+def extract_bank_account_number(text: str) -> Optional[str]:
+    """20 xonali bank hisob raqamini (X/R) ajratib olish (masalan: 20208000800208044003)"""
+    if not text:
+        return None
+    clean_pure = re.sub(r"[\s\.\-_]", "", text.strip())
+    m = re.search(r"\b(202\d{17})\b", clean_pure)
+    if m:
+        return m.group(1)
+    if clean_pure.isdigit() and len(clean_pure) == 20:
+        return clean_pure
+    return None
+
+def is_invalid_digit_length(text: str) -> Optional[int]:
+    """Agar mijoz 10, 11, 12 yoki 13 xonali son kiritgan bo'lsa (INN 9, JSHSHIR 14 bo'lishi kerak)"""
+    if not text:
+        return None
+    if extract_fiscal_module(text):
+        return None
+    pure = re.sub(r"[\s\.\-_]", "", text.strip())
+    if pure.isdigit() and 10 <= len(pure) <= 13:
+        if len(pure) == 12 and pure.startswith("998"):
+            return None
+        return len(pure)
+    return None
 
 def extract_clean_phone(text: str) -> Optional[str]:
     """
@@ -84,13 +128,13 @@ def extract_clean_phone(text: str) -> Optional[str]:
     if not text:
         return None
     t = text.strip()
-    m_full = re.search(r"(?:tel|telefon|nomer|raqam|телефон)?[:\s#№]*(?:\+?998[\s\-]?)?([389]\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2})\b", t, re.IGNORECASE)
+    m_full = re.search(r"(?<!\d)(?:(?:tel|telefon|nomer|raqam|телефон)[:\s#№]*)?(?:\+?998[\s\-]?)?([389]\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2})(?!\d)", t, re.IGNORECASE)
     if m_full:
         digits = re.sub(r"\D", "", m_full.group(1))
         if len(digits) == 9:
             return digits
 
-    m9 = re.search(r"\b([389]\d\d{7})\b", re.sub(r"[\s\.\-]", "", t))
+    m9 = re.search(r"(?<!\d)([389]\d{8})(?!\d)", re.sub(r"[\s\.\-]", "", t))
     if m9:
         return m9.group(1)
 

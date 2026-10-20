@@ -24,6 +24,14 @@ def deploy():
         'ai_helper.py',
         'user_memory.py',
         'ofd_bridge.py',
+        'ofd_client.py',
+        'transaction_tracker.py',
+        'receipt_analyzer.py',
+        'image_analyzer.py',
+        'excel_manager.py',
+        'error_manager.py',
+        'state_manager.py',
+        'translit_manager.py',
         'payment_accounts.py',
         'ARCHITECTURE.md',
         'handlers/__init__.py',
@@ -48,7 +56,8 @@ def deploy():
         'modules/__init__.py',
         'modules/admin_module.py',
         'data/custom_patches.json',
-        'data/regional_admins.json'
+        'data/regional_admins.json',
+        'data/admin_config.json'
     ]
 
     print("Building compressed tar archive in memory...")

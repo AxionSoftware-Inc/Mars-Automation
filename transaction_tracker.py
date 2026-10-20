@@ -111,7 +111,9 @@ class TransactionTracker:
 
     def check_old_receipt(self, date_str: str) -> Tuple[bool, Optional[str]]:
         """
-        Kvitansiya sanasi 30 kundan eski yoki o'tgan yilga tegishli ekanligini aniqlash.
+        Bot kunlik Excel bazadan qarzdorlikni tekshirgani sababli,
+        kvitansiya sanasi bugungi kundan oldingi bo'lsa (days_ago >= 1) -> ESKI KVITANSIYA hisoblanadi.
+        Faqat bugungi (o'sha kungi) kvitansiya oxirgi qarzni yopish uchun yangi kvitansiya deb olinadi.
         Qaytaradi: (is_old: bool, warning_message: Optional[str])
         """
         if not date_str:
@@ -121,22 +123,15 @@ class TransactionTracker:
         now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
         current_year = now_uzb.year
 
-        # 1. Yilni tekshirish (masalan 2024 yoki 2025 yilgi cheklar)
-        year_match = re.search(r"\b(202[0-9])\b", s)
-        if year_match:
-            doc_year = int(year_match.group(1))
-            if doc_year < current_year:
-                diff_years = current_year - doc_year
-                return True, f"Kvitansiya sanasi o'tgan yilgi ({s}). {diff_years} yil oldingi chek qabul qilinmaydi!"
-
-        # 2. To'liq sanani (YYYY-MM-DD yoki DD.MM.YYYY) parslash
+        # 1. To'liq sanani (YYYY-MM-DD yoki DD.MM.YYYY) parslash
         parsed_date = None
         formats = [
             "%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d",
             "%d.%m.%Y", "%d-%m-%Y", "%d/%m/%Y",
-            "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M"
+            "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M",
+            "%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S"
         ]
-        
+
         # Matndan sana qismini ajratish
         match_iso = re.search(r"\b(\d{4}[./-]\d{2}[./-]\d{2})\b", s)
         match_dm = re.search(r"\b(\d{2}[./-]\d{2}[./-]\d{4})\b", s)
@@ -151,8 +146,17 @@ class TransactionTracker:
 
         if parsed_date:
             days_ago = (now_uzb.date() - parsed_date.date()).days
-            if days_ago > 30:
-                return True, f"Kvitansiya sanasi {days_ago} kun avvalgi ({target_str}). Iltimos, joriy oy yangi to'lov chekini yuboring!"
+            if days_ago >= 1:
+                return True, f"Eski kvitansiya: sanasi {target_str} ({days_ago} kun oldingi)"
+            return False, None
+
+        # 2. Agar aniq kun-oy o'qilmasa, yilni tekshirish (masalan 2024 yoki 2025 yilgi cheklar)
+        year_match = re.search(r"\b(202[0-9])\b", s)
+        if year_match:
+            doc_year = int(year_match.group(1))
+            if doc_year < current_year:
+                diff_years = current_year - doc_year
+                return True, f"Eski kvitansiya: o'tgan yilgi ({s}, {diff_years} yil oldingi)"
 
         return False, None
 

@@ -19,7 +19,7 @@
     {
       "name": "Quvonchbek Admin",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
+      "telegram_id": 1041997926,
       "phone": "+998 91 945 32 89",
       "role": "Viloyat mas'ul ustasi",
       "receive_all_escalations": true
@@ -41,10 +41,10 @@
         "qarshi tumani",
         "karshi"
       ],
-      "admin_name": "Qarshi hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Qarshi hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 01",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -76,10 +76,10 @@
         "kitob",
         "kitob tumani"
       ],
-      "admin_name": "Kitob hududiy ustasi (Mock)",
+      "admin_name": "Yashnarbek (Kitob hududiy ustasi)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
-      "phone": "+998 90 100 00 03",
+      "phone": "+998 94 299 77 99",
       "active": true
     },
     {
@@ -95,10 +95,10 @@
         "g'uzor tumani",
         "guzor tumani"
       ],
-      "admin_name": "G'uzor hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (G'uzor hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 04",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -110,10 +110,10 @@
         "kasbi",
         "kasbi tumani"
       ],
-      "admin_name": "Kasbi hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Kasbi hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 05",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -125,10 +125,10 @@
         "koson",
         "koson tumani"
       ],
-      "admin_name": "Koson hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Koson hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 06",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -140,10 +140,10 @@
         "nishon",
         "nishon tumani"
       ],
-      "admin_name": "Nishon hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Nishon hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 07",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -159,10 +159,10 @@
         "dexqonobod",
         "dehqonobod tumani"
       ],
-      "admin_name": "Dehqonobod hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Dehqonobod hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 08",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -174,10 +174,10 @@
         "muborak",
         "muborak tumani"
       ],
-      "admin_name": "Muborak hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Muborak hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 09",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -193,10 +193,10 @@
         "yakkabog' tumani",
         "yakkabog tumani"
       ],
-      "admin_name": "Yakkabog' hududiy ustasi (Mock)",
+      "admin_name": "Yashnarbek (Yakkabog' hududiy ustasi)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
-      "phone": "+998 90 100 00 10",
+      "phone": "+998 94 299 77 99",
       "active": true
     },
     {
@@ -211,10 +211,10 @@
         "kamashi",
         "qamashi tumani"
       ],
-      "admin_name": "Qamashi hududiy ustasi (Mock)",
+      "admin_name": "Yashnarbek (Qamashi hududiy ustasi)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
-      "phone": "+998 90 100 00 11",
+      "phone": "+998 94 299 77 99",
       "active": true
     },
     {
@@ -226,10 +226,10 @@
         "mirishkor",
         "mirishkor tumani"
       ],
-      "admin_name": "Mirishkor hududiy ustasi (Mock)",
+      "admin_name": "Quvonchbek (Mirishkor hududiy ustasi)",
       "username": "quvonchbek_admin",
-      "telegram_id": 6436610869,
-      "phone": "+998 90 100 00 12",
+      "telegram_id": 1041997926,
+      "phone": "+998 91 945 32 89",
       "active": true
     },
     {
@@ -244,10 +244,10 @@
         "chirokchi",
         "chiroqchi tumani"
       ],
-      "admin_name": "Chiroqchi hududiy ustasi (Mock)",
+      "admin_name": "Yashnarbek (Chiroqchi hududiy ustasi)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
-      "phone": "+998 90 100 00 13",
+      "phone": "+998 94 299 77 99",
       "active": true
     },
     {
@@ -264,10 +264,10 @@
         "kukdala",
         "ko'kdala tumani"
       ],
-      "admin_name": "Ko'kdala hududiy ustasi (Mock)",
+      "admin_name": "Yashnarbek (Ko'kdala hududiy ustasi)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
-      "phone": "+998 90 100 00 14",
+      "phone": "+998 94 299 77 99",
       "active": true
     },
     {
@@ -289,7 +289,7 @@
         "хоразм",
         "урганч"
       ],
-      "admin_name": "Respublika bo'yicha mas'ul usta (Mock)",
+      "admin_name": "Yashnarbek (Respublika bo'yicha mas'ul usta)",
       "username": "Yashnarbek_butaev",
       "telegram_id": 1966874161,
       "phone": "+998 94 299 77 99",

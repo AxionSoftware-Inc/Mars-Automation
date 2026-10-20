@@ -10,10 +10,13 @@ from ofd_bridge import ofd_bridge
 from admin_manager import admin_manager, get_admin_contact_keyboard
 from payment_accounts import (
     FISKAL_MODUL_SAMPLE_POST_ID,
+    YANGI_TEXNOLOGIYALAR_INN,
     YANGI_TEXNOLOGIYALAR_POST_ID,
     YANGI_TEXNOLOGIYALAR_VIDEO_ID,
     MARS_POST_ID,
-    MARS_VIDEO_ID
+    MARS_VIDEO_ID,
+    parse_ofd_reply_status,
+    format_ofd_annual_status
 )
 
 logger = logging.getLogger(__name__)
@@ -137,14 +140,45 @@ class HardwareIntentHandler:
         # Yangi kiritilgan INN yoki Fiskal modulni aniqlash
         found_inn = extract_clean_inn(text)
         found_fm = extract_fiscal_module(text)
+        if found_fm and found_inn and found_inn in found_fm:
+            found_inn = None
 
+        # Agar mijoz «Yangi Texnologiyalar» DUK STIR raqamini (201589463) yuborgan bo'lsa
+        if found_inn == YANGI_TEXNOLOGIYALAR_INN:
+            yt_inn_msg = (
+                f"⚠️ <b>Diqqat! Kiritilgan СТИР (<code>{YANGI_TEXNOLOGIYALAR_INN}</code>) — Davlat Soliq Qo'mitasi huzuridagi «Yangi Texnologiyalar» DUK ning STIR raqami hisoblanadi!</b>\n\n"
+                "Iltimos, o'zingizning korxonangizga tegishli <b>9 xonali STIR (INN)</b> raqamingizni yuboring."
+            )
+            yt_inn_msg = adapt_to_user_script(yt_inn_msg, user_script)
+            try:
+                await message.reply(yt_inn_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(yt_inn_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, yt_inn_msg)
+            return True
+
+        # Agar mijoz xabarda yangi INN yozgan bo'lsa va u bazada topilmasa -> "0 so'm" demasdan, topilmaganini aytamiz!
         if found_inn:
+            found_results = excel_manager.search(found_inn)
+            if not found_results and not excel_manager.is_decommissioned(found_inn):
+                nf_msg = (
+                    f"❌ <b>СТИР (INN): <code>{found_inn}</code> bazadan topilmadi.</b>\n\n"
+                    "Iltimos, korxonangizning 9 xonali СТИР (INN) yoki 14 xonali JSHSHIR raqami to'g'ri yozilganini tekshirib qayta yuboring.\n"
+                    "👨‍💻 <i>Agar yangi mijoz bo'lsangiz yoki yordam kerak bo'lsa, «Usta kerak» deb yozing.</i>"
+                )
+                nf_msg = adapt_to_user_script(nf_msg, user_script)
+                try:
+                    await message.reply(nf_msg, parse_mode="HTML")
+                except Exception:
+                    await message.reply(nf_msg)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, nf_msg)
+                return True
             user_memory.set_last_id(chat_id, user_id, found_inn)
-        if found_fm:
-            user_memory.set_last_fm(chat_id, user_id, found_fm)
 
         remembered_id = user_memory.get_last_id(chat_id, user_id)
-        remembered_fm = user_memory.get_last_fm(chat_id, user_id)
+        remembered_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
 
         # =====================================================================
         # 1-BOSQICH: INN ANIQLANMAGAN BO'LSA -> INN NI SO'RASH
@@ -181,6 +215,21 @@ class HardwareIntentHandler:
                 await message.reply(decom_msg)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, decom_msg)
+            return True
+
+        if not results:
+            nf_msg = (
+                f"❌ <b>СТИР (INN): <code>{remembered_id}</code> bazadan topilmadi.</b>\n\n"
+                "Iltimos, korxonangizning 9 xonali СТИР (INN) raqami to'g'ri kiritilganini tekshirib qayta yuboring.\n"
+                "👨‍💻 <i>Yordam kerak bo'lsa, «Usta kerak» deb yozing.</i>"
+            )
+            nf_msg = adapt_to_user_script(nf_msg, user_script)
+            try:
+                await message.reply(nf_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(nf_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, nf_msg)
             return True
 
         org_name = results[0].get("name", "") if results else (user_memory.get_org_name(chat_id, user_id) or "")
@@ -268,14 +317,38 @@ class HardwareIntentHandler:
 
         # Fiskal modul bor -> OFD litsenziyasini tekshirish
         ofd_reply = await ofd_bridge.query_fiscal_module(bot, remembered_fm)
-        has_ann_debt = False
-        if ofd_reply:
-            lower_ofd = ofd_reply.lower()
-            has_no_debt = any(w in lower_ofd for w in [
-                "qarzdorlik mavjud emas", "qarzdorlik yo'q", "qarzdorlik yo‘q", "qarzi yo'q", "qarzi yo‘q", "faol"
-            ])
-            if not has_no_debt and any(w in lower_ofd for w in ["qarzdorlik mavjud", "fmo dan qarzdorlik", "qarzdorlik", "muddati o'tgan", "muddati o‘tgan"]):
-                has_ann_debt = True
+        ofd_status = parse_ofd_reply_status(ofd_reply)
+        if ofd_status == "unavailable":
+            user_memory.set_annual_status(chat_id, user_id, has_debt=False, details="unavailable", unavailable=True)
+            timeout_msg = (
+                f"⏳ <b>Davlat Soliq (OFD) tizimi vaqtincha javob bermayapti.</b>\n\n"
+                f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
+                f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n\n"
+                f"Soliq qo'mitasi (@ofd943_bot) tizimi bilan aloqa vaqtincha uzildi yoki serverda profilaktika ketmoqda.\n"
+                f"Iltimos, birozdan so'ng qayta urinib ko'ring yoki kassa apparatingiz ekranidagi xatolikni rasmga olib yuboring."
+            )
+            timeout_msg = adapt_to_user_script(timeout_msg, user_script)
+            try:
+                await message.reply(timeout_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(timeout_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, timeout_msg)
+            return True
+
+        if ofd_status == "not_found":
+            user_memory.clear_last_fm(chat_id, user_id)
+            not_found_msg = format_ofd_annual_status(remembered_fm, ofd_reply, user_script)
+            try:
+                await message.reply(not_found_msg, parse_mode="HTML")
+            except Exception:
+                await message.reply(not_found_msg)
+            user_memory.add_user_message(chat_id, user_id, text)
+            user_memory.add_assistant_message(chat_id, user_id, not_found_msg)
+            return True
+
+        user_memory.set_last_fm(chat_id, user_id, remembered_fm)
+        has_ann_debt = (ofd_status == "debt")
         user_memory.set_annual_status(chat_id, user_id, has_debt=has_ann_debt, details=ofd_reply or "")
 
         if has_ann_debt:

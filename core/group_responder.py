@@ -46,16 +46,16 @@ PROLONGED_CHAT_PHRASES = [
     "alo", "alo alo", "eshityapsizmi", "eshityapsanmi", "kimdir bormi", "odam bormi",
     "tirikmisiz", "tirikmisan", "bormisiz", "bormisan",
     "tezroq bo'l", "tezroq bol", "tezroq qiling", "tezroq qilib bering", "tezroq qib bering",
-    "tezroq yoq", "tezroq yoqing", "tezroq yoqvoring", "tezroq", "bo'laqol", "bolaqol",
+    "tezroq yoq", "tezroq yoqing", "tezroq yoqvoring", "bo'laqol", "bolaqol",
     "qachon yoqiladi", "qachon yoqasiz", "qachon yoqasizlar", "qachon tuzatiladi", "qachon tuzatasiz",
     "qachon bo'ladi", "qachon boladi", "bo'ladimi o'zi", "boladimi ozi", "bo'ladimi ozi",
     "kutib qoldim", "qachongacha kutaman", "qachongacha kutish kerak", "jonga tegdi",
     "e nima bo'ldi", "ee nima boldi", "nima bo'ldi", "nima boldi", "nima qilyapsiz",
     "admin qani", "admin qayerda", "usta qani", "kim javob beradi", "oxshamadi baribir",
-    "o'zing top", "ozing top", "bilmayman", "qayerdan bilay", "nimaga kerak", "senga nima",
+    "o'zing top", "ozing top", "senga nima",
     "qanaqa bot bu", "tushunarsiz bot", "tushunmayapsan", "axmoq", "jinni", "ha qachon", "qachon endi",
     "tashladimku boya", "tashladimku", "tashadimku", "hudoga soldim", "hudodan top",
-    "gap qaytarma", "nma qilay endi", "nima qilay endi", "lekin ishlamayabdida",
+    "gap qaytarma", "lekin ishlamayabdida",
     "ishlamayaptida baribir", "ishlamayabdida"
 ]
 
@@ -96,8 +96,10 @@ class GroupResponseOrchestrator:
             is_inn_or_phone_query_message,
             process_and_send_debt_result
         )
+        from excel_manager import excel_manager
 
         user_id = message.from_user.id if message.from_user else 0
+        username = message.from_user.username if message.from_user else None
         chat_id = message.chat.id
         raw_text = message.text or ""
         clean_text = raw_text.strip()
@@ -105,6 +107,34 @@ class GroupResponseOrchestrator:
 
         if not clean_text:
             return False
+
+        # =====================================================================
+        # 0-QADAM: GURUHDA ADMIN YOKI BOSHQA INSONGA YOZILGAN REPLY LARNI FILTRLASH
+        # =====================================================================
+        chat_type = getattr(message.chat, "type", "private")
+        if chat_type in ("group", "supergroup"):
+            replied_msg = getattr(message, "reply_to_message", None)
+            replied_user = getattr(replied_msg, "from_user", None) if replied_msg else None
+            replied_is_bot = bool(getattr(replied_user, "is_bot", False)) if replied_user else False
+
+            # A) Agar guruhda ro'yxatdan o'tgan Admin/Usta mijozga reply qilib javob yozayotgan bo'lsa:
+            # Mijozning eskalatsiya/muammo holatini yopamiz va bot sukut saqlaydi (adminga xalaqit bermaydi!)
+            if admin_manager.is_admin(user_id, username) and replied_user and not replied_is_bot:
+                target_uid = getattr(replied_user, "id", 0)
+                if target_uid:
+                    user_memory.clear_issue_mode(chat_id, target_uid)
+                    user_memory.clear_escalation(chat_id, target_uid)
+                return True
+
+            # B) Agar Admin guruhda mijozlarga ko'rsatma yozsa ("hozir yoqib beraman", "yoqildi", "tekshirib ko'ring"):
+            if admin_manager.is_admin(user_id, username):
+                admin_operator_phrases = [
+                    "yoqib beraman", "hozir yoqib", "ochib beraman", "hozir ochib",
+                    "yoqildi", "ochildi", "faollashtirildi", "ishlatib ko'ring",
+                    "o'chirib yoqing", "perezagruzka qiling", "tekshirib ko'ring"
+                ]
+                if any(ap in lower_text for ap in admin_operator_phrases):
+                    return True
 
         # =====================================================================
         # 1-QADAM: ALIFBO VA KONTEKSTNI DARHOL ESLAB QOLISH (Har qanday qadamdan kirganda ham!)
@@ -116,12 +146,10 @@ class GroupResponseOrchestrator:
         if found_fm and found_inn and found_inn in found_fm:
             found_inn = None
 
-        # Agar mijoz xabar ichida INN yoki FM yozgan bo'lsa (hatto boshqa savol ichida bo'lsa ham),
-        # darhol xotiraga yozib qo'yamiz — shunda keyingi qadamlar hech qachon yiqilmaydi!
-        if found_inn:
+        # Agar mijoz xabar ichida bazada mavjud INN yozgan bo'lsa,
+        # darhol xotiraga yozib qo'yamiz (noto'g'ri/begona 9 xonali raqam eski INN ni buzmasligi uchun tekshiramiz!)
+        if found_inn and (excel_manager.search(found_inn) or excel_manager.is_decommissioned(found_inn)):
             user_memory.set_last_id(chat_id, user_id, found_inn)
-        if found_fm:
-            user_memory.set_last_fm(chat_id, user_id, found_fm)
 
         # 1.1 Agar mijoz avval INN-siz to'lov kvitansiyasi tashlagan bo'lsa va endi INN yozsa -> darhol ulash!
         if found_inn:
@@ -354,7 +382,25 @@ class GroupResponseOrchestrator:
                     return True
 
             # 3.3 Agar mijoz aniq sabrsizlik iboralarini yozsa (masalan: "alo", "qachon javob", "tashladimku boya"):
-            is_prolonged = any(p in lower_text for p in PROLONGED_CHAT_PHRASES)
+            from payment_accounts import (
+                classify_payment_intent,
+                is_annual_check_intent,
+                is_monthly_check_intent,
+                is_both_check_intent,
+                is_general_debt_check_intent,
+                is_mxik_intent
+            )
+            from catalog_manager import catalog_manager
+            has_structured_intent = (
+                bool(classify_payment_intent(clean_text))
+                or is_annual_check_intent(clean_text)
+                or is_monthly_check_intent(clean_text)
+                or is_both_check_intent(clean_text)
+                or is_general_debt_check_intent(clean_text)
+                or is_mxik_intent(clean_text)
+                or bool(catalog_manager.find_matching_post(clean_text))
+            )
+            is_prolonged = (not has_structured_intent) and any(p in lower_text for p in PROLONGED_CHAT_PHRASES)
 
             if is_prolonged:
                 user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / sabrsizlik")
@@ -471,45 +517,6 @@ class GroupResponseOrchestrator:
         # =====================================================================
         # 8-QADAM: VIDEO KATALOG VA ERKIN SUHBAT (GEMINI AI)
         # =====================================================================
-        # Agar yuqoridagi 1-7 qadamlardagi aniq qoidalarning hech biriga tushmagan bo'lsa
-        # va foydalanuvchi allaqachon 4 martadan ortiq yozishma qilib gapni cho'zayotgan bo'lsa -> Adminga!
-        turn_cnt = user_memory.get_user_turn_count(chat_id, user_id)
-        if turn_cnt >= 4 and len(clean_text.split()) > 1 and not is_pure_greeting and not is_gratitude and not found_inn and not found_fm and not is_command:
-            from catalog_manager import catalog_manager
-            if not catalog_manager.find_post_by_keywords(clean_text):
-                user_memory.mark_escalated_to_admin(chat_id, user_id, reason="User gapni cho'zdi / uzoq suhbat")
-                remembered_id = user_memory.get_last_id(chat_id, user_id)
-                org_name = user_memory.get_org_name(chat_id, user_id)
-                last_photo = user_memory.get_last_photo(chat_id, user_id)
-
-                esc_msg = (
-                    "👨‍💻 <b>Sizni hududiy mas'ul administratorga yo'naltirdik. Iltimos, admin javobini kuting!</b>\n\n"
-                    f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
-                    "Barcha yozishmalaringiz va ma'lumotlaringiz mas'ul xodimimizga yetkazildi.\n"
-                    "Quyidagi tugmalar orqali to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
-                )
-                esc_msg = adapt_to_user_script(esc_msg, user_script)
-                kb = get_admin_contact_keyboard(inn=remembered_id)
-                try:
-                    await message.reply(esc_msg, parse_mode="HTML", reply_markup=kb)
-                except Exception:
-                    await message.reply(esc_msg, reply_markup=kb)
-
-                user_memory.add_user_message(chat_id, user_id, raw_text)
-                user_memory.add_assistant_message(chat_id, user_id, esc_msg)
-
-                await admin_manager.notify_user_query_escalation(
-                    bot=bot,
-                    user=message.from_user,
-                    chat_id=chat_id,
-                    query_text=raw_text,
-                    reason="Mijoz gapni cho'zdi / tezkor admin aralashuvi talab etiladi",
-                    inn=remembered_id,
-                    org_name=org_name,
-                    photo_file_id=last_photo
-                )
-                return True
-
         await conversation_intent_handler.handle(message, bot, user_script, ai_func=ai_func)
         return True
 
