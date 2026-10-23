@@ -122,7 +122,7 @@ class TestMxikAndAntiHallucination(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_05_billing_flow_oylikchi_and_yillikchi(self):
-        """'oylikchi' va 'yillikchi' alohida kanaldan post va video uzatishi kerak"""
+        """'oylikchi' va 'yillikchi' alohida kanaldan post uzatishi kerak (video avtomatik uzatilmaydi)"""
         bot = AsyncMock()
         bot.copy_message = AsyncMock()
 
@@ -132,13 +132,15 @@ class TestMxikAndAntiHallucination(unittest.IsolatedAsyncioTestCase):
         msg_oylik.chat.id = 12345
         msg_oylik.from_user.id = 12345
         msg_oylik.message_id = 101
+        msg_oylik.reply = AsyncMock()
+        msg_oylik.answer = AsyncMock()
 
         handled = await billing_intent_handler.handle(msg_oylik, bot, user_script="latin")
         self.assertTrue(handled)
-        self.assertEqual(bot.copy_message.call_count, 2)
+        self.assertEqual(bot.copy_message.call_count, 1)
         call_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(MARS_POST_ID, call_ids)
-        self.assertIn(MARS_VIDEO_ID, call_ids)
+        self.assertNotIn(MARS_VIDEO_ID, call_ids)
 
         # 2. "yillikchi"
         bot.copy_message.reset_mock()
@@ -147,13 +149,15 @@ class TestMxikAndAntiHallucination(unittest.IsolatedAsyncioTestCase):
         msg_yillik.chat.id = 12345
         msg_yillik.from_user.id = 12345
         msg_yillik.message_id = 102
+        msg_yillik.reply = AsyncMock()
+        msg_yillik.answer = AsyncMock()
 
         handled = await billing_intent_handler.handle(msg_yillik, bot, user_script="latin")
         self.assertTrue(handled)
-        self.assertEqual(bot.copy_message.call_count, 2)
+        self.assertEqual(bot.copy_message.call_count, 1)
         call_ids_ann = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, call_ids_ann)
-        self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, call_ids_ann)
+        self.assertNotIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, call_ids_ann)
 
     async def test_06_billing_handler_ignores_qarzim_qancha(self):
         """'qarzim qancha' BillingIntentHandler da to'lov posti bo'lib ketmasligi shart"""
@@ -165,6 +169,8 @@ class TestMxikAndAntiHallucination(unittest.IsolatedAsyncioTestCase):
         msg_debt.chat.id = 12345
         msg_debt.from_user.id = 12345
         msg_debt.message_id = 103
+        msg_debt.reply = AsyncMock()
+        msg_debt.answer = AsyncMock()
 
         # Foydalanuvchida hali INN yo'q, shuning uchun BillingIntentHandler False qaytarib, ConversationHandler ga o'tishi kerak
         handled = await billing_intent_handler.handle(msg_debt, bot, user_script="latin")

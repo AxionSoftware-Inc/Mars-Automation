@@ -6,18 +6,13 @@ from user_memory import user_memory
 from payment_accounts import (
     get_all_payment_accounts_card,
     get_both_posts_intro,
-    MARS_POST_ID,
-    MARS_VIDEO_ID,
-    YANGI_TEXNOLOGIYALAR_POST_ID,
-    YANGI_TEXNOLOGIYALAR_VIDEO_ID
+    send_both_account_posts,
 )
 from translit_manager import adapt_to_user_script, detect_script
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="commands_router")
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
@@ -73,36 +68,10 @@ async def cmd_tolov(message: types.Message, bot: Bot):
     except Exception:
         await message.reply(intro)
 
-    # 1. Kanaldan Oylik shot posti (Post 85)
-    try:
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=SOURCE_CHANNEL_ID,
-            message_id=MARS_POST_ID
-        )
-    except Exception as e:
-        logger.warning(f"Post 85 nusxalashda xatolik: {e}, kartani yuboramiz")
-        await message.answer(adapt_to_user_script(get_all_payment_accounts_card(), user_script), parse_mode="HTML")
+    await send_both_account_posts(bot, message.chat.id, script=user_script)
 
-    # 2. Kanaldan Yillik shot posti (Post 34)
-    try:
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=SOURCE_CHANNEL_ID,
-            message_id=YANGI_TEXNOLOGIYALAR_POST_ID
-        )
-    except Exception as e:
-        logger.warning(f"Post 34 nusxalashda xatolik: {e}")
-
-    # 3. Click orqali to'lash videosi (Post 148)
-    try:
-        await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=SOURCE_CHANNEL_ID,
-            message_id=MARS_VIDEO_ID
-        )
-    except Exception as e:
-        logger.error(f"Click videosini yuborishda xatolik: {e}")
+    user_memory.add_user_message(chat_id, user_id, "/tolov")
+    user_memory.add_assistant_message(chat_id, user_id, intro)
 
 
 @router.message(Command("tarix"))

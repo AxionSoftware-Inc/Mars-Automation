@@ -111,9 +111,12 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         reply1 = msg1.reply.call_args[0][0]
         self.assertIn("Fiskal modul", reply1)
         self.assertIn("seriya raqamini", reply1)
-        self.assertEqual(bot.copy_message.call_count, 0)  # Video yuborilmagan!
+        copied_ids_1 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertNotIn(145, copied_ids_1)  # Video yuborilmagan!
+        self.assertNotIn(148, copied_ids_1)
 
         # 2-qadam: oylikdanchi
+        bot.copy_message.reset_mock()
         msg2 = create_mock_message("oylikdanchi", chat_id, user_id)
         await handle_user_chat(msg2, bot)
         reply2 = msg2.reply.call_args[0][0]
@@ -129,6 +132,7 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Korxona", reply3)
 
         # 4-qadam: yillikdanchi (endi yana yillikni so'ramoqda)
+        bot.copy_message.reset_mock()
         msg4 = create_mock_message("yillikdanchi", chat_id, user_id)
         await handle_user_chat(msg4, bot)
         reply4 = msg4.reply.call_args[0][0]
@@ -141,12 +145,13 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("QARZDORLIK MAVJUD", reply5)
         self.assertIn("440 000 so'm", reply5)
 
-        # 6-qadam: to'layman -> Post 34 va Video 145 kanaldan uzatiladi
+        # 6-qadam: to'layman -> Post 34 kanaldan uzatiladi (video avtomatik uzatilmaydi)
+        bot.copy_message.reset_mock()
         msg6 = create_mock_message("to'layman", chat_id, user_id)
         await handle_user_chat(msg6, bot)
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(34, copied_ids)   # Yangi Texnologiyalar post 34
-        self.assertIn(145, copied_ids)  # Click yillik video 145
+        self.assertNotIn(145, copied_ids)  # Faqat so'ralgandagina video uzatiladi
 
     async def test_05_repeated_oylikchi_yillikchi_forwarding(self):
         """
@@ -159,43 +164,51 @@ class TestSequentialDebtFlow(unittest.IsolatedAsyncioTestCase):
         chat_id = 998811
         user_id = 445566
 
-        # 1-savol: oylikchi -> Post 85 va 148 uzatiladi
+        # 1-savol: oylikchi -> Post 85 uzatiladi (video 148 avtomatik emas)
         msg1 = create_mock_message("oylikchi", chat_id, user_id)
         await handle_user_chat(msg1, bot)
         copied_ids_1 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(85, copied_ids_1)
-        self.assertIn(148, copied_ids_1)
+        self.assertNotIn(148, copied_ids_1)
         self.assertEqual(msg1.reply.call_count, 0)  # Hech qanday uzun matn yozilmadi!
 
         bot.copy_message.reset_mock()
 
-        # 2-savol: yillikchi -> Post 34 va 145 uzatiladi
+        # 2-savol: yillikchi -> Post 34 uzatiladi (video 145 avtomatik emas)
         msg2 = create_mock_message("yillikchi", chat_id, user_id)
         await handle_user_chat(msg2, bot)
         copied_ids_2 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(34, copied_ids_2)
-        self.assertIn(145, copied_ids_2)
+        self.assertNotIn(145, copied_ids_2)
         self.assertEqual(msg2.reply.call_count, 0)
 
         bot.copy_message.reset_mock()
 
-        # 3-savol: yana oylikchi -> yana Post 85 va 148 uzatiladi
-        msg3 = create_mock_message("oylikchi", chat_id, user_id)
+        # 3-savol: qanday to'layman -> Video 145 uzatiladi (oxirgi mavzu yillik bo'lgani uchun)
+        msg3 = create_mock_message("qanday to'layman", chat_id, user_id)
         await handle_user_chat(msg3, bot)
         copied_ids_3 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
-        self.assertIn(85, copied_ids_3)
-        self.assertIn(148, copied_ids_3)
-        self.assertEqual(msg3.reply.call_count, 0)
+        self.assertIn(145, copied_ids_3)
 
         bot.copy_message.reset_mock()
 
-        # 4-savol: yana yillikchi -> yana Post 34 va 145 uzatiladi
-        msg4 = create_mock_message("yillikchi", chat_id, user_id)
+        # 4-savol: yana oylikchi -> yana Post 85 uzatiladi (video avtomatik emas)
+        msg4 = create_mock_message("oylikchi", chat_id, user_id)
         await handle_user_chat(msg4, bot)
         copied_ids_4 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
-        self.assertIn(34, copied_ids_4)
-        self.assertIn(145, copied_ids_4)
+        self.assertIn(85, copied_ids_4)
+        self.assertNotIn(148, copied_ids_4)
         self.assertEqual(msg4.reply.call_count, 0)
+
+        bot.copy_message.reset_mock()
+
+        # 5-savol: yana yillikchi -> yana Post 34 uzatiladi (video avtomatik emas)
+        msg5 = create_mock_message("yillikchi", chat_id, user_id)
+        await handle_user_chat(msg5, bot)
+        copied_ids_5 = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
+        self.assertIn(34, copied_ids_5)
+        self.assertNotIn(145, copied_ids_5)
+        self.assertEqual(msg5.reply.call_count, 0)
 
 
 if __name__ == "__main__":

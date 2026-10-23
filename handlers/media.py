@@ -18,14 +18,21 @@ from user_memory import user_memory
 from state_manager import get_last_file_message_id, set_last_file_message_id
 from translit_manager import adapt_to_user_script, detect_script
 from ofd_bridge import ofd_bridge
-from payment_accounts import MARS_ACCOUNT, YANGI_TEXNOLOGIYALAR_ACCOUNT, format_ofd_annual_status
+from payment_accounts import (
+    MARS_ACCOUNT,
+    YANGI_TEXNOLOGIYALAR_ACCOUNT,
+    format_ofd_annual_status,
+    SOURCE_CHANNEL_ID,
+    send_channel_message,
+    send_monthly_account_post,
+    send_annual_account_post,
+)
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="media_router")
 
 DESTINATION_CHANNEL_ID = -1003784534841  # marsfayllar
-SOURCE_CHANNEL_ID = -1001641871516       # @POS_Terminal_UzSmart_Bank
 EXCEL_CHANNEL_ID = int(os.getenv("EXCEL_CHANNEL_ID", "-1001795471853"))  # Абонент тулови🏦💸💰
 
 RECEIPT_KEYWORDS = [
@@ -412,27 +419,10 @@ async def _process_fiscal_receipt_content(
 
     # Qarz bo'lsa hisob raqamni matnda yozmasdan, kanaldan rasmiy post uzatiladi
     if has_monthly_debt:
-        from payment_accounts import MARS_POST_ID
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=MARS_POST_ID,
-                reply_to_message_id=message.message_id
-            )
-        except Exception as e:
-            logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
+        await send_monthly_account_post(bot, message.chat.id, reply_to_message_id=message.message_id, send_video=False)
 
     if has_annual_debt:
-        from payment_accounts import YANGI_TEXNOLOGIYALAR_POST_ID
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=YANGI_TEXNOLOGIYALAR_POST_ID
-            )
-        except Exception as e:
-            logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
+        await send_annual_account_post(bot, message.chat.id, send_video=False)
 
     user_memory.add_user_message(chat_id, user_id, f"[Kassa cheki] {caption}".strip())
     user_memory.add_assistant_message(chat_id, user_id, final_text)
@@ -619,15 +609,7 @@ async def _process_image_content(
                 user_memory.set_last_topic(chat_id, user_id, "issue_escalated_to_admin")
 
         if decision.video_id:
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=decision.video_id,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.error(f"Videoni yuborishda xatolik: {e}")
+            await send_channel_message(bot, message.chat.id, decision.video_id, reply_to_message_id=message.message_id)
         return
 
     # 3. BEGONA TASVIR YOKI XATOLIK BO'LGANDA XAVFSIZLIK CHIQISHI

@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="debt_router")
 
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
-
 def format_debt_response(results: list, checked_fm: str = None, annual_status: dict = None, chat_id: int = 0, user_id: int = 0) -> str:
     """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
     if not results:
@@ -74,7 +72,7 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
         monthly_rate = 100000.0 * device_count
         pay_year_end = total_debt + (remaining_months * monthly_rate)
 
-        text += f"🔴 <b>Qarzdorlik: {total_debt:,.0f} so'm</b>\n\n"
+        text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
         if remaining_months > 0:
             text += f"▫️ <b>Hozirgi qarz ({current_month_name}):</b> <code>{total_debt:,.0f}</code> so'm\n"
             text += f"▫️ <b>Yil oxirigacha (Dekabr):</b> <code>{pay_year_end:,.0f}</code> so'm\n\n"
@@ -97,8 +95,10 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
             else:
                 text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
         else:
+            is_issue = user_memory.is_issue_mode(chat_id, user_id) if (chat_id and user_id) else False
+            header = "2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish uchun:" if is_issue else "Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:"
             text += (
-                "\n\n🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+                f"\n\n🏛 <b>{header}</b>\n"
                 "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
             )
     else:
@@ -111,8 +111,10 @@ def format_debt_response(results: list, checked_fm: str = None, annual_status: d
             else:
                 text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
         else:
+            is_issue = user_memory.is_issue_mode(chat_id, user_id) if (chat_id and user_id) else False
+            header = "2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish uchun:" if is_issue else "Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:"
             text += (
-                "\n\n🏛 <b>Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:</b>\n"
+                f"\n\n🏛 <b>{header}</b>\n"
                 "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
             )
 
@@ -249,7 +251,7 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     if is_in_issue:
         if total_debt > 0:
             resp += (
-                "\n\n⚠️ <i>Apparat to'xtab qolishining sababi: «Mars» oylik abonent to'lovidagi qarzdorlik. "
+                "\n\n⚠️ <i>Apparat to'xtab qolishining sababi: «Mars» oylik abonent to'lovidan qarzdorlik. "
                 "Quyidagi hisob raqamga to'lov qilingandan so'ng apparat avtomatik faollashadi.</i>"
             )
         elif not checked_fm:
@@ -271,26 +273,11 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     user_memory.add_assistant_message(chat_id, user_id, resp)
 
     if total_debt > 0:
-        from payment_accounts import MARS_POST_ID, MARS_VIDEO_ID
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=MARS_POST_ID,
-                reply_to_message_id=message.message_id
-            )
-        except Exception as e:
-            logger.error(f"Oylik hisob raqam postini (85) nusxalashda xatolik: {e}")
+        from payment_accounts import send_monthly_account_post
+        await send_monthly_account_post(bot, message.chat.id, reply_to_message_id=message.message_id)
     elif is_in_issue:
-        from payment_accounts import FISKAL_MODUL_SAMPLE_POST_ID
-        try:
-            await bot.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=SOURCE_CHANNEL_ID,
-                message_id=FISKAL_MODUL_SAMPLE_POST_ID
-            )
-        except Exception as e:
-            logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+        from payment_accounts import send_fiscal_sample_post
+        await send_fiscal_sample_post(bot, message.chat.id)
 
 
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI

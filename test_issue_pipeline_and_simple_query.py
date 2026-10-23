@@ -35,7 +35,11 @@ class TestIssuePipelineAndSimpleQuery(unittest.IsolatedAsyncioTestCase):
         self.bot.send_message = AsyncMock()
         self.bot.copy_message = AsyncMock()
         self.bot.send_photo = AsyncMock()
+        self.orig_notify_admins = admin_manager.notify_admins
         admin_manager.notify_admins = AsyncMock()
+
+    def tearDown(self):
+        admin_manager.notify_admins = self.orig_notify_admins
 
     async def test_1_simple_query_no_issue_mode(self):
         """Oddiy so'rov: mijoz faqat INN yuboradi. Bot faqat qarzni aytadi, majburiy 2-bosqich yuklanmaydi."""
@@ -77,11 +81,11 @@ class TestIssuePipelineAndSimpleQuery(unittest.IsolatedAsyncioTestCase):
             # Javobda apparat to'xtashining sababi oylik qarz ekani aytilishi kerak
             reply_call = msg2.reply.call_args[0][0]
             self.assertIn("sababi: «Mars» oylik abonent to'lovidan qarzdorlik", reply_call)
-            # Post 85 va 148 nusxalanishi kerak
-            self.assertEqual(self.bot.copy_message.call_count, 2)
+            # Faqat rasmiy hisob raqam posti (Post 85) nusxalanadi (video faqat qanday to'lanadi deb so'ralganda uzatiladi)
+            self.assertEqual(self.bot.copy_message.call_count, 1)
             copy_msg_ids = [c[1]["message_id"] for c in self.bot.copy_message.call_args_list]
             self.assertIn(85, copy_msg_ids)
-            self.assertIn(148, copy_msg_ids)
+            self.assertNotIn(148, copy_msg_ids)
 
     async def test_3_issue_mode_with_annual_debt(self):
         """Muammo rejimi: apparat ishlamayapti -> Oylik 0 -> 2-bosqich FM so'raydi -> Yillik qarz bo'lsa -> Post 34 va 145."""
@@ -113,11 +117,11 @@ class TestIssuePipelineAndSimpleQuery(unittest.IsolatedAsyncioTestCase):
             reply3 = msg3.reply.call_args[0][0]
             self.assertIn("qarzdorlik mavjud", reply3.lower())
             self.assertIn("davlat soliq qo'mitasi (ofd) yillik litsenziya", reply3.lower())
-            # Post 34 va 145 nusxalangan bo'lishi kerak
-            self.assertEqual(self.bot.copy_message.call_count, 2)
+            # Faqat rasmiy hisob raqam posti (Post 34) nusxalanadi (video faqat qanday to'lanadi deb so'ralganda uzatiladi)
+            self.assertEqual(self.bot.copy_message.call_count, 1)
             copy_msg_ids = [c[1]["message_id"] for c in self.bot.copy_message.call_args_list]
             self.assertIn(34, copy_msg_ids)
-            self.assertIn(145, copy_msg_ids)
+            self.assertNotIn(145, copy_msg_ids)
 
     async def test_4_issue_mode_both_clear_escalates_to_admin(self):
         """Muammo rejimi: apparat ishlamayapti -> Oylik 0 -> Yillik 0 -> 3-bosqich ko'rsatiladi va ADMINGA ESKALATSIYA qilinadi!"""

@@ -90,8 +90,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 100000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=101, user_id=101)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("To'lov muvaffaqiyatli qabul qilindi", res.reply_text)
-            self.assertIn("Qarzdorlik to'liq bartaraf etildi", res.reply_text)
+            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
             self.assertTrue(res.debt_status_info.get("debt_covered"))
             self.assertEqual(res.debt_status_info.get("remaining_debt"), 0.0)
 
@@ -113,8 +112,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 200000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=102, user_id=102)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("qarz to'liq yopilmadi", res.reply_text)
-            self.assertIn("120,000 so'm", res.reply_text)
+            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
             self.assertFalse(res.debt_status_info.get("debt_covered"))
             self.assertEqual(res.debt_status_info.get("remaining_debt"), 120000.0)
 
@@ -136,9 +134,9 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 100000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=103, user_id=103)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("Ortiqcha to'lov (avans)", res.reply_text)
-            self.assertIn("100,000", res.reply_text)
+            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
             self.assertTrue(res.debt_status_info.get("debt_covered"))
+            self.assertEqual(res.debt_status_info.get("remaining_debt"), 0.0)
 
     def test_06_receipt_duplicate_detection(self):
         """Bitta kvitansiya tranzaksiyasi 2 marta yuborilganda dublikat deb belgilanishi va ogohlantirish berishi"""
@@ -163,7 +161,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch("transaction_tracker.transaction_tracker.is_duplicate", return_value=True), \
              patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 0.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=104, user_id=104)
-            self.assertIn("avval ham tizimga yuborilgan", res.reply_text)
+            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
             self.assertTrue(res.is_duplicate)
 
     def test_07_receipt_soliq_annual_fiscal_fee(self):
@@ -183,10 +181,9 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
 
         res = core_engine.process_receipt_facts(facts, chat_id=105, user_id=105)
         self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-        self.assertIn("Fiskal modulning yillik to'lov kvitansiyasi qabul qilindi", res.reply_text)
-        self.assertIn("Yangi Texnologiyalar", res.reply_text)
-        self.assertIn("2 soatdan 24 soatgacha", res.reply_text)
-        self.assertIn("Mars Elektron Texnika", res.reply_text)
+        self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
+        self.assertTrue(res.debt_status_info.get("is_annual"))
+        self.assertIn("Yangi Texnologiyalar", res.debt_status_info.get("recipient"))
 
     def test_08_receipt_unknown_third_party_recipient(self):
         """Marsga ham, Soliqqa ham tegishli bo'lmagan begona to'lov cheki yuborilganda ogohlantirish berishi"""

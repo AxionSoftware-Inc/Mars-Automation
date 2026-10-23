@@ -851,7 +851,8 @@ class CoreEngine:
         # 3. To'lov rekvizitlari va hisob raqamlar so'rovi (agar aniq INN yoki Fiskal modul kiritilmagan bo'lsa):
         from payment_accounts import (
             classify_payment_intent, get_monthly_payment_card, get_monthly_post_note,
-            get_annual_payment_card, get_annual_post_note, is_how_to_pay_video_intent
+            get_annual_payment_card, get_annual_post_note, is_how_to_pay_video_intent,
+            get_fiscal_module_request_prompt
         )
         p_intent = classify_payment_intent(clean_text)
         if p_intent and not found_fm and not found_inn:
@@ -880,14 +881,7 @@ class CoreEngine:
             "йиллик қарз", "йиллик карз", "йилликни текшир", "офд текшир", "фискал модул муддат"
         ]
         if any(kw in lower_text for kw in ofd_check_keywords) and not found_fm:
-            fm_ask = (
-                "🏛 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini tekshirish:</b>\n\n"
-                "⚠️ <b>Muhim qoida:</b> Har bitta kassa apparatida faqat <b>bitta o'ziga xos Fiskal modul</b> bo'ladi! "
-                "Boshqa apparatingizning chekidan emas, <b>aynan o'sha muammoli (ishlamayotgan) apparatdan</b> chiqarilgan chekning pastki qismidagi seriya raqami kerak.\n\n"
-                "📌 <b>Uni qayerdan topish mumkin?</b>\n"
-                "Aynan o'sha apparat chekining eng pastki qismida <b>LG...</b> yoki <b>YG...</b> kabi 2 ta harf bilan boshlangan 12-16 xonali seriya raqami yozilgan bo'ladi.\n\n"
-                "📸 <i>O'sha fiskal modul raqamini (masalan: <code>LG420210...</code>) yozib yuboring yoki chekning pastki qismini rasmga olib tashlang, darhol tekshirib beramiz!</i>"
-            )
+            fm_ask = get_fiscal_module_request_prompt(user_script)
             return DecisionResult(
                 action=ActionType.DEBT_INFO,
                 reply_text=fm_ask,

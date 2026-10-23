@@ -2,13 +2,13 @@ import os
 import logging
 from aiogram import Router, types, Bot
 from catalog_manager import catalog_manager
+from payment_accounts import SOURCE_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="channel_router")
 
 DESTINATION_CHANNEL_ID = int(os.getenv("DESTINATION_CHANNEL_ID", "-1003784534841"))  # marsfayllar
-SOURCE_CHANNEL_ID = int(os.getenv("SOURCE_CHANNEL_ID", "-1001641871516"))            # @POS_Terminal_UzSmart_Bank
 
 
 @router.channel_post()

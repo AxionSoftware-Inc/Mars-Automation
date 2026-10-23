@@ -3,11 +3,9 @@ from aiogram import types, Bot
 
 from user_memory import user_memory
 from translit_manager import adapt_to_user_script
-from payment_accounts import is_mxik_intent, get_mxik_guidance
+from payment_accounts import is_mxik_intent, get_mxik_guidance, send_channel_message
 
 logger = logging.getLogger(__name__)
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
 
 class MxikIntentHandler:
@@ -29,15 +27,7 @@ class MxikIntentHandler:
             await message.reply(mxik_text)
 
         if mxik_video_id:
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=mxik_video_id,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.warning(f"MXIK videosi yuborishda xatolik: {e}")
+            await send_channel_message(bot, message.chat.id, mxik_video_id, reply_to_message_id=message.message_id)
 
         user_memory.add_user_message(chat_id, user_id, text)
         user_memory.add_assistant_message(chat_id, user_id, mxik_text)

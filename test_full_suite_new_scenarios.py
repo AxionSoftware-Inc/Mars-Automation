@@ -84,28 +84,28 @@ class TestFullSuiteNewScenarios(unittest.IsolatedAsyncioTestCase):
             self.assertTrue("qarzdorlik yo'q" in reply3.lower() or "qarzingiz yo'q" in reply3.lower())
 
         # -------------------------------------------------------------
-        # 4-QADAM: Mijoz oylik hisob raqamini so'raydi: "oylikchi"
+        # 4-QADAM: Mijoz oylik hisob raqamini so'raydi: "oylik hisob raqamini tashlang"
         # -------------------------------------------------------------
-        print("\n🔹 [Turn 4] Mijoz: 'oylikchi'")
+        print("\n🔹 [Turn 4] Mijoz: 'oylik hisob raqamini tashlang'")
         bot.copy_message.reset_mock()
-        await self._send_msg(bot, "oylikchi")
-        self.assertEqual(bot.copy_message.call_count, 2)
+        await self._send_msg(bot, "oylik hisob raqamini tashlang")
+        self.assertEqual(bot.copy_message.call_count, 1)
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         print(f"🤖 Bot kanaldan uzatdi: Post {copied_ids}")
         self.assertIn(MARS_POST_ID, copied_ids)      # 85
-        self.assertIn(MARS_VIDEO_ID, copied_ids)     # 148
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids)  # Faqat qanday to'lanadi so'ralganda video uzatiladi
 
         # -------------------------------------------------------------
-        # 5-QADAM: Mijoz yillik hisob raqamini so'raydi: "yillikchi"
+        # 5-QADAM: Mijoz yillik hisob raqamini so'raydi: "yillik hisob raqamini tashlang"
         # -------------------------------------------------------------
-        print("\n🔹 [Turn 5] Mijoz: 'yillikchi'")
+        print("\n🔹 [Turn 5] Mijoz: 'yillik hisob raqamini tashlang'")
         bot.copy_message.reset_mock()
-        await self._send_msg(bot, "yillikchi")
-        self.assertEqual(bot.copy_message.call_count, 2)
+        await self._send_msg(bot, "yillik hisob raqamini tashlang")
+        self.assertEqual(bot.copy_message.call_count, 1)
         copied_ann = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         print(f"🤖 Bot kanaldan uzatdi: Post {copied_ann}")
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ann)  # 34
-        self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ann) # 145
+        self.assertNotIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ann) # Faqat qanday to'lanadi so'ralganda video uzatiladi
 
         # -------------------------------------------------------------
         # 6-QADAM: "Ikkalasini bitta hisob raqamga to'lasam bo'ladimi?"

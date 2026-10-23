@@ -131,14 +131,13 @@ class TestScriptAndChannelAccounts(unittest.IsolatedAsyncioTestCase):
 
         # bot.copy_message chaqiruvlari tekshiriladi
         copy_calls = bot.copy_message.call_args_list
-        # Birinchi copy_message: Post 85 (Oylik matn posti)
-        # Ikkinchi copy_message: Video 148 (Click videosi)
+        # Yangi qoidaga binoan (Foydalanuvchi talabi 6-7): Video avtomatik uzatilmaydi, faqat shot posti uzatiladi!
         copied_ids = [c.kwargs.get("message_id") for c in copy_calls]
         self.assertIn(MARS_POST_ID, copied_ids, f"Post {MARS_POST_ID} nusxalanishi shart!")
-        self.assertIn(MARS_VIDEO_ID, copied_ids, f"Video {MARS_VIDEO_ID} uzatilishi shart!")
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids, f"Video {MARS_VIDEO_ID} avtomatik uzatilmasligi kerak!")
 
     async def test_07_channel_post_forwarding_annual_cyrillic(self):
-        """7. Yillik shot Kirillcha so'ralganda 34-post va 145-video uzatilishi"""
+        """7. Yillik shot Kirillcha so'ralganda 34-post uzatilishi (video avtomatik uzatilmaydi)"""
         from handlers.chat import handle_user_chat
         bot = AsyncMock()
         message = MagicMock()
@@ -154,7 +153,7 @@ class TestScriptAndChannelAccounts(unittest.IsolatedAsyncioTestCase):
         copy_calls = bot.copy_message.call_args_list
         copied_ids = [c.kwargs.get("message_id") for c in copy_calls]
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, f"Post {YANGI_TEXNOLOGIYALAR_POST_ID} nusxalanishi shart!")
-        self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, f"Video {YANGI_TEXNOLOGIYALAR_VIDEO_ID} uzatilishi shart!")
+        self.assertNotIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, f"Video {YANGI_TEXNOLOGIYALAR_VIDEO_ID} avtomatik uzatilmasligi kerak!")
 
     async def test_08_channel_post_forwarding_both_posts(self):
         """8. Umumiy rekvizit so'ralganda ikkala post (85 va 34) ketma-ket uzatilishi"""

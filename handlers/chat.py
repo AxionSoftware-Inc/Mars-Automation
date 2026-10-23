@@ -8,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="chat_router")
 
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
-
 
 @router.message(F.text)
 async def handle_user_chat(message: types.Message, bot: Bot):

@@ -32,10 +32,9 @@ from core.models import (
     is_incomplete_inn_text
 )
 from admin_manager import admin_manager, get_admin_contact_keyboard
+from payment_accounts import PAYMENT_METHODS_KEYWORDS, send_channel_message
 
 logger = logging.getLogger(__name__)
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
 # Sabrsizlik yoki gapni cho'zish iboralari (3-Qadam uchun)
 PROLONGED_CHAT_PHRASES = [
@@ -204,14 +203,7 @@ class GroupResponseOrchestrator:
             user_memory.add_user_message(chat_id, user_id, raw_text)
             user_memory.add_assistant_message(chat_id, user_id, resp)
             if patch_result.video_id:
-                try:
-                    await bot.copy_message(
-                        chat_id=chat_id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=patch_result.video_id
-                    )
-                except Exception as e:
-                    logger.error(f"Patch video yuborishda xatolik: {e}")
+                await send_channel_message(bot, chat_id, patch_result.video_id)
             if patch_result.should_notify_admin:
                 await admin_manager.notify_user_query_escalation(
                     bot=bot,
@@ -332,9 +324,9 @@ class GroupResponseOrchestrator:
                     is_both_check_intent,
                     is_general_debt_check_intent,
                     is_mxik_intent,
-                    is_how_to_pay_video_intent
+                    is_how_to_pay_video_intent,
+                    PAYMENT_METHODS_KEYWORDS
                 )
-                from handlers.intents.billing import PAYMENT_METHODS_KEYWORDS
                 from catalog_manager import catalog_manager
                 is_structured_request = (
                     bool(classify_payment_intent(clean_text))
@@ -393,6 +385,7 @@ class GroupResponseOrchestrator:
                 is_mxik_intent
             )
             from catalog_manager import catalog_manager
+            from handlers.intents.conversation import CONVERSATIONAL_FOLLOWUPS
             has_structured_intent = (
                 bool(classify_payment_intent(clean_text))
                 or is_annual_check_intent(clean_text)
@@ -400,6 +393,7 @@ class GroupResponseOrchestrator:
                 or is_both_check_intent(clean_text)
                 or is_general_debt_check_intent(clean_text)
                 or is_mxik_intent(clean_text)
+                or any(kw in lower_text for kw in CONVERSATIONAL_FOLLOWUPS)
                 or bool(catalog_manager.find_matching_post(clean_text))
             )
             is_prolonged = (not has_structured_intent) and any(p in lower_text for p in PROLONGED_CHAT_PHRASES)
@@ -464,6 +458,11 @@ class GroupResponseOrchestrator:
             "чек чиқмаяпти", "чек чикмаяпти", "чек йўқ", "чек йук",
             "фискал модул қаерда", "фискал модул каерда", "фискал модул нима"
         ])
+        is_paid_not_active = any(w in lower_text for w in [
+            "yechildi", "pul ketdi", "to'ladim lekin", "toladim lekin", "to'lov qildim lekin",
+            "to'langan lekin", "pul o'tdi", "ечилди", "тўладим лекин"
+        ]) and any(w in lower_text for w in ["yonmadi", "yoqmadi", "ishlamadi", "ochilmadi", "hali", "xali", "blok"])
+
         is_billing_or_payment_intent = (
             bool(found_fm)
             or is_annual_check_intent(clean_text)
@@ -472,6 +471,7 @@ class GroupResponseOrchestrator:
             or bool(classify_payment_intent(clean_text))
             or is_asking_fm_location
             or is_incomplete_inn_text(clean_text)
+            or is_paid_not_active
             or (clean_text.isdigit() and 1 <= len(clean_text) <= 8 and not found_fm)
         )
         if is_billing_or_payment_intent:

@@ -138,7 +138,8 @@ class TestAnnualOFDFlow(unittest.TestCase):
         await handle_user_chat(msg3, bot)
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(34, copied_ids)   # Post 34
-        self.assertIn(145, copied_ids)  # Video 145
+        # Video 145 faqat qanday to'lanadi deb so'ralgandagina uzatiladi
+        self.assertNotIn(145, copied_ids)
 
     def test_04_full_chat_flow(self):
         asyncio.run(self._async_test_full_chat_flow())

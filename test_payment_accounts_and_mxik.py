@@ -275,7 +275,8 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(MARS_POST_ID, copied_ids)
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids)
-        self.assertIn(MARS_VIDEO_ID, copied_ids)
+        # Faqat qanday to'lanadi so'ralgandagina video uzatiladi, rekvizitlar so'rovida video jo'natilmaydi
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids)
 
     async def test_admin_annual_notification(self):
         bot = create_mock_bot()

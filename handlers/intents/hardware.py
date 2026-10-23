@@ -9,19 +9,15 @@ from core.models import extract_clean_inn, extract_fiscal_module
 from ofd_bridge import ofd_bridge
 from admin_manager import admin_manager, get_admin_contact_keyboard
 from payment_accounts import (
-    FISKAL_MODUL_SAMPLE_POST_ID,
     YANGI_TEXNOLOGIYALAR_INN,
-    YANGI_TEXNOLOGIYALAR_POST_ID,
-    YANGI_TEXNOLOGIYALAR_VIDEO_ID,
-    MARS_POST_ID,
-    MARS_VIDEO_ID,
+    send_monthly_account_post,
+    send_annual_account_post,
+    send_fiscal_sample_post,
     parse_ofd_reply_status,
     format_ofd_annual_status
 )
 
 logger = logging.getLogger(__name__)
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
 DEVICE_ISSUE_PHRASES = [
     "apparat ishlamayapti", "apparatim ishlamayapti", "aparat ishlamayapti", "aparatim ishlamayapti",
@@ -73,8 +69,16 @@ class HardwareIntentHandler:
         user_id = message.from_user.id if message.from_user else 0
         chat_id = message.chat.id
 
-        # 0. Aniq soat/vaqt videosi so'ralsa -> videoga yo'naltirish
-        if any(w in lower_text for w in ["soatni to'g'rilash", "vaqtni to'g'rilash", "soat videosi", "vaqt videosi"]):
+        # 0. Aniq yo'riqnoma yoki katalog videosi so'ralsa (Z-hisobot, soat/vaqt, MXIK) -> tegishli handlerga yo'naltirish
+        from payment_accounts import is_mxik_intent
+        if is_mxik_intent(text):
+            return False
+
+        if any(w in lower_text for w in [
+            "z hisobot", "z-hisobot", "z otchet", "z-otchet", "kunlik hisobot",
+            "soatni to'g'rilash", "vaqtni to'g'rilash", "soat videosi", "vaqt videosi",
+            "vaqtni qanday", "soatni qanday", "soat noto'g'ri", "vaqt noto'g'ri", "soat xato", "vaqt xato"
+        ]):
             return False
 
         is_in_issue = user_memory.is_issue_mode(chat_id, user_id)
@@ -248,9 +252,9 @@ class HardwareIntentHandler:
             debt_resp = adapt_to_user_script(debt_resp, user_script)
             try:
                 await message.reply(debt_resp, parse_mode="HTML")
-                await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-            except Exception as e:
-                logger.warning(f"Oylik qarz xabarini uzatishda xatolik: {e}")
+            except Exception:
+                await message.reply(debt_resp)
+            await send_monthly_account_post(bot, chat_id, script=user_script)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, debt_resp)
             return True
@@ -300,14 +304,7 @@ class HardwareIntentHandler:
             except Exception:
                 await message.reply(clear_msg)
 
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=FISKAL_MODUL_SAMPLE_POST_ID
-                )
-            except Exception as e:
-                logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+            await send_fiscal_sample_post(bot, message.chat.id)
 
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, clear_msg)
@@ -363,9 +360,9 @@ class HardwareIntentHandler:
             ann_msg = adapt_to_user_script(ann_msg, user_script)
             try:
                 await message.reply(ann_msg, parse_mode="HTML")
-                await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-            except Exception as e:
-                logger.warning(f"Yillik qarz postini yuborishda xatolik: {e}")
+            except Exception:
+                await message.reply(ann_msg)
+            await send_annual_account_post(bot, chat_id, script=user_script)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, ann_msg)
             user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
@@ -397,7 +394,7 @@ class HardwareIntentHandler:
                 f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
                 f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n"
                 f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
-                f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Litsenziya muddati joyida)\n\n"
                 f"{contacts_block}\n\n"
                 f"📸 <b>Iltimos, apparat ekranidagi xatolik yozuvini rasmga olib yuboring!</b>\n\n"
                 f"📌 <i>Shuningdek tekshirib ko'ring:</i>\n"

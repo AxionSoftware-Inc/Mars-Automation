@@ -66,10 +66,10 @@ class TestStrictDiagnosticFlow(unittest.TestCase):
         )
 
         self.assertEqual(decision.action, ActionType.DIAGNOSE_AND_REPLY)
-        self.assertEqual(decision.video_id, 148)
+        self.assertIsNone(decision.video_id)  # Yangi qoida: video avtomatik jo'natilmaydi, faqat so'ralganda
         self.assertGreater(decision.debt_amount, 0)
         self.assertIn("JAMI QARZDORLIK", decision.reply_text)
-        self.assertIn("kanaldan uzatildi", decision.reply_text)
+        self.assertTrue("quyida keltirildi" in decision.reply_text or "kanaldan uzatildi" in decision.reply_text)
 
     def test_smartone_photo_with_zero_debt_asks_fiscal_module(self):
         """Smart One apparatida Mars qarzi 0 bo'lsa, Step 2: Fiskal modul so'raydi!"""

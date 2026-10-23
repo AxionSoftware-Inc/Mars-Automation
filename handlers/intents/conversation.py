@@ -5,10 +5,9 @@ from user_memory import user_memory
 from translit_manager import adapt_to_user_script
 from catalog_manager import catalog_manager
 from admin_manager import admin_manager, get_admin_contact_keyboard
+from payment_accounts import send_channel_message
 
 logger = logging.getLogger(__name__)
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
 
 CONVERSATIONAL_FOLLOWUPS = [
     "qachon qo'shiladi", "qachon qoshiladi", "qachon yoqiladi", "qachon ochiladi",
@@ -60,19 +59,11 @@ class ConversationIntentHandler:
         if not is_conversational or explicit_video_request:
             video_id = catalog_manager.find_matching_post(text)
             if video_id:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=video_id,
-                        reply_to_message_id=message.message_id
-                    )
-                    user_memory.add_user_message(chat_id, user_id, text)
-                    user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
-                    user_memory.set_last_topic(chat_id, user_id, f"video_{video_id}")
-                    return True
-                except Exception as e:
-                    logger.error(f"Video post jo'natishda xatolik (ID: {video_id}): {e}")
+                await send_channel_message(bot, message.chat.id, video_id, reply_to_message_id=message.message_id)
+                user_memory.add_user_message(chat_id, user_id, text)
+                user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
+                user_memory.set_last_topic(chat_id, user_id, f"video_{video_id}")
+                return True
 
         # 2. Agar bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
         if is_conversational or (has_active_context and not explicit_video_request):
@@ -119,15 +110,7 @@ class ConversationIntentHandler:
                 )
 
             if ai_video_id:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=ai_video_id,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.error(f"AI tavsiya qilgan videoni yuborishda xatolik (ID: {ai_video_id}): {e}")
+                await send_channel_message(bot, message.chat.id, ai_video_id, reply_to_message_id=message.message_id)
             return True
 
         # 3. Boshqalari bo'yicha umumiy AI javobi
@@ -174,15 +157,7 @@ class ConversationIntentHandler:
             )
 
         if ai_video_id:
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=ai_video_id,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.error(f"AI tavsiya qilgan videoni yuborishda xatolik (ID: {ai_video_id}): {e}")
+            await send_channel_message(bot, message.chat.id, ai_video_id, reply_to_message_id=message.message_id)
         return True
 
 conversation_intent_handler = ConversationIntentHandler()

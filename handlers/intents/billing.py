@@ -23,6 +23,7 @@ from payment_accounts import (
     is_annual_pay_intent,
     is_monthly_pay_intent,
     is_how_to_pay_video_intent,
+    is_mxik_intent,
     parse_ofd_reply_status,
     format_ofd_annual_status,
     get_monthly_payment_card,
@@ -31,28 +32,17 @@ from payment_accounts import (
     get_annual_post_note,
     get_both_posts_intro,
     get_fiscal_module_request_prompt,
-    MARS_POST_ID,
-    MARS_VIDEO_ID,
     YANGI_TEXNOLOGIYALAR_INN,
-    YANGI_TEXNOLOGIYALAR_POST_ID,
-    YANGI_TEXNOLOGIYALAR_VIDEO_ID,
-    FISKAL_MODUL_SAMPLE_POST_ID
+    PAYMENT_METHODS_KEYWORDS,
+    send_channel_message,
+    send_monthly_account_post,
+    send_annual_account_post,
+    send_both_account_posts,
+    send_fiscal_sample_post,
+    send_how_to_pay_video
 )
 
 logger = logging.getLogger(__name__)
-
-SOURCE_CHANNEL_ID = -1001641871516  # @POS_Terminal_UzSmart_Bank
-
-PAYMENT_METHODS_KEYWORDS = [
-    "qanday to'layman", "qanday tolayman", "qanaqa to'layman", "qanaqa tolayman",
-    "qanday to'lanadi", "qanday tolanadi", "qanday tulanadi",
-    "qanday to'lasa bo'ladi", "qanday tolasa boladi", "qanday tulasa boladi",
-    "click orqali to'lash", "click orqali tolash", "clickdan to'lash", "clickdan tolash",
-    "click orqali qanday", "kartadan to'lash", "plastikdan to'lash", "to'lash tartibi",
-    "qanday to'lasam bo'ladi", "qanday tolasam boladi", "to'lov qilish tartibi",
-    "to'lash videosi", "tolash videosi", "to'lashni o'rgating", "tolashni orgating",
-    "қандай тўланади", "кандай толанади", "қандай тўлайман", "тўлаш тартиби", "тўлаш видеоси"
-]
 
 TECH_QUESTION_WORDS = [
     "qanday", "qanaqa", "qilish kerak", "qo'yish", "urish", "bekor qilish",
@@ -105,9 +95,9 @@ class BillingIntentHandler:
                 acc_msg = adapt_to_user_script(acc_msg, user_script)
                 try:
                     await message.reply(acc_msg, parse_mode="HTML")
-                    await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                except Exception as e:
-                    logger.warning(f"Mars post 85 uzatishda xatolik: {e}")
+                except Exception:
+                    await message.reply(acc_msg)
+                await send_monthly_account_post(bot, message.chat.id, script=user_script)
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, acc_msg)
                 return True
@@ -121,9 +111,9 @@ class BillingIntentHandler:
                 acc_msg = adapt_to_user_script(acc_msg, user_script)
                 try:
                     await message.reply(acc_msg, parse_mode="HTML")
-                    await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-                except Exception as e:
-                    logger.warning(f"Yangi Texnologiyalar post 34 uzatishda xatolik: {e}")
+                except Exception:
+                    await message.reply(acc_msg)
+                await send_annual_account_post(bot, message.chat.id, script=user_script)
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, acc_msg)
                 return True
@@ -313,11 +303,7 @@ class BillingIntentHandler:
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, single_warn)
 
-            try:
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-            except Exception:
-                pass
+            await send_both_account_posts(bot, message.chat.id, script=user_script)
             user_memory.set_last_topic(chat_id, user_id, "payment_info_both")
             return True
 
@@ -347,8 +333,9 @@ class BillingIntentHandler:
         # 2. Ikkala to'lov / umumiy qarzdorlik so'ralsa yoki bitta xabarda ham yillik, ham oylik/INN bo'lsa
         is_both = is_both_check_intent(text) or (bool(found_fm) and bool(found_inn)) or (is_annual_check_intent(text) and (is_monthly_check_intent(text) or bool(found_inn)))
         is_general_debt = is_general_debt_check_intent(text)
+        has_context_for_general = bool(found_inn or user_memory.get_last_id(chat_id, user_id) or found_fm or user_memory.get_last_fm(chat_id, user_id))
 
-        if is_both or (is_general_debt and not is_annual_check_intent(text) and not is_monthly_check_intent(text)):
+        if is_both or (is_general_debt and has_context_for_general and not is_annual_check_intent(text) and not is_monthly_check_intent(text)):
             remembered_id = found_inn or user_memory.get_last_id(chat_id, user_id)
             remembered_fm = found_fm or user_memory.get_last_fm(chat_id, user_id)
 
@@ -375,14 +362,7 @@ class BillingIntentHandler:
                         await message.answer(fm_ask, parse_mode="HTML")
                     except Exception:
                         await message.answer(fm_ask)
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=FISKAL_MODUL_SAMPLE_POST_ID
-                        )
-                    except Exception as e:
-                        logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+                    await send_fiscal_sample_post(bot, message.chat.id)
                     user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
                 return True
             elif remembered_fm and not remembered_id:
@@ -473,14 +453,9 @@ class BillingIntentHandler:
                 ofd_text = adapt_to_user_script(ofd_text, user_script)
                 try:
                     await message.reply(ofd_text, parse_mode="HTML")
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
+                except Exception:
+                    await message.reply(ofd_text)
+                await send_annual_account_post(bot, message.chat.id, reply_to_message_id=message.message_id, script=user_script)
                 user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, ofd_text)
@@ -513,10 +488,7 @@ class BillingIntentHandler:
                         await message.reply(monthly_debt_msg, parse_mode="HTML")
                     except Exception:
                         await message.reply(monthly_debt_msg)
-                    try:
-                        await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                    except Exception as e:
-                        logger.warning(f"Post 85 yuborishda xatolik: {e}")
+                    await send_monthly_account_post(bot, message.chat.id, script=user_script)
                     user_memory.add_user_message(chat_id, user_id, text)
                     user_memory.add_assistant_message(chat_id, user_id, monthly_debt_msg)
                     user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
@@ -530,14 +502,14 @@ class BillingIntentHandler:
                         f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
                         f"🏛 <b>Fiskal modul:</b> <code>{found_fm}</code>\n"
                         f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
-                        f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                        f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Litsenziya muddati joyida)\n\n"
                         f"📌 <b>Apparatni ishga tushirish uchun quyidagilarni tekshiring:</b>\n"
                         f"1️⃣ <b>Internet aloqasi:</b> Apparatda Wi-Fi yoki SIM-karta tarmog'i (antenna belgisi) borligini tekshiring;\n"
                         f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
                         f"3️⃣ <b>Qayta yoqish:</b> Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot);\n"
                         f"4️⃣ <b>Rasm yuborish:</b> Agar baribir ishlamasa, apparat ekranidagi xatolik yozuvini rasmga olib yuboring.\n\n"
                         f"{admin_manager.get_contacts_display(inn=remembered_id)}\n\n"
-                        f"👨‍💻 <b>Barcha ma'lumotlaringiz hududingiz bo'yicha mas'ul adminga yetkazildi.</b> Tez orada mutaxassis siz bilan bog'lanadi:"
+                        f"👨‍💻 <b>Barcha ma'lumotlaringiz hududingiz bo'yicha mas'ul mutaxassislarga yetkazildi.</b> Tez orada mutaxassis siz bilan bog'lanadi:"
                     )
                     step3_text = adapt_to_user_script(step3_text, user_script)
                     kb = get_admin_contact_keyboard(inn=remembered_id)
@@ -594,15 +566,7 @@ class BillingIntentHandler:
                 await message.reply(fm_guide, parse_mode="HTML")
             except Exception:
                 await message.reply(fm_guide)
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=FISKAL_MODUL_SAMPLE_POST_ID,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+            await send_fiscal_sample_post(bot, message.chat.id, reply_to_message_id=message.message_id)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, fm_guide)
             user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
@@ -626,15 +590,7 @@ class BillingIntentHandler:
                 await message.reply(yt_text, parse_mode="HTML")
             except Exception:
                 await message.reply(yt_text)
-            try:
-                await bot.copy_message(
-                    chat_id=message.chat.id,
-                    from_chat_id=SOURCE_CHANNEL_ID,
-                    message_id=SOLIQ_POST_ID,
-                    reply_to_message_id=message.message_id
-                )
-            except Exception as e:
-                logger.warning(f"Soliq postini yuborishda xatolik: {e}")
+            await send_annual_account_post(bot, message.chat.id, reply_to_message_id=message.message_id, script=user_script)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, yt_text)
             user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
@@ -650,14 +606,14 @@ class BillingIntentHandler:
 
         # Agar mijoz hozirgina "shot raqam" / "qayerga to'layman" deb hisob raqam so'ragan bo'lsa,
         # va keyingi gapida "yillikchi", "yillik-chi", "oylikchi" desa — u yillik/oylik SHOT (hisob raqam) so'rayapti!
-        is_contextual_ann_shot = is_in_payment_card_context and any(w in lower_text for w in [
+        is_contextual_ann_shot = (not is_mxik_intent(text)) and is_in_payment_card_context and any(w in lower_text for w in [
             "yillikchi", "yilikchi", "yillik-chi", "yillikkachi", "yillikdanchi", "fiskalchi", "soliqchi", "ofdchi",
             "yillikch", "yillikcha",
             "yillik", "fiskal", "soliq", "ofd", "йилликчи", "йилликкачи", "йилликданчи", "фискалчи", "солиқчи", "йиллик",
-            "йилликч", "йилликча"
+            "йилликч", "йилликcha"
         ]) and not any(w in lower_text for w in ["qarz", "bormi", "tekshir", "қарз", "борми", "текшир"])
 
-        is_contextual_mon_shot = is_in_payment_card_context and any(w in lower_text for w in [
+        is_contextual_mon_shot = (not is_mxik_intent(text)) and is_in_payment_card_context and any(w in lower_text for w in [
             "oylikchi", "oylik-chi", "oylikkachi", "oylikdanchi", "marschi", "abonentchi",
             "oylikch", "oylikcha",
             "oylik", "mars", "abonent", "ойликчи", "ойликкачи", "ойликданчи", "марсчи", "ойлик",
@@ -676,26 +632,7 @@ class BillingIntentHandler:
         if (is_ann_pay or is_mon_pay or is_both_pay) and not found_fm and not found_inn:
             if is_both_pay:
                 # Kanaldan ikkala hisob raqam postini to'g'ridan-to'g'ri uzatish
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 85 nusxalashda xatolik: {e}")
-                    await message.reply(adapt_to_user_script(get_monthly_payment_card(), user_script), parse_mode="HTML")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
-                    await message.answer(adapt_to_user_script(get_annual_payment_card(), user_script), parse_mode="HTML")
+                await send_both_account_posts(bot, message.chat.id, reply_to_message_id=message.message_id, script=user_script)
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Ikkala shot posti (85 va 34) kanaldan uzatildi]")
@@ -761,29 +698,12 @@ class BillingIntentHandler:
                         await message.reply(status_header)
                     user_memory.add_assistant_message(chat_id, user_id, status_header)
 
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Oylik shot postini (85) nusxalashda xatolik: {e}")
-                    if not status_header:
-                        monthly_card = adapt_to_user_script(get_monthly_payment_card(), user_script)
-                        await message.reply(monthly_card, parse_mode="HTML")
-
-                wants_video = is_how_to_pay_video_intent(text)
-                if wants_video:
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=MARS_VIDEO_ID
-                        )
-                    except Exception as e:
-                        logger.warning(f"Video 148 nusxalashda xatolik: {e}")
+                await send_monthly_account_post(
+                    bot, message.chat.id,
+                    reply_to_message_id=message.message_id,
+                    send_video=is_how_to_pay_video_intent(text),
+                    script=user_script
+                )
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) kanaldan uzatildi]")
@@ -844,28 +764,12 @@ class BillingIntentHandler:
                         await message.reply(debt_msg)
                     user_memory.add_assistant_message(chat_id, user_id, debt_msg)
 
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Yillik shot postini (34) nusxalashda xatolik: {e}")
-                    annual_card = adapt_to_user_script(get_annual_payment_card(), user_script)
-                    await message.reply(annual_card, parse_mode="HTML")
-
-                wants_video = is_how_to_pay_video_intent(text)
-                if wants_video:
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
-                        )
-                    except Exception as e:
-                        logger.warning(f"Video 145 nusxalashda xatolik: {e}")
+                await send_annual_account_post(
+                    bot, message.chat.id,
+                    reply_to_message_id=message.message_id,
+                    send_video=is_how_to_pay_video_intent(text),
+                    script=user_script
+                )
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot posti (34) kanaldan uzatildi]")
@@ -934,15 +838,7 @@ class BillingIntentHandler:
                     user_memory.add_assistant_message(chat_id, user_id, ofd_text)
                     user_memory.set_last_topic(chat_id, user_id, "annual_debt_exists")
 
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                            reply_to_message_id=message.message_id
-                        )
-                    except Exception as e:
-                        logger.warning(f"Post 34 nusxalashda xatolik: {e}")
+                    await send_annual_account_post(bot, message.chat.id, reply_to_message_id=message.message_id, script=user_script)
                     return True
                 else:
                     remembered_id = user_memory.get_last_id(chat_id, user_id)
@@ -980,10 +876,7 @@ class BillingIntentHandler:
                         except Exception:
                             await message.reply(monthly_debt_msg)
                         if is_issue:
-                            try:
-                                await bot.copy_message(chat_id=message.chat.id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                            except Exception as e:
-                                logger.warning(f"Post 85 uzatishda xatolik: {e}")
+                            await send_monthly_account_post(bot, message.chat.id, script=user_script)
                         user_memory.add_user_message(chat_id, user_id, text)
                         user_memory.add_assistant_message(chat_id, user_id, monthly_debt_msg)
                         user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists")
@@ -998,7 +891,7 @@ class BillingIntentHandler:
                             f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id or 'Aniqlangan'}</code>)\n"
                             f"🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>\n"
                             f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
-                            f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Muddati joyida)\n\n"
+                            f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Litsenziya muddati joyida)\n\n"
                             f"📌 <b>Apparatni ishga tushirish uchun tekshirib ko'ring:</b>\n"
                             f"1️⃣ <b>Internet aloqasi:</b> Apparatda Wi-Fi yoki SIM-karta tarmog'i (antenna belgisi) borligini tekshiring;\n"
                             f"2️⃣ <b>Soat va sana:</b> Apparatdagi vaqt hozirgi aniq vaqt bilan to'g'ri kelayotganini tekshiring;\n"
@@ -1058,15 +951,7 @@ class BillingIntentHandler:
                 except Exception:
                     await message.reply(fm_prompt)
 
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=FISKAL_MODUL_SAMPLE_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Fiskal modul namunasi postini yuborishda xatolik: {e}")
+                await send_fiscal_sample_post(bot, message.chat.id, reply_to_message_id=getattr(message, "message_id", None))
 
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, fm_prompt)
@@ -1105,15 +990,7 @@ class BillingIntentHandler:
                 user_memory.add_assistant_message(chat_id, user_id, multi_text)
                 user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists" if has_any_debt else "monthly_debt_clear")
                 if has_any_debt:
-                    try:
-                        await bot.copy_message(
-                            chat_id=message.chat.id,
-                            from_chat_id=SOURCE_CHANNEL_ID,
-                            message_id=MARS_POST_ID,
-                            reply_to_message_id=message.message_id
-                        )
-                    except Exception as e:
-                        logger.warning(f"Oylik shot postini uzatishda xatolik: {e}")
+                    await send_monthly_account_post(bot, message.chat.id, reply_to_message_id=message.message_id, send_video=False)
                 return True
 
             remembered_id = explicit_inn or user_memory.get_last_id(chat_id, user_id)
@@ -1156,50 +1033,23 @@ class BillingIntentHandler:
                 or any(w in lower_text for w in ["yillik", "fiskal", "soliq", "ofd", "йиллик", "фискал", "солиқ", "солик", "офд"])
             )
             if is_annual_context:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 34 nusxalashda xatolik: {e}")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.error(f"Yillik video 145 nusxalashda xatolik: {e}")
-
+                await send_annual_account_post(
+                    bot, message.chat.id,
+                    reply_to_message_id=message.message_id,
+                    send_video=True,
+                    script=user_script
+                )
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Yillik shot (34) va Yillik to'lov videosi (145) yuborildi]")
                 user_memory.set_last_topic(chat_id, user_id, "annual_payment_card_sent")
                 return True
             else:
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_POST_ID,
-                        reply_to_message_id=message.message_id
-                    )
-                except Exception as e:
-                    logger.warning(f"Post 85 yuborishda xatolik: {e}")
-                    await message.reply(adapt_to_user_script(get_monthly_payment_card(), user_script), parse_mode="HTML")
-
-                try:
-                    await bot.copy_message(
-                        chat_id=message.chat.id,
-                        from_chat_id=SOURCE_CHANNEL_ID,
-                        message_id=MARS_VIDEO_ID
-                    )
-                except Exception as e:
-                    logger.error(f"To'lov videosi yuborishda xatolik: {e}")
-
+                await send_monthly_account_post(
+                    bot, message.chat.id,
+                    reply_to_message_id=message.message_id,
+                    send_video=True,
+                    script=user_script
+                )
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, "[Oylik shot posti (85) va Click video (148) yuborildi]")
                 user_memory.set_last_topic(chat_id, user_id, "monthly_payment_card_sent")

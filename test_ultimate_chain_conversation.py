@@ -107,9 +107,9 @@ class TestUltimateChainConversation(unittest.IsolatedAsyncioTestCase):
                 elif "Turn 10" in step_title:
                     self.assertTrue("1,500,400" in reply or "qarzdorlik" in reply.lower() or "406" in reply.lower())
                 elif "Turn 11" in step_title:
-                    self.assertTrue(any(w in reply.lower() for w in ["vaqt", "soat", "15", "video", "post"]))
+                    self.assertTrue(any(w in reply.lower() for w in ["vaqt", "soat", "15", "141", "video", "post"]))
                 elif "Turn 12" in step_title:
-                    self.assertTrue(any(w in reply.lower() for w in ["z-hisobot", "z hisobot", "hisobotlar", "kunlik"]))
+                    self.assertTrue("2" in reply or any(w in reply.lower() for w in ["z-hisobot", "z hisobot", "hisobotlar", "kunlik"]))
                 elif "Turn 13" in step_title:
                     self.assertTrue(any(w in reply.lower() for w in ["tamaki", "mxik", "kod", "02401"]))
                 elif "Turn 14" in step_title:

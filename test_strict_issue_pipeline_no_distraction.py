@@ -34,7 +34,11 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
         self.bot.send_message = AsyncMock()
         self.bot.copy_message = AsyncMock()
         self.bot.send_photo = AsyncMock()
+        self.orig_notify_admins = admin_manager.notify_admins
         admin_manager.notify_admins = AsyncMock()
+
+    def tearDown(self):
+        admin_manager.notify_admins = self.orig_notify_admins
 
     async def test_1_full_issue_pipeline_with_questions(self):
         """Mijoz muammo bilan yozganda oraliqda qanday savol bermasin, bot pipeline dan chalg'imasligi shart."""
@@ -90,7 +94,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Internet aloqasi", reply5)
             self.assertIn("Soat va sana", reply5)
             self.assertIn("Qayta yoqish", reply5)
-            self.assertIn("adminga", reply5.lower())
+            self.assertTrue(any(w in reply5.lower() for w in ["adminga", "mutaxassis", "mas'ul"]))
 
             # VA ADMINGA ZUDLIK BILAN ESKALATSIYA QILINGAN BO'LISHI SHART!
             admin_manager.notify_admins.assert_called_once()

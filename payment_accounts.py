@@ -1,9 +1,15 @@
+import logging
+import os
 import re
 from typing import Optional, Tuple, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # 1. TASHKILOTLAR VA HISOB RAQAMLAR (OYLIK VA YILLIK TO'LOVLAR)
 # =============================================================================
+
+SOURCE_CHANNEL_ID = int(os.getenv("SOURCE_CHANNEL_ID", "-1001641871516"))  # @POS_Terminal_UzSmart_Bank
 
 # 1.1 OYLIK ABONENT TO'LOVI (Har oyning 6-sanasigacha to'lanadi)
 # Xizmat turi: Smart POS kassa apparatiga dasturiy va servis xizmati ko'rsatish
@@ -51,6 +57,119 @@ YANGI_TEXNOLOGIYALAR_KEYWORDS = [
     "фискал модул тўлов", "фискал модул толов", "фискал модулнинг йиллик",
     "йиллик тўлов", "йиллик толов", "йиллик тулов", "йиллик шот", "йиллик ҳисоб"
 ]
+
+
+PAYMENT_METHODS_KEYWORDS = [
+    "qanday to'layman", "qanday tolayman", "qanaqa to'layman", "qanaqa tolayman",
+    "qanday to'lanadi", "qanday tolanadi", "qanday tulanadi",
+    "qanday to'lasa bo'ladi", "qanday tolasa boladi", "qanday tulasa boladi",
+    "click orqali to'lash", "click orqali tolash", "clickdan to'lash", "clickdan tolash",
+    "click orqali qanday", "kartadan to'lash", "plastikdan to'lash", "to'lash tartibi",
+    "qanday to'lasam bo'ladi", "qanday tolasam boladi", "to'lov qilish tartibi",
+    "to'lash videosi", "tolash videosi", "to'lashni o'rgating", "tolashni orgating",
+    "қандай тўланади", "кандай толанади", "қандай тўлайман", "тўлаш тартиби", "тўлаш видеоси"
+]
+
+
+# =============================================================================
+# 1.3 KANAL DISPETCHERI VA HISOB RAQAM POSTLARINI UZATISH (MARKAZIY DISPATCHER)
+# =============================================================================
+
+async def send_channel_message(
+    bot: Any,
+    chat_id: int,
+    message_id: int,
+    reply_to_message_id: Optional[int] = None,
+    fallback_text: Optional[str] = None,
+    parse_mode: str = "HTML"
+) -> bool:
+    """Rasmiy kanaldan postni nusxalash, agar muammo bo'lsa fallback matnni yuborish"""
+    try:
+        kwargs = {}
+        if reply_to_message_id:
+            kwargs["reply_to_message_id"] = reply_to_message_id
+        await bot.copy_message(
+            chat_id=chat_id,
+            from_chat_id=SOURCE_CHANNEL_ID,
+            message_id=message_id,
+            **kwargs
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"Kanal postini ({message_id}) nusxalashda xatolik: {e}")
+        if fallback_text:
+            try:
+                await bot.send_message(chat_id=chat_id, text=fallback_text, parse_mode=parse_mode)
+            except Exception as e2:
+                logger.error(f"Fallback matnni yuborishda ham xatolik: {e2}")
+        return False
+
+
+async def send_monthly_account_post(
+    bot: Any,
+    chat_id: int,
+    reply_to_message_id: Optional[int] = None,
+    send_video: bool = False,
+    script: str = "latin"
+) -> bool:
+    """85-post (Mars oylik abonent shoti) va faqat so'ralganda 148-videoni yuborish"""
+    from translit_manager import adapt_to_user_script
+    fallback = adapt_to_user_script(get_monthly_payment_card(), script)
+    ok = await send_channel_message(bot, chat_id, MARS_POST_ID, reply_to_message_id=reply_to_message_id, fallback_text=fallback)
+    if send_video:
+        await send_channel_message(bot, chat_id, MARS_VIDEO_ID)
+    return ok
+
+
+async def send_annual_account_post(
+    bot: Any,
+    chat_id: int,
+    reply_to_message_id: Optional[int] = None,
+    send_video: bool = False,
+    script: str = "latin"
+) -> bool:
+    """34-post (Yangi Texnologiyalar yillik shoti) va faqat so'ralganda 145-videoni yuborish"""
+    from translit_manager import adapt_to_user_script
+    fallback = adapt_to_user_script(get_annual_payment_card(), script)
+    ok = await send_channel_message(bot, chat_id, YANGI_TEXNOLOGIYALAR_POST_ID, reply_to_message_id=reply_to_message_id, fallback_text=fallback)
+    if send_video:
+        await send_channel_message(bot, chat_id, YANGI_TEXNOLOGIYALAR_VIDEO_ID)
+    return ok
+
+
+async def send_both_account_posts(
+    bot: Any,
+    chat_id: int,
+    reply_to_message_id: Optional[int] = None,
+    script: str = "latin"
+) -> bool:
+    """Ikkala postni (85 va 34) ketma-ket uzatish"""
+    from translit_manager import adapt_to_user_script
+    fb_month = adapt_to_user_script(get_monthly_payment_card(), script)
+    fb_ann = adapt_to_user_script(get_annual_payment_card(), script)
+    ok1 = await send_channel_message(bot, chat_id, MARS_POST_ID, reply_to_message_id=reply_to_message_id, fallback_text=fb_month)
+    ok2 = await send_channel_message(bot, chat_id, YANGI_TEXNOLOGIYALAR_POST_ID, fallback_text=fb_ann)
+    return ok1 and ok2
+
+
+async def send_fiscal_sample_post(
+    bot: Any,
+    chat_id: int,
+    reply_to_message_id: Optional[int] = None
+) -> bool:
+    """Fiskal modul chek namunasini (149-post) uzatish"""
+    return await send_channel_message(bot, chat_id, FISKAL_MODUL_SAMPLE_POST_ID, reply_to_message_id=reply_to_message_id)
+
+
+async def send_how_to_pay_video(
+    bot: Any,
+    chat_id: int,
+    account_type: str = "monthly",
+    reply_to_message_id: Optional[int] = None
+) -> bool:
+    """Faqat 'qanday to'lanadi' so'rovi bo'lganda tegishli videoni yuborish"""
+    vid_id = YANGI_TEXNOLOGIYALAR_VIDEO_ID if account_type == "annual" else MARS_VIDEO_ID
+    return await send_channel_message(bot, chat_id, vid_id, reply_to_message_id=reply_to_message_id)
 
 
 # =============================================================================
@@ -155,7 +274,7 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va uning nimaligini tushuntirish"""
     from translit_manager import adapt_to_user_script
     text = (
-        "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun Fiskal modul (FM) raqamini yuboring:</b>\n\n"
+        "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun Fiskal modul seriya raqamini (FM) yuboring:</b>\n\n"
         "📌 <b>Seriya raqami:</b> <code>LG...</code> yoki <code>YG...</code> bilan boshlanadi.\n"
         "🔎 <b>Qayerdan topasiz:</b> Kassa chekining pastki qismida yoki apparat orqasidagi oq yorliq (nakleyka)da (masalan: <code>LG420210630789</code>).\n"
         "📸 Chekning pastki qismini rasmga olib yuborsangiz ham bo'ladi.\n\n"
@@ -306,26 +425,17 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "kelganmi", "keldimi", "keldikmi", "chiqmadimi", "chiqmaganmi", "tugaganmi", "tugamaganmi",
         "nima boldi", "nima bo'ldi", "nima gap", "qanaqa", "qanday",
         "yillikkachi", "yilikkachi", "oylikkachi", "yillikdanchi", "oylikdanchi",
-        "yillikchi", "oylikchi", "yillikch", "oylikch", "yillikcha", "oylikcha",
-        "yillikchi?", "oylikchi?", "yillikch?", "oylikch?", "yillik-ch", "oylik-ch",
         "fiskalchi", "soliqchi", "ofdchi", "fmochi",
-        "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи", "йилликчи", "ойликчи",
-        "йилликч", "ойликч", "йилликча", "ойликча",
+        "йилликкачи", "ойликкачи", "йилликданчи", "ойликданчи",
         "кемаганми", "келмаганми", "келмадими", "кемадими", "вақти", "қачонгача", "қачон", "муддат",
         "қайси сана", "санагача", "қарз", "борми", "текшир", "тугаганми", "тугамаганми"
     ]):
         if not any(w in t for w in ["shot", "rekvizit", "xisob", "hisob raqam", "shotini", "kartasi", "karta", "to'lash uchun", "tolash uchun", "to'lashga", "tolashga", "шот", "реквизит", "ҳисоб", "карта"]):
             return None
 
-    # Standalone holat so'rovlari: "yillik", "yillik?", "oylik", "oylik?", "fiskal", "ofd" -> bular rekvizit emas, holat intenti
+    # Standalone holat so'rovlari: "fiskal", "ofd" -> bular rekvizit emas, holat intenti
     if t in (
-        "yillik", "yillik?", "yilik", "yilik?", "oylik", "oylik?",
-        "yillikchi", "yillikchi?", "yillikch", "yillikch?", "yillikcha", "yillikcha?",
-        "oylikchi", "oylikchi?", "oylikch", "oylikch?", "oylikcha", "oylikcha?",
         "fiskal", "fiskal?", "ofd", "ofd?",
-        "йиллик", "йиллик?", "ойлик", "ойлик?",
-        "йилликчи", "йилликчи?", "йилликч", "йилликч?", "йилликча",
-        "ойликчи", "ойликчи?", "ойликч", "ойликч?", "ойликча",
         "фискал", "офд"
     ):
         return None
@@ -337,6 +447,8 @@ def classify_payment_intent(text: str) -> Optional[str]:
 
     # Yillik to'lov alomatlari (Lotin va Kirill)
     is_annual = any(w in t for w in [
+        "yillik", "yillik?", "yillikchi", "yillikchi?", "yillikch", "yillikcha",
+        "yilik", "yilik?", "yilikchi", "yilikchi?",
         "yillik shot", "yillik hisob", "yillik rekvizit", "fiskal modul shot",
         "fiskal modul hisob", "fiskal modul to'lov shot", "fiskal modul tolov shot",
         "yillik to'lov shot", "yillik tolov shot", "yillik to'lov kartasi", "yillik tolov kartasi",
@@ -358,6 +470,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "yangi texnologiyalar", "yillik qancha", "yillikka qancha", "yillik to'lov qancha", "yillik tolov qancha",
         "yillik narxi", "yillik narxi qancha", "yillik necha pul", "yillik summa", "440000", "440 000",
         "yillikka qancha to'layman", "yillikka qancha tolayman", "yillik qancha to'layman", "yillik qancha tolayman",
+        "йиллик", "йиллик?", "йилликчи", "йилликчи?", "йилликч", "йилликча",
         "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
         "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
         "йиллик тўлов шот", "йиллик толов шот", "янги технологиялар",
@@ -376,6 +489,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
 
     # Oylik to'lov alomatlari (Lotin va Kirill)
     is_monthly = any(w in t for w in [
+        "oylik", "oylik?", "oylikchi", "oylikchi?", "oylikch", "oylikcha",
         "oylik shot", "oylik hisob", "oylik rekvizit", "mars hisob", "mars shot",
         "abonent to'lov shot", "abonent tolov shot", "marsga to'lov shot",
         "oylik to'lov shot", "oylik tolov shot", "oylik to'lov kartasi",
@@ -398,6 +512,7 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "oylik to'lay", "oylik tolay", "oylik tulay",
         "oylik to'lasam", "oylik tolasam", "oylik tulasam",
         "oylik to'lab", "oylik tolab", "oylik tulab",
+        "ойлик", "ойлик?", "ойликчи", "ойликчи?", "ойликч", "ойликча",
         "ойлик шот", "ойлик ҳисоб", "ойлик хисоб", "ойлик реквизит",
         "марс ҳисоб", "марс хисоб", "марс шот", "абонент тўлов шот",
         "ойлик тўламоқчи", "ойлик толамокчи", "ойлик туламокчи",
@@ -540,6 +655,9 @@ def classify_receipt_target(recipient_account: str, amount: float, raw_text: str
 
 def is_annual_check_intent(text: str) -> bool:
     """Foydalanuvchi yillik to'lov yoki fiskal modul (OFD/Soliq) qarzdorligini tekshirishni so'rayaptimi?"""
+    if is_mxik_intent(text):
+        return False
+
     t = _normalize_payment_text(text)
 
     # Agar aniq hisob raqam / shot / karta so'ralayotgan bo'lsa va tekshirish/qarz so'zi bo'lmasa -> bu to'lov kartasi so'rovi!
@@ -552,24 +670,19 @@ def is_annual_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
             return False
 
-    # Standalone yillik so'rovi: "yillik", "yillik?", "yillikch", "yillikchi" -> mijoz yillik holatini bilmoqchi
+    # Standalone yillik/fiskal holat so'rovi -> mijoz fiskal holatini bilmoqchi
     if t in (
-        "yillik", "yillik?", "yilik", "yilik?",
-        "yillikchi", "yillikchi?", "yillikch", "yillikch?", "yillikcha", "yillikcha?",
         "fiskal", "fiskal?", "ofd", "ofd?", "fiskalchi", "soliqchi", "ofdchi",
-        "йиллик", "йиллик?", "йилликчи", "йилликчи?", "йилликч", "йилликч?", "йилликча",
         "фискал", "офд", "фискалчи", "солиқчи", "офдчи"
     ):
         return True
     
-    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "yillikchi?", "fiskaldanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("yillikdanchi?", "yillikkachi?", "fiskaldanchi?")
     followup_words = [
         "yillikdanchi", "yilikdanchi", "yillikkachi", "yilikkachi", "yillikgachi",
-        "yillikchi", "yilikchi", "yillik-chi", "yilik-chi", "yillikch", "yillikcha",
-        "yillikch?", "yillikchi?", "yillikcha?",
         "fiskaldanchi", "soliqdanchi", "fiskalgachi", "soliqgachi",
         "ofddanchi", "fmodanchi",
-        "йилликданчи", "йилликкачи", "йилликчи", "йилликч", "йилликча",
+        "йилликданчи", "йилликкачи",
         "фискалданчи", "солиқданчи", "офдданчи"
     ]
     if any(w in t for w in followup_words):
@@ -617,6 +730,9 @@ def is_annual_check_intent(text: str) -> bool:
 
 def is_monthly_check_intent(text: str) -> bool:
     """Foydalanuvchi oylik abonent to'lovi (Mars) qarzdorligini tekshirishni so'rayaptimi?"""
+    if is_mxik_intent(text):
+        return False
+
     t = _normalize_payment_text(text)
 
     # Agar aniq hisob raqam / shot / karta so'ralayotgan bo'lsa va tekshirish/qarz so'zi bo'lmasa -> bu to'lov kartasi so'rovi!
@@ -629,22 +745,18 @@ def is_monthly_check_intent(text: str) -> bool:
         if not any(w in t for w in ["qarz", "tekshir", "bormi", "qarzdorlik", "қарз", "борми", "текшир"]):
             return False
 
-    # Standalone oylik so'rovi: "oylik", "oylik?", "oylikch", "oylikchi" -> mijoz oylik holatini bilmoqchi
+    # Standalone oylik/mars holat so'rovi -> mijoz oylik holatini bilmoqchi
     if t in (
-        "oylik", "oylik?", "oylikchi", "oylikchi?", "oylikch", "oylikch?", "oylikcha", "oylikcha?",
-        "mars", "marschi", "abonent", "abonentchi",
-        "ойлик", "ойлик?", "ойликчи", "ойликчи?", "ойликч", "ойликч?", "ойликча",
-        "марс", "марсчи", "абонент", "абонентчи"
+        "mars", "abonent",
+        "марс", "абонент"
     ):
         return True
 
-    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "oylikchi?", "marsdanchi?")
+    # Tezkor davomiy qarzdorlik iboralari ("oylikdanchi?", "oylikkachi?", "marsdanchi?")
     followup_words = [
         "oylikdanchi", "oylikdanam", "oylikdan-chi", "oylikkachi", "oylikgachi",
-        "oylikchi", "oylik-chi", "oylikch", "oylikcha", "oylich",
-        "oylikch?", "oylikchi?", "oylikcha?",
         "marsdanchi", "abonentdanchi",
-        "ойликданчи", "ойликкачи", "ойликчи", "ойликч", "ойликча", "ойликданам",
+        "ойликданчи", "ойликкачи", "ойликданам",
         "марсданчи", "абонентданчи"
     ]
     if any(w in t for w in followup_words):

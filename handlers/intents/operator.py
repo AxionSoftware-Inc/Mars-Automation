@@ -5,6 +5,7 @@ from user_memory import user_memory
 from translit_manager import adapt_to_user_script
 from core import core_engine
 from admin_manager import admin_manager, get_admin_contact_keyboard
+from payment_accounts import classify_payment_intent, is_annual_pay_intent, is_monthly_pay_intent
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +39,17 @@ class OperatorIntentHandler:
             return False
 
         # Agar mijoz hisob raqam yoki to'lov so'rayotgan bo'lsa (masalan: "hisob raqamini tashlang", "yillik to'lov hisob raqami"):
-        is_payment_related = any(w in lower_text for w in [
-            "hisob raqam", "hisob raqami", "hisob raqamini", "hsob raqam",
-            "shot", "shotini", "shot raqam", "rekvizit", "rekvizitlar",
-            "to'lov", "tolov", "to'lash", "tolash", "yillik", "oylik",
-            "хисоб ракам", "шот", "реквизит", "тўлов", "толов"
-        ])
+        is_payment_related = (
+            bool(classify_payment_intent(text))
+            or is_annual_pay_intent(text)
+            or is_monthly_pay_intent(text)
+            or any(w in lower_text for w in [
+                "hisob raqam", "hisob raqami", "hisob raqamini", "hsob raqam",
+                "shot", "shotini", "shot raqam", "rekvizit", "rekvizitlar",
+                "to'lov", "tolov", "to'lash", "tolash", "yillik", "oylik",
+                "хисоб ракам", "шот", "реквизит", "тўлов", "толов"
+            ])
+        )
         is_explicit_human_ask = any(w in lower_text for w in [
             "operator", "usta", "admin", "mutaxassis", "administrator", "xodim", "inson", "odam",
             "оператор", "уста", "админ", "мастер"

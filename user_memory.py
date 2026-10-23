@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 # Xotiraning amal qilish muddati: 1 soat (soniyalarda)
-TTL_SECONDS = 2 * 3600  # 7,200 soniya (2 soat)
+TTL_SECONDS = 3600  # 3,600 soniya (1 soat)
 MAX_HISTORY_TURNS = 10   # Har bir foydalanuvchi uchun oxirgi 10 ta xabar almashinuvi (20 ta xabar)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -181,18 +181,35 @@ class UserMemoryManager:
         }
         self.save_sessions()
 
-    def _fallback_from_group(self, chat_id: int, field: str) -> Any:
+    def _fallback_from_group(self, chat_id: int, field: str, user_id: Optional[int] = None) -> Any:
         """Guruh chatlarida (chat_id < 0) biror xodim yozgan ma'lumotni guruh kontekstidan topish"""
         if chat_id >= 0:
             return None
         prefix = f"{chat_id}:"
+        user_key = f"{chat_id}:{user_id}" if user_id is not None else None
+        user_inn = self.sessions.get(user_key, {}).get("last_id") if user_key else None
+
         # Oxirgi faol bo'lgan sessiyalarni saralash
         sorted_sessions = sorted(
-            [s for k, s in self.sessions.items() if k.startswith(prefix)],
-            key=lambda x: x.get("last_active", 0),
+            [(k, s) for k, s in self.sessions.items() if k.startswith(prefix)],
+            key=lambda x: x[1].get("last_active", 0),
             reverse=True
         )
-        for s in sorted_sessions:
+
+        # Agar guruhda bir nechta turli korxonalar (INN) faol bo'lsa,
+        # INNi yo'q yangi foydalanuvchiga tasodifiy korxonani biriktirmaymiz (ambiguity guardrail)
+        if field == "last_id":
+            distinct_inns = {s.get("last_id") for _, s in sorted_sessions if s.get("last_id")}
+            if len(distinct_inns) > 1:
+                return None
+
+        for k, s in sorted_sessions:
+            if user_key and k == user_key:
+                continue
+            # Agar foydalanuvchida o'z INNi bo'lsa va bu boshqa sessiyaning INNisiga to'g'ri kelmasa,
+            # begona korxonaning fiskal modulini yoki boshqa ma'lumotlarini o'zlashtirmaymiz!
+            if user_inn and s.get("last_id") and s.get("last_id") != user_inn:
+                continue
             val = s.get(field)
             if val is not None and val != "":
                 return val
@@ -203,7 +220,7 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         inns = session.get("checked_inns", {})
         if not inns and chat_id < 0:
-            fb_inns = self._fallback_from_group(chat_id, "checked_inns")
+            fb_inns = self._fallback_from_group(chat_id, "checked_inns", user_id)
             if fb_inns and isinstance(fb_inns, dict):
                 return fb_inns
         return inns
@@ -221,16 +238,16 @@ class UserMemoryManager:
     def get_annual_status(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Yillik Davlat Soliq (OFD) to'lovi holatini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("annual_status") or self._fallback_from_group(chat_id, "annual_status")
+        return session.get("annual_status") or self._fallback_from_group(chat_id, "annual_status", user_id)
 
     def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
         """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_id") or self._fallback_from_group(chat_id, "last_id")
+        return session.get("last_id") or self._fallback_from_group(chat_id, "last_id", user_id)
 
     def get_org_name(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("org_name") or self._fallback_from_group(chat_id, "org_name")
+        return session.get("org_name") or self._fallback_from_group(chat_id, "org_name", user_id)
 
     def set_last_receipt(self, chat_id: int, user_id: int, receipt_info: Dict[str, Any]):
         """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash (kunlik Excel qarzini o'zgartirmasdan!)"""
@@ -282,12 +299,12 @@ class UserMemoryManager:
 
     def get_last_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt")
+        return session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt", user_id)
 
     def get_debt_info(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Oxirgi tekshirilgan qarz ma'lumotlarini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("debt_info") or self._fallback_from_group(chat_id, "debt_info")
+        return session.get("debt_info") or self._fallback_from_group(chat_id, "debt_info", user_id)
 
     def set_last_topic(self, chat_id: int, user_id: int, topic: str):
         """Oxirgi mavzuni saqlash (masalan: 'receipt_submitted', 'debt_checked', 'time_error')"""
@@ -552,7 +569,7 @@ class UserMemoryManager:
 
     def get_last_fm(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_fm") or self._fallback_from_group(chat_id, "last_fm")
+        return session.get("last_fm") or self._fallback_from_group(chat_id, "last_fm", user_id)
 
     def set_last_photo(self, chat_id: int, user_id: int, file_id: str):
         """Oxirgi yuborilgan kassa rasmi file_id sini saqlash"""
@@ -562,7 +579,7 @@ class UserMemoryManager:
 
     def get_last_photo(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_photo") or self._fallback_from_group(chat_id, "last_photo")
+        return session.get("last_photo") or self._fallback_from_group(chat_id, "last_photo", user_id)
 
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""
