@@ -249,7 +249,6 @@ class HardwareIntentHandler:
             try:
                 await message.reply(debt_resp, parse_mode="HTML")
                 await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_POST_ID)
-                await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=MARS_VIDEO_ID)
             except Exception as e:
                 logger.warning(f"Oylik qarz xabarini uzatishda xatolik: {e}")
             user_memory.add_user_message(chat_id, user_id, text)
@@ -365,7 +364,6 @@ class HardwareIntentHandler:
             try:
                 await message.reply(ann_msg, parse_mode="HTML")
                 await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_POST_ID)
-                await bot.copy_message(chat_id=chat_id, from_chat_id=SOURCE_CHANNEL_ID, message_id=YANGI_TEXNOLOGIYALAR_VIDEO_ID)
             except Exception as e:
                 logger.warning(f"Yillik qarz postini yuborishda xatolik: {e}")
             user_memory.add_user_message(chat_id, user_id, text)

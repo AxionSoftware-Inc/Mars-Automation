@@ -343,16 +343,35 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "fiskal modul hisob", "fiskal modul to'lov shot", "fiskal modul tolov shot",
         "yillik to'lov shot", "yillik tolov shot", "yillik to'lov kartasi", "yillik tolov kartasi",
         "yillik to'lash", "yillik tolash",
+        "yillik to'lamoqchi", "yillik tolamoqchi", "yillik tulamoqchi",
+        "yillik to'lamoqchiydim", "yillik tolamoqchiydim", "yillik tulamoqchiydim",
+        "yillik to'lamoqchidim", "yillik tolamoqchidim", "yillik tulamoqchidim",
+        "yillik to'lamoqchi edim", "yillik tolamoqchi edim", "yillik tulamoqchi edim",
+        "yillikka to'lamoqchi", "yillikka tolamoqchi", "yillikka tulamoqchi",
+        "yillikka to'lamoqchiydim", "yillikka tolamoqchiydim", "yillikka tulamoqchiydim",
+        "yillikka to'lamoqchi edim", "yillikka tolamoqchi edim", "yillikka tulamoqchi edim",
         "yillik to'lamoqchiman", "yillik tolamoqchiman", "yillik tulamoqchiman",
+        "yillik to'lov qilmoqchi", "yillik tolov qilmoqchi", "yillik tulov qilmoqchi",
+        "yillik to'lov qilmoqchiman", "yillik tolov qilmoqchiman",
+        "yillik to'lab qo'ymoqchi", "yillik tolab qoymoqchi", "yillik tulab quymoqchi",
         "yillik to'layman", "yillik tolayman", "yillik tulayman",
+        "yillik to'lay", "yillik tolay", "yillik tulay",
+        "yillik to'lasam", "yillik tolasam", "yillik tulasam",
         "yangi texnologiyalar", "yillik qancha", "yillikka qancha", "yillik to'lov qancha", "yillik tolov qancha",
         "yillik narxi", "yillik narxi qancha", "yillik necha pul", "yillik summa", "440000", "440 000",
         "yillikka qancha to'layman", "yillikka qancha tolayman", "yillik qancha to'layman", "yillik qancha tolayman",
         "йиллик шот", "йиллик ҳисоб", "йиллик хисоб", "йиллик реквизит",
         "фискал модул шот", "фискал модул ҳисоб", "фискал модул хисоб",
         "йиллик тўлов шот", "йиллик толов шот", "янги технологиялар",
+        "йиллик тўламоқчи", "йиллик толамокчи", "йиллик туламокчи",
+        "йиллик тўламоқчийдим", "йиллик толамокчийдим", "йиллик туламокчийдим",
+        "йиллик тўламоқчи эдим", "йиллик толамокчи эдим", "йиллик туламокчи эдим",
+        "йилликка тўламоқчи", "йилликка толамокчи", "йилликка туламокчи",
+        "йилликка тўламоқчийдим", "йилликка толамокчийдим", "йилликка туламокчийдим",
         "йиллик тўламоқчиман", "йиллик толамокчиман", "йиллик туламокчиман",
         "йиллик тўлайман", "йиллик толайман", "йиллик тўлаш", "йиллик толаш",
+        "йиллик тўлай", "йиллик толай", "йиллик тулай",
+        "йиллик тўласам", "йиллик толасам", "йиллик туласам",
         "йиллик қанча", "йиллик канча", "йилликка қанча", "йиллик тўлов қанча", "йиллик толов қанча",
         "йиллик неча пул", "йиллик нархи", "йиллик нархи қанча", "йилликка қанча тўлайман", "йилликка қанча толайман"
     ])
@@ -366,13 +385,32 @@ def classify_payment_intent(text: str) -> Optional[str]:
         "oylik narxi", "oylik narxi qancha", "oylik necha pul", "oylik summa", "100000", "100 000",
         "oylikka qancha to'layman", "oylikka qancha tolayman", "oylik qancha to'layman", "oylik qancha tolayman",
         "oylik to'lash", "oylik tolash",
+        "oylik to'lamoqchi", "oylik tolamoqchi", "oylik tulamoqchi",
+        "oylik to'lamoqchiydim", "oylik tolamoqchiydim", "oylik tulamoqchiydim",
+        "oylik to'lamoqchidim", "oylik tolamoqchidim", "oylik tulamoqchidim",
+        "oylik to'lamoqchi edim", "oylik tolamoqchi edim", "oylik tulamoqchi edim",
+        "oylikka to'lamoqchi", "oylikka tolamoqchi", "oylikka tulamoqchi",
+        "oylikka to'lamoqchiydim", "oylikka tolamoqchiydim", "oylikka tulamoqchiydim",
+        "oylikka to'lamoqchi edim", "oylikka tolamoqchi edim", "oylikka tulamoqchi edim",
+        "oylik to'lov qilmoqchi", "oylik tolov qilmoqchi", "oylik tulov qilmoqchi",
+        "oylik to'lov qilmoqchiman", "oylik tolov qilmoqchiman",
+        "oylik to'lab qo'ymoqchi", "oylik tolab qoymoqchi", "oylik tulab quymoqchi",
         "oylik to'lamoqchiman", "oylik tolamoqchiman", "oylik tulamoqchiman",
         "oylik to'layman", "oylik tolayman", "oylik tulayman",
+        "oylik to'lay", "oylik tolay", "oylik tulay",
+        "oylik to'lasam", "oylik tolasam", "oylik tulasam",
         "oylik to'lab", "oylik tolab", "oylik tulab",
         "ойлик шот", "ойлик ҳисоб", "ойлик хисоб", "ойлик реквизит",
         "марс ҳисоб", "марс хисоб", "марс шот", "абонент тўлов шот",
+        "ойлик тўламоқчи", "ойлик толамокчи", "ойлик туламокчи",
+        "ойлик тўламоқчийдим", "ойлик толамокчийдим", "ойлик туламокчийдим",
+        "ойлик тўламоқчи эдим", "ойлик толамокчи эдим", "ойлик туламокчи эдим",
+        "ойликка тўламоқчи", "ойликка толамокчи", "ойликка туламокчи",
+        "ойликка тўламоқчийдим", "ойликка толамокчийдим", "ойликка туламокчийдим",
         "ойлик тўламоқчиман", "ойлик толамокчиман", "ойлик туламокчиман",
         "ойлик тўлайман", "ойлик толайман", "ойлик тулайман",
+        "ойлик тўлай", "ойлик толай", "ойлик тулай",
+        "ойлик тўласам", "ойлик толасам", "ойлик туласам",
         "ойлик тўлаш", "ойлик толаш",
         "ойлик қанча", "ойликка қанча", "ойлик тўлов қанча", "ойлик толов қанча",
         "ойлик неча пул", "ойлик нархи", "ойлик нархи қанча", "ойликка қанча тўлайман", "ойликка қанча толайман"
@@ -382,11 +420,19 @@ def classify_payment_intent(text: str) -> Optional[str]:
     has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
     has_pay = any(w in t for w in [
         "shot", "hisob", "hsob", "schet", "rekvizit", "to'lov", "tolov", "tulov", "to'lash", "tolash", "tulash",
-        "to'lay", "tolay", "tulay", "to'layman", "tolayman", "tulayman", "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+        "to'lay", "tolay", "tulay", "to'layman", "tolayman", "tulayman",
+        "to'lamoqchi", "tolamoqchi", "tulamoqchi",
+        "to'lamoqchiydim", "tolamoqchiydim", "tulamoqchiydim",
+        "to'lamoqchidim", "tolamoqchidim", "tulamoqchidim",
+        "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
         "to'lab", "tolab", "tulab", "to'lasam", "tolasam", "tulasam", "qayerga", "qaerga",
         "тўлов", "толов", "тулов", "тўлаш", "толаш", "тулаш", "тўлай", "толай", "тулай",
-        "тўлайман", "толайман", "тулайман", "тўламоқчиман", "толамокчиман", "туламокчиман",
-        "тўлаб", "толаб", "тулаб", "шот", "реквизит", "ҳисоб", "хисоб", "счёт", "счет", "қаерга", "каерга"
+        "тўлайман", "толайман", "тулайман",
+        "тўламоқчи", "толамокчи", "туламокчи",
+        "тўламоқчийдим", "толамокчийдим", "туламокчийдим",
+        "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўлаб", "толаб", "тулаб", "тўласам", "толасам", "туласам",
+        "шот", "реквизит", "ҳисоб", "хисоб", "счёт", "счет", "қаерга", "каерга"
     ])
 
     if (has_annual and has_monthly and has_pay) or any(w in t for w in ["ikkala shot", "ikkala hisob", "ikkala to'lov", "ikkala tolov", "иккала шот", "иккала ҳисоб", "иккала тўлов"]):
@@ -686,6 +732,49 @@ def is_general_debt_check_intent(text: str) -> bool:
     return False
 
 
+def is_how_to_pay_video_intent(text: str) -> bool:
+    """
+    Foydalanuvchi qanday to'lashni yoki to'lash videosi/yo'riqnomasini so'rayaptimi?
+    (Masalan: 'qanday to'lanadi', 'to'lash videosi', 'qanday to'lash kerak', 'o'rgatilgan video', 'to'lash tartibini o'rgating')
+    """
+    t = _normalize_payment_text(text)
+    
+    # Aniq video so'rovlari
+    video_words = [
+        "video", "videosi", "videoni", "videolar", "videoni tashla", "videoni ber",
+        "videoni yubor", "video bormi", "видео", "видеоси", "видеони", "видео ташла"
+    ]
+    if any(w in t for w in video_words):
+        return True
+        
+    # Aniq 'qanday to'lanadi' va 'o'rgatish' iboralari
+    how_to_phrases = [
+        "qanday to'lanadi", "qanday tolanadi", "qanday tulanadi",
+        "qanday to'lasa bo'ladi", "qanday tolasa boladi", "qanday tulasa boladi",
+        "qanday to'lasam bo'ladi", "qanday tolasam boladi", "qanday tulasam boladi",
+        "qanday to'lash kerak", "qanday tolash kerak", "qanday tulash kerak",
+        "qanday to'layman", "qanday tolayman", "qanday tulayman",
+        "qanaqa to'lanadi", "qanaqa tolanadi", "qanaqa to'layman", "qanaqa tolayman",
+        "to'lash tartibi", "tolash tartibi", "tulash tartibi",
+        "to'lash tartibini", "tolash tartibini", "tulash tartibini",
+        "to'lov qilish tartibi", "tolov qilish tartibi",
+        "to'lashni o'rgating", "tolashni orgating", "tulashni orgating",
+        "to'lashni o'rgat", "tolashni orgat", "to'lash tartibini o'rgat",
+        "o'rgating", "orgating", "o'rgatilgan", "orgatilgan", "o'rgatuvchi",
+        "ko'rsating", "korsating", "yo'riqnoma", "yoriqnoma", "qo'llanma", "qollanma",
+        "click orqali qanday", "clickda qanday", "paymeda qanday",
+        "қандай тўланади", "кандай толанади", "кандай туланади",
+        "қандай тўласа бўлади", "кандай толаса болади",
+        "қандай тўласам бўлади", "кандай толасам болади",
+        "қандай тўлаш керак", "кандай толаш керак",
+        "қандай тўлайман", "кандай толайман",
+        "тўлаш тартиби", "толаш тартиби", "тўлов қилиш тартиби",
+        "тўлашни ўргатинг", "толашни ургатинг", "ўргатинг", "ургатинг",
+        "кўрсатинг", "йўриқнома", "қўлланма"
+    ]
+    return any(p in t for p in how_to_phrases)
+
+
 def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     """Foydalanuvchi yillik to'lov uchun hisob raqam (shot) so'rayaptimi yoki to'lashini aytmoqdami?"""
     t = _normalize_payment_text(text)
@@ -701,7 +790,7 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         "to'lashim kerakmi", "tolashim kerakmi", "kerakmi", "qaysi biriga", "qaysiga", "qaysi",
         "кемаганми", "келмаганми", "борми", "қарз", "муддат", "йилликчи", "қанча", "яна"
     ]):
-        if not any(w in t for w in ["shot", "rekvizit", "hisob raqam", "xisob", "karta", "kartasi", "шот", "реквизит"]):
+        if not any(w in t for w in ["shot", "rekvizit", "hisob raqam", "xisob", "karta", "kartasi", "to'lash uchun", "tolash uchun", "to'lashga", "tolashga", "to'lamoqchi", "tolamoqchi", "tulamoqchi", "шот", "реквизит"]):
             return False
 
     # 1. Agar foydalanuvchi yaqinda yillik qarz tekshirgan bo'lsa va endi to'lashini aytsa (kontekst ustun)
@@ -710,7 +799,13 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         if not has_monthly:
             general_pay_phrases = [
                 "to'layman", "tolayman", "tulayman", "to'lashim kerak", "tolashim kerak", "to'lashim kk", "tolashim kk",
-                "to'lay", "tolay", "tulay", "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+                "to'lay", "tolay", "tulay",
+                "to'lamoqchi", "tolamoqchi", "tulamoqchi",
+                "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+                "to'lamoqchiydim", "tolamoqchiydim", "tulamoqchiydim",
+                "to'lamoqchidim", "tolamoqchidim", "tulamoqchidim",
+                "to'lamoqchi edim", "tolamoqchi edim", "tulamoqchi edim",
+                "to'lab qo'ymoqchiydim", "tolab qoymoqchiydim", "tulab quymoqchiydim",
                 "to'lab qo'ymoqchiman", "tolab qoymoqchiman", "tulab quymoqchiman",
                 "to'lab qo'yay", "tulab quyay", "to'lab quyay", "to'lab quymoqchi",
                 "shot raqam tashla", "shot tashla", "shot tashlab", "shot tashlab ber", "shot tashlab beriyla",
@@ -720,14 +815,18 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
                 "hisob raqam tashla", "hisob raqam ber", "hisob raqam bering",
                 "qayerga to'layman", "qayerga tolayman", "qayerga to'lash", "qayerga tolash",
                 "qanday to'layman", "qanday tolayman",
-                "тўлайман", "толайман", "тулайман", "тўламоқчиман", "толамокчиман", "туламокчиман",
+                "тўлайман", "толайман", "тулайман",
+                "тўламоқчи", "толамокчи", "туламокчи",
+                "тўламоқчиман", "толамокчиман", "туламокчиман",
+                "тўламоқчийдим", "толамокчийдим", "туламокчийдим",
+                "тўламоқчи эдим", "толамокчи эдим", "туламокчи эдим",
                 "тўлаб қўймоқчиман", "тулаб куймокчиман", "тўлашим керак", "толашим керак",
                 "шот ташла", "шот ташлаб бер", "шот ташлаб берийла", "шот беринг", "шот бер",
                 "реквизит", "реквизитлар", "реквизит ташла", "реквизит беринг",
-                "ҳисоб рақам", "хисоб ракам", "ҳисоб рақамlar", "хисоб ракамлар", "хисоб ракамларни",
+                "ҳисоб рақам", "хисоб ракам", "ҳисоб рақамлар", "хисоб ракамлар", "хисоб ракамларни",
                 "қаерга тўлашим керак", "каерга толашим керак", "қаерга тўлайман", "каерга толайман"
             ]
-            if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman", "tulayman", "to'lamoqchiman", "tulamoqchiman", "hisob raqam", "hsob"]):
+            if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman", "tulayman", "to'lamoqchi", "tolamoqchi", "tulamoqchi", "to'lamoqchiman", "tulamoqchiman", "hisob raqam", "hsob"]):
                 return True
 
     if classify_payment_intent(text) == "both":
@@ -736,12 +835,26 @@ def is_annual_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     # 2. Aniq yillik to'lov so'rovi
     has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
     has_pay = any(w in t for w in [
+        "to'lov", "tolov", "tulov", "to'lovlar", "tolovlar",
         "to'layman", "tolayman", "tulayman", "to'lash", "tolash", "tulash", "to'lay", "tolay", "tulay",
-        "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman", "to'lab", "tolab", "tulab",
+        "to'lamoqchi", "tolamoqchi", "tulamoqchi",
+        "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+        "to'lamoqchiydim", "tolamoqchiydim", "tulamoqchiydim",
+        "to'lamoqchidim", "tolamoqchidim", "tulamoqchidim",
+        "to'lamoqchi edim", "tolamoqchi edim", "tulamoqchi edim",
+        "qilmoqchi", "qilmoqchiman", "qilmoqchiydim", "qilmoqchi edim",
+        "to'lab", "tolab", "tulab", "to'lasam", "tolasam", "tulasam",
         "shot", "shot raqam", "shot tashla", "shot tashlab", "shot tashlab ber", "shot tashlab beriyla",
         "shotini tashla", "shot ber", "shotini ber", "shot bering", "shot beriyla",
         "rekvizit", "hisob raqam", "hsob", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
-        "тўлайман", "толайман", "тулайман", "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўлов", "толов", "тулов", "тўлаш", "толаш", "тулаш",
+        "тўлайман", "толайман", "тулайман",
+        "тўламоқчи", "толамокчи", "туламокчи",
+        "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўламоқчийдим", "толамокчийдим", "туламокчийдим",
+        "тўламоқчи эдим", "толамокчи эдим", "туламокчи эдим",
+        "қилмоқчи", "қилмоқчиман",
+        "тўлаб", "толаб", "тулаб", "тўласам", "толасам", "туласам",
         "шот ташла", "шот ташлаб бер", "реквизит ташла"
     ])
     has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
@@ -764,7 +877,7 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         "to'lashim kerakmi", "tolashim kerakmi", "kerakmi",
         "қачон", "қачонгача", "муддат", "қарз", "борми", "ойликчи", "қанча", "яна", "тўлашим керакми"
     ]):
-        if not any(w in t for w in ["shot", "rekvizit", "hisob", "xisob", "hsob", "karta", "kartasi", "шот", "реквизит", "ҳисоб"]):
+        if not any(w in t for w in ["shot", "rekvizit", "hisob", "xisob", "hsob", "karta", "kartasi", "to'lash uchun", "tolash uchun", "to'lashga", "tolashga", "to'lamoqchi", "tolamoqchi", "tulamoqchi", "шот", "реквизит", "ҳисоб"]):
             return False
 
     # 1. Agar foydalanuvchi yaqinda oylik qarz tekshirgan bo'lsa va endi to'lashini aytsa (kontekst ustun)
@@ -773,7 +886,13 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
         if not has_annual:
             general_pay_phrases = [
                 "to'layman", "tolayman", "tulayman", "to'lashim kerak", "tolashim kerak", "to'lashim kk", "tolashim kk",
-                "to'lay", "tolay", "tulay", "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+                "to'lay", "tolay", "tulay",
+                "to'lamoqchi", "tolamoqchi", "tulamoqchi",
+                "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+                "to'lamoqchiydim", "tolamoqchiydim", "tulamoqchiydim",
+                "to'lamoqchidim", "tolamoqchidim", "tulamoqchidim",
+                "to'lamoqchi edim", "tolamoqchi edim", "tulamoqchi edim",
+                "to'lab qo'ymoqchiydim", "tolab qoymoqchiydim", "tulab quymoqchiydim",
                 "to'lab qo'ymoqchiman", "tolab qoymoqchiman", "tulab quymoqchiman",
                 "to'lab qo'yay", "tulab quyay", "to'lab quyay", "to'lab quymoqchi",
                 "shot raqam tashla", "shot tashla", "shot tashlab", "shot tashlab ber", "shot tashlab beriyla",
@@ -784,14 +903,18 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
                 "qayerga to'layman", "qayerga tolayman", "qayerga to'lashim kerak", "qayerga tolashim kerak",
                 "qayerga to'lash kerak", "qayerga tolash kerak", "qayerga to'lash", "qayerga tolash",
                 "qanday to'layman", "qanday tolayman",
-                "тўлайман", "толайман", "тулайман", "тўламоқчиман", "толамокчиман", "туламокчиман",
+                "тўлайман", "толайман", "тулайман",
+                "тўламоқчи", "толамокчи", "туламокчи",
+                "тўламоқчиман", "толамокчиман", "туламокчиман",
+                "тўламоқчийдим", "толамокчийдим", "туламокчийдим",
+                "тўламоқчи эдим", "толамокчи эдим", "туламокчи эдим",
                 "тўлаб қўймоқчиман", "тулаб куймокчиман", "тўлашим керак", "толашим керак",
                 "шот ташла", "шот ташлаб бер", "шот ташлаб берийла", "шот беринг", "шот бер",
                 "реквизит", "реквизитlar", "реквизитлар", "реквизит ташла", "реквизит беринг",
-                "ҳисоб рақам", "хисоб ракам", "ҳисоб рақамлар", "хисоб ракамлар", "хисоб ракамларни",
+                "ҳисоб рақам", "хисоб ракам", "ҳисоб рақамлар", "хисоб ракамlar", "хисоб ракамларни",
                 "қаерга тўлашим керак", "каерга толашим керак", "қаерга тўлайман", "каерга толайман"
             ]
-            if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman", "tulayman", "to'lamoqchiman", "tulamoqchiman", "hisob raqam", "hsob"]):
+            if any(w in t for w in general_pay_phrases) or any(w in t for w in ["shot", "shotini", "rekvizit", "to'layman", "tolayman", "tulayman", "to'lamoqchi", "tolamoqchi", "tulamoqchi", "to'lamoqchiman", "tulamoqchiman", "hisob raqam", "hsob"]):
                 return True
 
     if classify_payment_intent(text) == "both":
@@ -801,12 +924,26 @@ def is_monthly_pay_intent(text: str, last_topic: Optional[str] = None) -> bool:
     has_annual = any(w in t for w in ["yillik", "fiskal", "soliq", "ofd", "yangi texnologiyalar", "йиллик", "фискал", "солиқ", "солик", "офд"])
     has_monthly = any(w in t for w in ["oylik", "abonent", "mars", "ойлик", "абонент", "марс"])
     has_pay = any(w in t for w in [
+        "to'lov", "tolov", "tulov", "to'lovlar", "tolovlar",
         "to'layman", "tolayman", "tulayman", "to'lash", "tolash", "tulash", "to'lay", "tolay", "tulay",
-        "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman", "to'lab", "tolab", "tulab",
+        "to'lamoqchi", "tolamoqchi", "tulamoqchi",
+        "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+        "to'lamoqchiydim", "tolamoqchiydim", "tulamoqchiydim",
+        "to'lamoqchidim", "tolamoqchidim", "tulamoqchidim",
+        "to'lamoqchi edim", "tolamoqchi edim", "tulamoqchi edim",
+        "qilmoqchi", "qilmoqchiman", "qilmoqchiydim", "qilmoqchi edim",
+        "to'lab", "tolab", "tulab", "to'lasam", "tolasam", "tulasam",
         "shot", "shot raqam", "shot tashla", "shot tashlab", "shot tashlab ber", "shot tashlab beriyla",
         "shotini tashla", "shot ber", "shotini ber", "shot bering", "shot beriyla",
         "rekvizit", "hisob raqam", "hsob", "qayerga to'lay", "qayerga tolay", "qayerga to'lash",
-        "тўлайман", "толайман", "тулайман", "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўлов", "толов", "тулов", "тўлаш", "толаш", "тулаш",
+        "тўлайман", "толайман", "тулайман",
+        "тўламоқчи", "толамокчи", "туламокчи",
+        "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўламоқчийдим", "толамокчийдим", "туламокчийдим",
+        "тўламоқчи эдим", "толамокчи эдим", "туламокчи эдим",
+        "қилмоқчи", "қилмоқчиман",
+        "тўлаб", "толаб", "тулаб", "тўласам", "толасам", "туласам",
         "шот ташла", "шот ташлаб бер", "реквизит ташла"
     ])
     if has_monthly and has_pay and not has_annual:
