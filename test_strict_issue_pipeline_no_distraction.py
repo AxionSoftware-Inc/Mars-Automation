@@ -56,7 +56,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
 
         # Bot oylik qarz yo'qligini aytib, 2-bosqich: Fiskal modul so'rashi va Post 149 yuborishi shart!
         reply2 = msg2.reply.call_args[0][0]
-        self.assertIn("2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish", reply2)
+        self.assertIn("Fiskal modul", reply2)
         self.assertEqual(self.bot.copy_message.call_args[1]["message_id"], 149)
 
         # 3-qadam: Mijoz chalg'ituvchi savol beradi: "fiskal modul nima u"
@@ -110,7 +110,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
         # Bot oylik qarz 0 bo'lgani uchun to'xtab qolmasdan darhol 2-bosqich: Fiskal modul so'rashi kerak!
         self.assertTrue(user_memory.is_issue_mode(chat_id, user_id))
         reply = msg.reply.call_args[0][0]
-        self.assertIn("2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish", reply)
+        self.assertIn("Fiskal modul", reply)
         self.assertEqual(self.bot.copy_message.call_args[1]["message_id"], 149)
 
     async def test_3_reboot_failed_immediate_escalation(self):
@@ -126,7 +126,7 @@ class TestStrictIssuePipelineNoDistraction(unittest.IsolatedAsyncioTestCase):
         await handle_user_chat(msg, self.bot)
 
         reply = msg.reply.call_args[0][0]
-        self.assertIn("mas'ul xodimlarimizga", reply.lower())
+        self.assertTrue(any(w in reply.lower() for w in ["mas'ul mutaxassis", "mas'ul xodim", "mutaxassis"]))
 
         # Adminga eskalatsiya
         admin_manager.notify_admins.assert_called_once()

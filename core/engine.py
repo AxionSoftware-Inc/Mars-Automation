@@ -183,7 +183,7 @@ class CoreEngine:
                         return DecisionResult(
                             action=ActionType.DIAGNOSE_AND_REPLY,
                             reply_text=f"{p3_diag_text}\n\n──────────────\n{debt_reply}" if p3_diag_text else debt_reply,
-                            video_id=148,
+                            video_id=None,
                             detected_inn=target_inn,
                             debt_amount=total_debt,
                             org_name=org_name,
@@ -253,7 +253,7 @@ class CoreEngine:
             return DecisionResult(
                 action=ActionType.DIAGNOSE_AND_REPLY,
                 reply_text=debt_reply,
-                video_id=148,
+                video_id=None,
                 detected_inn=target_inn,
                 debt_amount=total_debt,
                 org_name=org_name,
@@ -707,7 +707,7 @@ class CoreEngine:
         tuman = excel_manager.get_district_for_inn(inn) if (inn and inn != "-") else ""
         contacts_info = admin_manager.get_contacts_display(inn=inn if inn != "-" else None, tuman=tuman)
         reply_text = (
-            f"👨‍💻 <b>Murojaatingiz qabul qilindi va hududingiz bo'yicha mas'ul mutaxassisga yetkazildi!</b>\n\n"
+            f"👨‍💻 <b>Murojaatingiz qabul qilindi va operator / mas'ul mutaxassisga yetkazildi!</b>\n\n"
             f"{contacts_info}\n\n"
             f"Mas'ul ustamiz tez orada siz bilan bog'lanadi yoki quyidagi tugma orqali to'g'ridan-to'g'ri yozishingiz mumkin:"
         )
@@ -740,7 +740,7 @@ class CoreEngine:
         user_memory.set_last_id(chat_id, user_id, inn, org_name=org_name, debt=total_debt)
 
         debt_text = format_debt_response(results)
-        video_id = 148 if total_debt > 0 else None
+        video_id = None
 
         return DecisionResult(
             action=ActionType.DIAGNOSE_AND_REPLY,
@@ -849,15 +849,19 @@ class CoreEngine:
             )
 
         # 3. To'lov rekvizitlari va hisob raqamlar so'rovi (agar aniq INN yoki Fiskal modul kiritilmagan bo'lsa):
-        from payment_accounts import classify_payment_intent, get_monthly_payment_card, get_monthly_post_note, get_annual_payment_card, get_annual_post_note
+        from payment_accounts import (
+            classify_payment_intent, get_monthly_payment_card, get_monthly_post_note,
+            get_annual_payment_card, get_annual_post_note, is_how_to_pay_video_intent
+        )
         p_intent = classify_payment_intent(clean_text)
         if p_intent and not found_fm and not found_inn:
+            wants_vid = is_how_to_pay_video_intent(clean_text)
             if p_intent == "monthly":
                 card_text = f"{get_monthly_payment_card()}\n\n{get_monthly_post_note(user_script)}"
                 return DecisionResult(
                     action=ActionType.DIAGNOSE_AND_REPLY,
                     reply_text=card_text,
-                    video_id=148,
+                    video_id=148 if wants_vid else None,
                     log_reason="Monthly payment account inquiry"
                 )
             else:
@@ -865,7 +869,7 @@ class CoreEngine:
                 return DecisionResult(
                     action=ActionType.DIAGNOSE_AND_REPLY,
                     reply_text=card_text,
-                    video_id=145,
+                    video_id=145 if wants_vid else None,
                     log_reason="Annual payment account inquiry"
                 )
 
@@ -961,10 +965,11 @@ class CoreEngine:
                         "\n\n💡 <b>Yillik fiskal modul to'lovi va Soliq (OFD) muddatini ham tekshirish uchun:</b>\n"
                         "Apparat chekining pastki qismidagi <b>Fiskal modul raqamini</b> (masalan: <code>LG...</code>, <code>YG...</code> yoki <code>UZ...</code>) yuboring."
                     )
+                    wants_vid = is_how_to_pay_video_intent(clean_text)
                     return DecisionResult(
                         action=ActionType.DEBT_INFO,
                         reply_text=f"{debt_res_text}{fm_tip}",
-                        video_id=148,
+                        video_id=148 if wants_vid else None,
                         detected_inn=target_inn,
                         debt_amount=total_debt,
                         org_name=target_org,

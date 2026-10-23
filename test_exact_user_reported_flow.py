@@ -144,12 +144,12 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
         bot.copy_message.reset_mock()
         await self._send_msg(bot, "oylikchi")
         
-        # Oylik hisob raqami va videosi kanaldan uzatiladi
-        self.assertEqual(bot.copy_message.call_count, 2)
+        # Oylik hisob raqami kanaldan uzatiladi (video esa avtomatik uzatilmaydi)
+        self.assertEqual(bot.copy_message.call_count, 1)
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         print(f"🤖 Bot kanaldan uzatdi: {copied_ids}")
         self.assertIn(MARS_POST_ID, copied_ids)
-        self.assertIn(MARS_VIDEO_ID, copied_ids)
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids)
 
         # Eng muhimi: Qarz hali ham xotirada 2 100 000 bo'lib turibdi, 0 ga aylanmagan!
         debt_after_oylikchi = user_memory.get_debt_info(self.chat_id, self.user_id)
@@ -258,9 +258,10 @@ class TestExactUserReportedFlow(unittest.IsolatedAsyncioTestCase):
         # 5. 'qayerga tolashim kerak'
         bot.copy_message.reset_mock()
         m5 = await self._send_msg(bot, "qayerga tolashim kerak")
-        self.assertEqual(bot.copy_message.call_count, 2, "Qayerga tolashim kerak so'roviga kanal postlari (85 va 148) uzatilishi shart!")
+        self.assertEqual(bot.copy_message.call_count, 1, "Qayerga tolashim kerak so'roviga kanal posti 85 uzatilishi shart!")
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(MARS_POST_ID, copied_ids)
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids)
 
         # 6. 'qarzdorligim bormi'
         m6 = await self._send_msg(bot, "qarzdorligim bormi")

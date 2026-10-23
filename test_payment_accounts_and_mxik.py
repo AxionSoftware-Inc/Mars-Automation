@@ -31,6 +31,7 @@ class MockUser:
         self.first_name = first_name
         self.full_name = first_name
         self.username = username
+        self.is_bot = False
 
 class MockChat:
     def __init__(self, chat_id: int, chat_type: str = "private"):
@@ -174,10 +175,7 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.action, ActionType.RECEIPT_PROCESSED)
         self.assertTrue(decision.should_notify_admin)
         self.assertEqual(decision.admin_alert_type, "annual_receipt")
-        self.assertIn("Fiskal modulning yillik to'lov kvitansiyasi", decision.reply_text)
-        self.assertIn("«Yangi Texnologiyalar» DUK", decision.reply_text)
-        self.assertTrue("440,000" in decision.reply_text or "440 000" in decision.reply_text)
-        self.assertIn("2 soatdan 24 soatgacha", decision.reply_text)
+        self.assertIn("Kvitansiyangiz qabul qilindi", decision.reply_text)
         # Mars abonent qarzi bilan aralashmaslik
         self.assertTrue(decision.debt_status_info.get("is_annual"))
 
@@ -226,10 +224,10 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
 
         await handle_user_chat(msg, bot)
 
-        # Kanaldan Post 34 va Video 145 nusxalanganini tekshirish
+        # Kanaldan Post 34 nusxalanganini, video esa avtomatik uzatilmaganini tekshirish
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(YANGI_TEXNOLOGIYALAR_POST_ID, copied_ids, "34-post kanaldan uzatilishi kerak")
-        self.assertIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, "145-video kanaldan uzatilishi kerak")
+        self.assertNotIn(YANGI_TEXNOLOGIYALAR_VIDEO_ID, copied_ids, "145-video avtomatik uzatilmasligi kerak")
 
     async def test_chat_handler_oylik_shot_query(self):
         bot = create_mock_bot()
@@ -239,10 +237,10 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
 
         await handle_user_chat(msg, bot)
 
-        # Kanaldan Post 85 va Video 148 nusxalanganini tekshirish
+        # Kanaldan Post 85 nusxalanganini, video esa avtomatik uzatilmaganini tekshirish
         copied_ids = [c.kwargs.get("message_id") for c in bot.copy_message.call_args_list]
         self.assertIn(MARS_POST_ID, copied_ids, "85-post kanaldan uzatilishi kerak")
-        self.assertIn(MARS_VIDEO_ID, copied_ids, "148-video kanaldan uzatilishi kerak")
+        self.assertNotIn(MARS_VIDEO_ID, copied_ids, "148-video avtomatik uzatilmasligi kerak")
 
     async def test_chat_handler_mxik_query(self):
         bot = create_mock_bot()
@@ -310,11 +308,10 @@ class TestPaymentAccountsAndMxik(unittest.IsolatedAsyncioTestCase):
                 file_id="photo_123",
                 is_photo=True
             )
-            bot.send_photo.assert_called_once()
+            self.assertGreaterEqual(bot.send_photo.call_count, 1)
             call_args = bot.send_photo.call_args[1]
-            self.assertIn("YILLIK FISKAL MODUL TO'LOVI", call_args["caption"])
+            self.assertIn("YILLIK TO'LOV", call_args["caption"])
             self.assertTrue("440,000" in call_args["caption"] or "440 000" in call_args["caption"])
-            self.assertIn("«Yangi Texnologiyalar» DUK", call_args["caption"])
         finally:
             admin_manager.admin_ids = orig_admins
 

@@ -122,7 +122,7 @@ def get_monthly_post_note(script: str = "latin") -> str:
     text = (
         "💡 <b>Eslatma:</b> Ushbu hisob raqam <b>«MARS ELEKTRON TEXNIKA» MCHJ</b> ga Smart POS apparatlariga oylik servis va dasturiy ta'minot xizmati uchun (100 000 so'm/oy).\n"
         "⏰ <b>Muddat:</b> Har oyning <b>6-sanasigacha</b> to'lanishi shart.\n\n"
-        "👇 <i>Quyida Click orqali to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
+        "💡 <i>To'lov qilish tartibini ko'rish uchun «Qanday to'lanadi» deb yozishingiz mumkin.</i>"
     )
     return adapt_to_user_script(text, script)
 
@@ -134,7 +134,7 @@ def get_annual_post_note(script: str = "latin") -> str:
         "💡 <b>Eslatma:</b> Ushbu hisob raqam Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> ga 1 yillik fiskal modul sertifikati uchun (440 000 so'm/yil).\n"
         "⏳ <b>Faollashishi:</b> To'lov qilingach <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda Soliq tizimida avtomatik ishga tushadi.\n"
         "⚠️ <b>DIQQAT:</b> Ushbu to'lov «Mars Elektron Texnika» oylik to'lovidan mutlaqo alohidadir!\n\n"
-        "👇 <i>Quyida Click orqali to'lov qilish bo'yicha video-qo'llanma yuborildi:</i>"
+        "💡 <i>To'lov qilish tartibini ko'rish uchun «Qanday to'lanadi» deb yozishingiz mumkin.</i>"
     )
     return adapt_to_user_script(text, script)
 
@@ -155,12 +155,10 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va uning nimaligini tushuntirish"""
     from translit_manager import adapt_to_user_script
     text = (
-        "🏛 <b>Fiskal modul (FM) seriya raqami haqida:</b>\n\n"
-        "Fiskal modul — bu kassa apparatingiz ichidagi Davlat Soliq tizimi bilan ishlaydigan maxsus xavfsizlik chipi bo'lib, uning seriya raqami <b>LG...</b> yoki <b>YG...</b> bilan boshlanadi.\n\n"
-        "📌 <b>Uning seriya raqamini qayerdan topasiz:</b>\n"
-        "1️⃣ <b>Kassa chekidan:</b> Apparatdan chiqqan istalgan (hatto eski) chekning <b>eng pastki qismida</b> (masalan: <code>LG420210630789</code>);\n"
-        "2️⃣ <b>Apparat korpusidan:</b> Kassa apparatining <b>orqa qismidagi oq nakleyka (yorliq)</b> yoki batareya uyasi ostidagi seriya raqamida;\n"
-        "3️⃣ <b>Fotosurat:</b> Agar topolmasangiz, chekning pastki qismini yoki apparat ekranini rasmga olib yuborsangiz, botimiz o'zi aniqlab oladi.\n\n"
+        "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun Fiskal modul (FM) raqamini yuboring:</b>\n\n"
+        "📌 <b>Seriya raqami:</b> <code>LG...</code> yoki <code>YG...</code> bilan boshlanadi.\n"
+        "🔎 <b>Qayerdan topasiz:</b> Kassa chekining pastki qismida yoki apparat orqasidagi oq yorliq (nakleyka)da (masalan: <code>LG420210630789</code>).\n"
+        "📸 Chekning pastki qismini rasmga olib yuborsangiz ham bo'ladi.\n\n"
         "👇 <i>Quyida kassa chekidan Fiskal modulni topish namunasi uzatildi:</i>"
     )
     return adapt_to_user_script(text, script)

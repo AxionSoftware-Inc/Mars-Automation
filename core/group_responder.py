@@ -186,7 +186,7 @@ class GroupResponseOrchestrator:
             lower_text=lower_text,
             chat_id=chat_id,
             user_id=user_id,
-            user_name=message.from_user.full_name if message.from_user else "Mijoz",
+            user_name=getattr(message.from_user, "full_name", getattr(message.from_user, "first_name", "Mijoz")) if message.from_user else "Mijoz",
             user_username=message.from_user.username if message.from_user else "",
             user_script=user_script,
             found_inn=found_inn,

@@ -20,7 +20,7 @@ OPERATOR_KEYWORDS = [
     "ochirib yoqdim ishlamadi", "usta yuboring", "usta jonating", "usta jo'nating",
     "admin bilan gaplashaman", "admin bilan gaplashmoqchiman", "ustaxonaga", "qilolmadim",
     "usta raqam", "usta raqami", "usta nomer", "usta nomeri", "admin raqam", "admin raqami", "admin nomer", "admin nomeri",
-    "telefon nomer", "telefon nomeri", "telefon nomerini", "nomerini tashlang", "raqamini tashlang", "telefonini tashlang",
+    "telefon nomer", "telefon nomeri", "telefon nomerini", "telefon raqamini tashlang", "telefonini tashlang", "usta nomerini tashlang",
     "уста рақам", "уста рақами", "уста номер", "уста номери", "админ рақам", "админ номер", "телефон номер"
 ]
 
@@ -35,6 +35,20 @@ class OperatorIntentHandler:
         user_id = message.from_user.id if message.from_user else 0
 
         if not any(kw in lower_text for kw in OPERATOR_KEYWORDS):
+            return False
+
+        # Agar mijoz hisob raqam yoki to'lov so'rayotgan bo'lsa (masalan: "hisob raqamini tashlang", "yillik to'lov hisob raqami"):
+        is_payment_related = any(w in lower_text for w in [
+            "hisob raqam", "hisob raqami", "hisob raqamini", "hsob raqam",
+            "shot", "shotini", "shot raqam", "rekvizit", "rekvizitlar",
+            "to'lov", "tolov", "to'lash", "tolash", "yillik", "oylik",
+            "хисоб ракам", "шот", "реквизит", "тўлов", "толов"
+        ])
+        is_explicit_human_ask = any(w in lower_text for w in [
+            "operator", "usta", "admin", "mutaxassis", "administrator", "xodim", "inson", "odam",
+            "оператор", "уста", "админ", "мастер"
+        ])
+        if is_payment_related and not is_explicit_human_ask:
             return False
 
         decision = core_engine.escalate_general_issue(text, chat_id, user_id)

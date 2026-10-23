@@ -178,19 +178,31 @@ class TestMonthlyAndAnnualBillingFlows(unittest.IsolatedAsyncioTestCase):
         chat_id = 1006
         user_id = 1006
 
-        # A) Oylik to'lov hisob raqami so'ralganda (Post 85 va Video 148 uzatiladi)
+        # A) Oylik to'lov hisob raqami so'ralganda (Faqat Post 85 uzatiladi, video uzatilmaydi)
         r1 = await self._send_msg(chat_id, user_id, "oylik to'lov shotini ber", bot)
         copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
-        self.assertIn(85, copied_ids)   # Mars oylik shot posti
-        self.assertIn(148, copied_ids)  # Oylik to'lov videosi
+        self.assertIn(85, copied_ids)      # Mars oylik shot posti
+        self.assertNotIn(148, copied_ids) # Video faqat qanday to'lanadi deb so'ralganda uzatiladi!
 
-        # B) Yillik to'lov hisob raqami so'ralganda (Post 34 va Video 145 uzatiladi)
+        # A2) Oylik to'lov videosi faqat "qanday to'lanadi" deb so'ralganda:
+        bot.copy_message.reset_mock()
+        await self._send_msg(chat_id, user_id, "qanday to'lanadi", bot)
+        copied_ids_vid = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+        self.assertIn(148, copied_ids_vid)
+
+        # B) Yillik to'lov hisob raqami so'ralganda (Faqat Post 34 uzatiladi, video uzatilmaydi)
         bot.copy_message.reset_mock()
         user_memory.clear()
         r2 = await self._send_msg(chat_id, user_id, "yillik to'lov shotini tashla", bot)
         copied_ids = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
-        self.assertIn(34, copied_ids)   # Yangi Texnologiyalar yillik shot posti
-        self.assertIn(145, copied_ids)  # Yillik to'lov videosi
+        self.assertIn(34, copied_ids)      # Yangi Texnologiyalar yillik shot posti
+        self.assertNotIn(145, copied_ids) # Video faqat qanday to'lanadi deb so'ralganda uzatiladi!
+
+        # B2) Yillik video faqat "yillik qanday to'lanadi" so'ralganda:
+        bot.copy_message.reset_mock()
+        await self._send_msg(chat_id, user_id, "yillik qanday to'lanadi", bot)
+        copied_ids_ann_vid = [call.kwargs.get("message_id") or call.args[2] for call in bot.copy_message.call_args_list]
+        self.assertIn(145, copied_ids_ann_vid)
 
         # C) Umumiy / ikkala hisob raqam so'ralganda (Post 85 va Post 34 uzatiladi)
         bot.copy_message.reset_mock()
