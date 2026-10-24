@@ -257,11 +257,11 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(len(r8) > 0)
 
     # =========================================================================
-    # FLOW 4: 1-HOUR MEMORY EXPIRATION MID-DIALOGUE (6 TURNS)
+    # FLOW 4: 30-MINUTE MEMORY EXPIRATION MID-DIALOGUE (6 TURNS)
     # =========================================================================
-    async def test_flow_4_session_expiry_after_5_minutes(self):
+    async def test_flow_4_session_expiry_after_30_minutes(self):
         """
-        5 daqiqa (300s) TTL tugashidan keyin botning xotirani toza unutishi,
+        30 daqiqa (1800s) TTL tugashidan keyin botning xotirani toza unutishi,
         qulab tushmasdan muloyimlik bilan INNni qayta so'rashi.
         """
         chat_id = 70004
@@ -282,12 +282,12 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
             r2 = await self._send_msg(chat_id, user_id, "nega buncha qarzman to'lov tariximni ko'rsat", bot)
             self.assertIn("QASHQADARYO SHARQ GAVHARI", r2)
 
-            # Turn 3: 305 soniya o'tdi (> 5 daqiqa TTL)
-            current_fake_time += 305.0
+            # Turn 3: 1805 soniya o'tdi (> 30 daqiqa TTL)
+            current_fake_time += 1805.0
 
             # Foydalanuvchi kelib qisqa savol beradi: "oylikdanchi?"
             r3 = await self._send_msg(chat_id, user_id, "oylikdanchi qarzim qancha", bot)
-            # Xotira 5 daqiqadan keyin tozalangan bo'lishi kerak, shuning uchun INN so'raydi
+            # Xotira 30 daqiqadan keyin tozalangan bo'lishi kerak, shuning uchun INN so'raydi
             self.assertIn("INN", r3)
             self.assertIsNone(user_memory.get_last_id(chat_id, user_id))
 

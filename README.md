@@ -34,7 +34,7 @@
 ├── excel_manager.py           # Excel bazasi (qarz, to'lovlar, avto-yuklash)
 ├── error_manager.py           # Ekran nosozliklari qoidalari (JSON asosida)
 ├── catalog_manager.py         # 50+ video qo'llanmalar qidiruv moduli
-├── user_memory.py             # 5 daqiqalik ko'p foydalanuvchili sessiya xotirasi
+├── user_memory.py             # 30 daqiqalik ko'p foydalanuvchili sessiya xotirasi
 ├── openrouter_client.py       # Gemini 2.5 Flash Lite API mijozi
 ├── data/                      # Konfiguratsiya va ma'lumotlar
 │   ├── screen_errors.json     # Ekran xatoliklari deklaratsiyasi
