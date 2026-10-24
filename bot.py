@@ -40,16 +40,16 @@ async def main():
 
     # Scheduler rejalashtiruvchi
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
-    # Har kuni soat 9:00 da
+    # Har kuni soat 9:00 va 15:00 da
     scheduler.add_job(
         daily_channel_file_maintenance,
-        CronTrigger(hour=9, minute=0, timezone="Asia/Tashkent"),
+        CronTrigger(hour="9,15", minute=0, timezone="Asia/Tashkent"),
         args=[bot]
     )
-    # Ish vaqtida har 10 daqiqada yangi fayl chiqqanligini tekshirish
+    # Zaxira sifatida har soatda tekshirish (real-vaqt tinglovchisiga xalaqit bermaslik uchun)
     scheduler.add_job(
         daily_channel_file_maintenance,
-        CronTrigger(minute="*/10", timezone="Asia/Tashkent"),
+        CronTrigger(minute=0, timezone="Asia/Tashkent"),
         args=[bot]
     )
     scheduler.start()

@@ -68,6 +68,10 @@ class ConversationIntentHandler:
 
         # 2. Agar bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!
         if is_conversational or (has_active_context and not explicit_video_request):
+            try:
+                await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+            except Exception:
+                pass
             context_summary = user_memory.get_context_summary(chat_id, user_id)
             ai_res = ai_func(text, context_history=context_summary, target_script=user_script)
             if asyncio.iscoroutine(ai_res):
@@ -115,6 +119,10 @@ class ConversationIntentHandler:
             return True
 
         # 3. Boshqalari bo'yicha umumiy AI javobi
+        try:
+            await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+        except Exception:
+            pass
         context_summary = user_memory.get_context_summary(chat_id, user_id)
         ai_res = ai_func(text, context_history=context_summary, target_script=user_script)
         if asyncio.iscoroutine(ai_res):

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("GEMINI_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "google/gemini-2.5-flash"
+DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash-lite")
 
 class OpenRouterClient:
     """
@@ -72,7 +72,7 @@ class OpenRouterClient:
         headers, payload = built
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(OPENROUTER_URL, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -98,7 +98,7 @@ class OpenRouterClient:
         headers, payload = built
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=10.0) as client:
                 resp = client.post(OPENROUTER_URL, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()

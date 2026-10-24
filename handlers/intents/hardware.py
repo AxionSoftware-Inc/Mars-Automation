@@ -52,7 +52,23 @@ def is_device_issue(text: str) -> bool:
     if not text:
         return False
     lower = text.lower()
-    return any(p in lower for p in DEVICE_ISSUE_PHRASES)
+    if any(p in lower for p in DEVICE_ISSUE_PHRASES):
+        return True
+
+    # Moslashuvchan o'zaklar (har xil xatoliklar, orfografik xatolar va shevalar uchun: "ishklamayapdi", "ishlamayabdi", "kurib beriyla")
+    has_device = any(d in lower for d in ["aparat", "apparat", "kassa", "terminal", "pos", "smart one", "p3", "uskuna", "ekran"])
+    has_issue_stem = any(s in lower for s in [
+        "ishlam", "ishklam", "ochil", "ochmay", "yonmay", "yoqil", "qotib", "buzil",
+        "blok", "xato", "oshibka", "chek chiq", "chek berm", "chek ur"
+    ])
+    if has_device and has_issue_stem:
+        return True
+
+    # "aparatimni kurib beriyla", "kassani tekshirib beringlar", "aparat ishlamay qoldi"
+    if has_device and any(v in lower for v in ["kurib ber", "ko'rib ber", "korib ber", "tuzatib ber", "tekshirib ber"]):
+        return True
+
+    return False
 
 
 class HardwareIntentHandler:
