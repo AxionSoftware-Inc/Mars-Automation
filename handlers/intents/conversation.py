@@ -63,6 +63,7 @@ class ConversationIntentHandler:
                 user_memory.add_user_message(chat_id, user_id, text)
                 user_memory.add_assistant_message(chat_id, user_id, f"[Video qo'llanma yuborildi: ID {video_id}]")
                 user_memory.set_last_topic(chat_id, user_id, f"video_{video_id}")
+                user_memory.clear_issue_mode(chat_id, user_id)
                 return True
 
         # 2. Agar bu davomiy suhbat yoki faol kontekst bo'lsa -> AI kontekstiga!

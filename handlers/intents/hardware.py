@@ -69,17 +69,36 @@ class HardwareIntentHandler:
         user_id = message.from_user.id if message.from_user else 0
         chat_id = message.chat.id
 
-        # 0. Aniq yo'riqnoma yoki katalog videosi so'ralsa (Z-hisobot, soat/vaqt, MXIK) -> tegishli handlerga yo'naltirish
+        # 0. Aniq yo'riqnoma yoki katalog videosi so'ralsa (Z-hisobot, soat/vaqt, MXIK, qo'llanmalar) -> tegishli handlerga yo'naltirish
         from payment_accounts import is_mxik_intent
         if is_mxik_intent(text):
             return False
 
-        if any(w in lower_text for w in [
-            "z hisobot", "z-hisobot", "z otchet", "z-otchet", "kunlik hisobot",
+        from catalog_manager import catalog_manager
+        norm_t = catalog_manager.normalize(text)
+
+        # A) Soat, vaqt yoki sana bo'yicha har qanday savol/tuzatish/qo'llanma so'rovi (saot, vaqt, sana...)
+        is_clock_inquiry = (
+            any(w in norm_t for w in ["soat", "vaqt", "sana"]) and
+            any(w in norm_t for w in ["togirla", "tuzat", "sozla", "notogri", "xato", "adash", "orqada", "oldinda", "qanday", "vide", "korsat", "urgan"])
+        ) or any(w in lower_text for w in [
+            "z hisobot", "z-hisobot", "z otchet", "z-otchet", "kunlik hisobot", "x hisobot", "x-hisobot",
             "soatni to'g'rilash", "vaqtni to'g'rilash", "soat videosi", "vaqt videosi",
-            "vaqtni qanday", "soatni qanday", "soat noto'g'ri", "vaqt noto'g'ri", "soat xato", "vaqt xato"
-        ]):
+            "vaqtni qanday", "soatni qanday", "soat noto'g'ri", "vaqt noto'g'ri", "soat xato", "vaqt xato",
+            "saot", "soatini", "vaqtini", "soat tuzat", "vaqt tuzat"
+        ])
+        if is_clock_inquiry:
             return False
+
+        # B) Agar foydalanuvchi video katalogdagi biror aniq qo'llanmani so'rayotgan bo'lsa -> apparat nosozligi sifatida bloklamaslik!
+        matching_video_id = catalog_manager.find_post_by_keywords(text)
+        if matching_video_id:
+            return False
+
+        # C) Agar mijoz "qanday qilinadi", "qanday tuzataman", "qanday olaman" kabi operatsion savol bersa va video katalogda mavjud bo'lsa:
+        if any(w in norm_t for w in ["qanday", "qanaqa", "video", "rolik", "kursat", "organ", "qollanma"]):
+            if catalog_manager.find_matching_post(text):
+                return False
 
         is_in_issue = user_memory.is_issue_mode(chat_id, user_id)
         has_issue_phrase = any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES)

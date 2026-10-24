@@ -65,6 +65,11 @@ class CatalogManager:
         t = re.sub(r"ishlam[aei]+[p]?[d]?[i]?", "ishlamay", t)
         t = t.replace("karz", "qarz")
         t = t.replace("tulov", "tolov").replace("tulash", "tolash")
+        # Soat / vaqt xatoliklari va shevalar (saot -> soat, vaxt/vaht -> vaqt, tugirla -> togirla)
+        t = re.sub(r"\bsaot", "soat", t)
+        t = re.sub(r"\bsotni\b|\bsotini\b", "soatni", t)
+        t = re.sub(r"\bva[hx]t", "vaqt", t)
+        t = re.sub(r"tug['`ʻʼ]?irla", "togirla", t)
         return t
 
     def find_post_by_keywords(self, text: str) -> Optional[int]:
