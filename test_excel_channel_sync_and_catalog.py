@@ -37,6 +37,9 @@ class TestExcelChannelSyncAndCatalog(unittest.IsolatedAsyncioTestCase):
             if original is not None:
                 set_last_excel_channel_msg_id(original)
 
+    def tearDown(self):
+        ofd_bridge._telethon_client = None
+
     @patch("telethon.TelegramClient")
     async def test_sync_excel_mock_flow(self, mock_client_cls):
         """sync_excel_from_channel muvaffaqiyatli yuklab olish oqimi"""
@@ -66,9 +69,10 @@ class TestExcelChannelSyncAndCatalog(unittest.IsolatedAsyncioTestCase):
         with patch("excel_manager.excel_manager.update_file", return_value=True):
             with patch("state_manager.get_last_excel_channel_msg_id", return_value=12300):
                 with patch("state_manager.set_last_excel_channel_msg_id") as mock_set:
-                    res = await ofd_bridge.sync_excel_from_channel(channel_id=-1001795471853)
-                    self.assertTrue(res)
-                    mock_set.assert_called_with(12345)
+                    with patch("state_manager.set_last_forwarded_excel_channel_msg_id"):
+                        res = await ofd_bridge.sync_excel_from_channel(channel_id=-1001795471853)
+                        self.assertTrue(res)
+                        mock_set.assert_called_with(12345)
 
 if __name__ == "__main__":
     unittest.main()

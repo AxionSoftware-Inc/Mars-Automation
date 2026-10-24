@@ -271,29 +271,30 @@ class OFDBridgeManager:
         return os.path.exists(USER_SESSION_FILE)
 
     async def get_telethon_client(self):
-        """Telethon mijozini olish yoki ulash"""
+        """Telethon mijozini olish yoki ulash (lock bilan xavfsiz singleton)"""
         if not self.has_user_session():
             return None
-        if self._telethon_client is not None:
+        async with self._query_lock:
+            if self._telethon_client is not None:
+                try:
+                    if self._telethon_client.is_connected():
+                        return self._telethon_client
+                except Exception:
+                    pass
             try:
-                if self._telethon_client.is_connected():
-                    return self._telethon_client
-            except Exception:
-                pass
-        try:
-            from telethon import TelegramClient
-            session_prefix = os.path.join(DATA_DIR, "ofd_user")
-            client = TelegramClient(session_prefix, API_ID, API_HASH)
-            await client.connect()
-            if not await client.is_user_authorized():
-                logger.warning("Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
-                await client.disconnect()
+                from telethon import TelegramClient
+                session_prefix = os.path.join(DATA_DIR, "ofd_user")
+                client = TelegramClient(session_prefix, API_ID, API_HASH)
+                await client.connect()
+                if not await client.is_user_authorized():
+                    logger.warning("Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
+                    await client.disconnect()
+                    return None
+                self._telethon_client = client
+                return self._telethon_client
+            except Exception as e:
+                logger.error(f"Telethon ulanishida xatolik: {e}")
                 return None
-            self._telethon_client = client
-            return self._telethon_client
-        except Exception as e:
-            logger.error(f"Telethon ulanishida xatolik: {e}")
-            return None
 
     async def close_telethon_client(self):
         """Telethon mijozini xavfsiz to'xtatish"""
@@ -494,11 +495,12 @@ class OFDBridgeManager:
             os.getenv("OYLIK_ABONIT_GROUP_ID", str(forward_target or "-1004405333505"))
         ))
 
+        client = await self.get_telethon_client()
+        if not client:
+            return False
+
         async with self._query_lock:
-            client = None
-            is_temp_client = False
             try:
-                from telethon import TelegramClient
                 from excel_manager import excel_manager
                 from state_manager import (
                     get_last_excel_channel_msg_id,
@@ -506,18 +508,6 @@ class OFDBridgeManager:
                     get_last_forwarded_excel_channel_msg_id,
                     set_last_forwarded_excel_channel_msg_id,
                 )
-
-                if self._telethon_client is not None and getattr(self._telethon_client, "is_connected", lambda: False)():
-                    client = self._telethon_client
-                else:
-                    session_prefix = os.path.join(DATA_DIR, "ofd_user")
-                    client = TelegramClient(session_prefix, API_ID, API_HASH)
-                    await client.connect()
-                    if not await client.is_user_authorized():
-                        logger.warning("sync_excel_from_channel: Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
-                        await client.disconnect()
-                        return False
-                    is_temp_client = True
 
                 last_excel_id = get_last_excel_channel_msg_id() or 0
                 last_fwd_id = get_last_forwarded_excel_channel_msg_id()
@@ -587,12 +577,6 @@ class OFDBridgeManager:
             except Exception as e:
                 logger.error(f"❌ sync_excel_from_channel xatoligi: {e}", exc_info=True)
                 return False
-            finally:
-                if is_temp_client and client:
-                    try:
-                        await client.disconnect()
-                    except Exception:
-                        pass
 
         return False
 

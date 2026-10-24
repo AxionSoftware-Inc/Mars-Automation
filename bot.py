@@ -60,9 +60,8 @@ async def main():
     from core.module_registry import module_registry
     await module_registry.startup_all(bot, dp)
 
-    # Ishga tushganda fon rejimida Telethon tinglovchisini va tekshiruvini ishga tushirish
+    # Ishga tushganda fon rejimida Telethon tinglovchisini ishga tushirish (startda bazani ham tekshiradi)
     telethon_task = asyncio.create_task(ofd_bridge.start_telethon_listener(bot))
-    asyncio.create_task(daily_channel_file_maintenance(bot))
 
     try:
         await dp.start_polling(bot)

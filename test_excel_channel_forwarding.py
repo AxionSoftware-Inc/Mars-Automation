@@ -18,6 +18,7 @@ class TestExcelChannelForwarding(unittest.IsolatedAsyncioTestCase):
         self.orig_fwd = get_last_forwarded_excel_channel_msg_id()
 
     def tearDown(self):
+        ofd_bridge._telethon_client = None
         if self.orig_fwd is not None:
             set_last_forwarded_excel_channel_msg_id(self.orig_fwd)
 
