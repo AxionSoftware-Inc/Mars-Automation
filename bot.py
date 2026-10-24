@@ -46,10 +46,10 @@ async def main():
         CronTrigger(hour=9, minute=0, timezone="Asia/Tashkent"),
         args=[bot]
     )
-    # Ish vaqtida har 30 daqiqada yangi fayl chiqqanligini tekshirish
+    # Ish vaqtida har 10 daqiqada yangi fayl chiqqanligini tekshirish
     scheduler.add_job(
         daily_channel_file_maintenance,
-        CronTrigger(minute="*/30", timezone="Asia/Tashkent"),
+        CronTrigger(minute="*/10", timezone="Asia/Tashkent"),
         args=[bot]
     )
     scheduler.start()
@@ -60,12 +60,16 @@ async def main():
     from core.module_registry import module_registry
     await module_registry.startup_all(bot, dp)
 
-    # Ishga tushganda fon rejimida oxirgi Excel faylni tekshirish
+    # Ishga tushganda fon rejimida Telethon tinglovchisini va tekshiruvini ishga tushirish
+    telethon_task = asyncio.create_task(ofd_bridge.start_telethon_listener(bot))
     asyncio.create_task(daily_channel_file_maintenance(bot))
 
     try:
         await dp.start_polling(bot)
     finally:
+        if "telethon_task" in locals() and not telethon_task.done():
+            telethon_task.cancel()
+        await ofd_bridge.close_telethon_client()
         await module_registry.shutdown_all(bot, dp)
 
 if __name__ == "__main__":

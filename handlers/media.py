@@ -15,7 +15,13 @@ from admin_manager import admin_manager, get_admin_contact_keyboard
 from core import core_engine, ActionType
 from core.models import extract_clean_inn, extract_fiscal_module, ReceiptFacts, FiscalChekFacts
 from user_memory import user_memory
-from state_manager import get_last_file_message_id, set_last_file_message_id
+from state_manager import (
+    get_last_file_message_id,
+    set_last_file_message_id,
+    get_last_forwarded_excel_channel_msg_id,
+    set_last_forwarded_excel_channel_msg_id,
+    set_last_excel_channel_msg_id
+)
 from translit_manager import adapt_to_user_script, detect_script
 from ofd_bridge import ofd_bridge
 from payment_accounts import (
@@ -23,6 +29,7 @@ from payment_accounts import (
     YANGI_TEXNOLOGIYALAR_ACCOUNT,
     format_ofd_annual_status,
     SOURCE_CHANNEL_ID,
+    EXCEL_FORWARD_CHANNEL_ID,
     send_channel_message,
     send_monthly_account_post,
     send_annual_account_post,
@@ -114,6 +121,28 @@ async def handle_document(message: types.Message, bot: Bot):
                     except Exception as err:
                         logger.warning(f"Avvalgi fayl postini o'chirishda xatolik: {err}")
                 set_last_file_message_id(message.message_id)
+
+            if success and message.chat.id == EXCEL_CHANNEL_ID:
+                set_last_excel_channel_msg_id(message.message_id)
+                last_fwd = get_last_forwarded_excel_channel_msg_id() or 0
+                if message.message_id > last_fwd:
+                    try:
+                        await bot.forward_message(
+                            chat_id=EXCEL_FORWARD_CHANNEL_ID,
+                            from_chat_id=message.chat.id,
+                            message_id=message.message_id
+                        )
+                    except Exception as err_fwd:
+                        try:
+                            await bot.copy_message(
+                                chat_id=EXCEL_FORWARD_CHANNEL_ID,
+                                from_chat_id=message.chat.id,
+                                message_id=message.message_id
+                            )
+                        except Exception as err_cp:
+                            logger.error(f"Excel faylini Oylik abanit guruhiga uzatishda xatolik: {err_cp}")
+                    set_last_forwarded_excel_channel_msg_id(message.message_id)
+                    logger.info(f"Excel fayli (ID: {message.message_id}) Oylik abanit guruhiga uzatildi.")
 
             if success:
                 logger.info(f"Yangi Excel bazasi yangilandi! Yozuvlar: {excel_manager.records_count}")

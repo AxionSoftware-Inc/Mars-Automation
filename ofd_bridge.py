@@ -39,6 +39,7 @@ class OFDBridgeManager:
         self._query_lock = asyncio.Lock()
         self._active_collector: Optional[Dict[str, Any]] = None
         self._cache: Dict[str, Dict[str, Any]] = {}
+        self._telethon_client = None
         self.load_config()
 
     def load_config(self):
@@ -269,19 +270,48 @@ class OFDBridgeManager:
         """Telethon user-akkaunt sessiyasi mavjudligini tekshirish"""
         return os.path.exists(USER_SESSION_FILE)
 
-    async def _query_telethon(self, inn: str, timeout: float = 9.0) -> Optional[str]:
-        """Telethon user-akkaunt orqali maxfiy guruhga yoki to'g'ridan-to'g'ri @ofd943_bot ga INN yuborib javob olish"""
+    async def get_telethon_client(self):
+        """Telethon mijozini olish yoki ulash"""
         if not self.has_user_session():
             return None
+        if self._telethon_client is not None:
+            try:
+                if self._telethon_client.is_connected():
+                    return self._telethon_client
+            except Exception:
+                pass
         try:
             from telethon import TelegramClient
             session_prefix = os.path.join(DATA_DIR, "ofd_user")
             client = TelegramClient(session_prefix, API_ID, API_HASH)
             await client.connect()
             if not await client.is_user_authorized():
+                logger.warning("Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
                 await client.disconnect()
                 return None
+            self._telethon_client = client
+            return self._telethon_client
+        except Exception as e:
+            logger.error(f"Telethon ulanishida xatolik: {e}")
+            return None
 
+    async def close_telethon_client(self):
+        """Telethon mijozini xavfsiz to'xtatish"""
+        if self._telethon_client is not None:
+            try:
+                await self._telethon_client.disconnect()
+            except Exception:
+                pass
+            self._telethon_client = None
+
+    async def _query_telethon(self, inn: str, timeout: float = 9.0) -> Optional[str]:
+        """Telethon user-akkaunt orqali maxfiy guruhga yoki to'g'ridan-to'g'ri @ofd943_bot ga INN yuborib javob olish"""
+        if not self.has_user_session():
+            return None
+        client = await self.get_telethon_client()
+        if not client:
+            return None
+        try:
             target = self.ofd_group_id if (self.ofd_group_id and self.is_configured()) else self.ofd_username
             sent = await client.send_message(target, inn)
             logger.info(f"📤 OFDBridge (Telethon Userbot): {target} ga INN yuborildi: {inn}")
@@ -307,7 +337,6 @@ class OFDBridgeManager:
                     await asyncio.sleep(0.5)
                     break
 
-            await client.disconnect()
             if reply_texts:
                 full_reply = "\n\n".join(reply_texts).strip()
                 logger.info(f"📥 OFDBridge (Telethon Userbot): @{self.ofd_username} dan javob olindi (len={len(full_reply)})")
@@ -445,81 +474,209 @@ class OFDBridgeManager:
         """Eski kod bilan moslik uchun alias"""
         return await self.query_fiscal_module(bot, inn, timeout=timeout)
 
-    async def sync_excel_from_channel(self, channel_id: int = -1001795471853) -> bool:
+    async def sync_excel_from_channel(
+        self,
+        channel_id: int = -1001795471853,
+        forward_target: Optional[int] = None
+    ) -> bool:
         """
         Telethon user-akkaunt orqali Excel bazasi yuboriladigan kanaldan (masalan: Абонент тулови🏦💸💰 -1001795471853)
-        eng so'nggi .xlsx faylni avtomatik yuklab olib, excel_manager bazasini yangilash.
+        barcha yangi xabarlarni Oylik abanit guruhiga (-1004405333505) uzatish va eng so'nggi .xlsx faylni
+        avtomatik yuklab olib, excel_manager bazasini yangilash.
         """
         if not self.has_user_session():
             logger.warning("sync_excel_from_channel: User session topilmadi.")
             return False
 
         target_channel = int(os.getenv("EXCEL_CHANNEL_ID", str(channel_id)))
+        target_forward = int(os.getenv(
+            "EXCEL_FORWARD_CHANNEL_ID",
+            os.getenv("OYLIK_ABONIT_GROUP_ID", str(forward_target or "-1004405333505"))
+        ))
+
         async with self._query_lock:
             client = None
+            is_temp_client = False
             try:
                 from telethon import TelegramClient
                 from excel_manager import excel_manager
-                from state_manager import get_last_excel_channel_msg_id, set_last_excel_channel_msg_id
+                from state_manager import (
+                    get_last_excel_channel_msg_id,
+                    set_last_excel_channel_msg_id,
+                    get_last_forwarded_excel_channel_msg_id,
+                    set_last_forwarded_excel_channel_msg_id,
+                )
 
-                session_prefix = os.path.join(DATA_DIR, "ofd_user")
-                client = TelegramClient(session_prefix, API_ID, API_HASH)
-                await client.connect()
-                if not await client.is_user_authorized():
-                    logger.warning("sync_excel_from_channel: Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
+                if self._telethon_client is not None and getattr(self._telethon_client, "is_connected", lambda: False)():
+                    client = self._telethon_client
+                else:
+                    session_prefix = os.path.join(DATA_DIR, "ofd_user")
+                    client = TelegramClient(session_prefix, API_ID, API_HASH)
+                    await client.connect()
+                    if not await client.is_user_authorized():
+                        logger.warning("sync_excel_from_channel: Telethon user-akkaunt avtorizatsiyadan o'tmagan.")
+                        await client.disconnect()
+                        return False
+                    is_temp_client = True
+
+                last_excel_id = get_last_excel_channel_msg_id() or 0
+                last_fwd_id = get_last_forwarded_excel_channel_msg_id()
+                if last_fwd_id is None:
+                    last_fwd_id = last_excel_id
+                elif last_excel_id and last_fwd_id > last_excel_id:
+                    last_fwd_id = min(last_fwd_id, last_excel_id)
+
+                # Kanaldan so'nggi xabarlarni yig'ib olish
+                messages = []
+                async for message in client.iter_messages(target_channel, limit=30):
+                    messages.append(message)
+
+                if not messages:
+                    logger.info(f"sync_excel_from_channel: Kanaldan ({target_channel}) xabar topilmadi.")
                     return False
 
-                last_synced_id = get_last_excel_channel_msg_id()
-                found_msg = None
+                # Eskisidan yangisiga qarab saralaymiz
+                messages.sort(key=lambda m: getattr(m, "id", 0))
 
-                async for message in client.iter_messages(target_channel, limit=20):
-                    if message.file and getattr(message.file, "name", None):
+                excel_updated = False
+                processed_any = False
+
+                for message in messages:
+                    msg_id = getattr(message, "id", 0)
+                    if last_fwd_id and msg_id <= last_fwd_id:
+                        continue
+
+                    # 1. Yangi xabarni Oylik abanit guruhiga uzatish (forward)
+                    try:
+                        await client.forward_messages(target_forward, msg_id, from_peer=target_channel)
+                        logger.info(f"✅ Telethon sync: Xabar (ID: {msg_id}) {target_forward} ga uzatildi.")
+                    except Exception as ef:
+                        logger.warning(f"Telethon sync forward xatoligi (msg_id={msg_id}): {ef}")
+
+                    # 2. Agar Excel fayl bo'lsa, yuklab olib bazani yangilash
+                    if getattr(message, "file", None) and getattr(message.file, "name", None):
                         fn = message.file.name.lower()
                         if fn.endswith(".xlsx") or fn.endswith(".xls"):
-                            found_msg = message
-                            break
+                            temp_path = os.path.join(DATA_DIR, f"auto_sync_{message.file.name}")
+                            logger.info(f"📥 sync_excel_from_channel: Yangi Excel fayl yuklab olinmoqda (msg_id={msg_id}, name={message.file.name})...")
+                            await client.download_media(message, file=temp_path)
 
-                if not found_msg:
-                    logger.info(f"sync_excel_from_channel: Kanaldan ({target_channel}) Excel fayl topilmadi.")
-                    return False
+                            if os.path.exists(temp_path):
+                                success = await asyncio.to_thread(excel_manager.update_file, temp_path)
+                                try:
+                                    os.remove(temp_path)
+                                except Exception:
+                                    pass
 
-                if last_synced_id and found_msg.id <= last_synced_id:
-                    logger.info(f"sync_excel_from_channel: Yangi Excel fayl yo'q (oxirgi yuklangan msg_id={last_synced_id}).")
-                    return False
+                                if success:
+                                    set_last_excel_channel_msg_id(msg_id)
+                                    excel_updated = True
+                                    logger.info(
+                                        f"✅ sync_excel_from_channel: Baza muvaffaqiyatli yangilandi! "
+                                        f"MsgID={msg_id}, Yozuvlar={excel_manager.records_count}"
+                                    )
+                                else:
+                                    logger.error(f"❌ sync_excel_from_channel: excel_manager faylni qabul qilmadi (msg_id={msg_id}).")
 
-                temp_path = os.path.join(DATA_DIR, f"auto_sync_{found_msg.file.name}")
-                logger.info(f"📥 sync_excel_from_channel: Yangi Excel fayl yuklab olinmoqda (msg_id={found_msg.id}, name={found_msg.file.name})...")
-                await client.download_media(found_msg, file=temp_path)
+                    set_last_forwarded_excel_channel_msg_id(msg_id)
+                    last_fwd_id = msg_id
+                    processed_any = True
 
-                if os.path.exists(temp_path):
-                    success = await asyncio.to_thread(excel_manager.update_file, temp_path)
-                    try:
-                        os.remove(temp_path)
-                    except Exception:
-                        pass
-
-                    if success:
-                        set_last_excel_channel_msg_id(found_msg.id)
-                        logger.info(
-                            f"✅ sync_excel_from_channel: Baza muvaffaqiyatli yangilandi! "
-                            f"MsgID={found_msg.id}, Yozuvlar={excel_manager.records_count}"
-                        )
-                        return True
-                    else:
-                        logger.error("❌ sync_excel_from_channel: excel_manager faylni qabul qilmadi.")
-                        return False
+                return excel_updated or processed_any
 
             except Exception as e:
                 logger.error(f"❌ sync_excel_from_channel xatoligi: {e}", exc_info=True)
                 return False
             finally:
-                if client:
+                if is_temp_client and client:
                     try:
                         await client.disconnect()
                     except Exception:
                         pass
 
         return False
+
+    async def start_telethon_listener(self, bot: Optional[Bot] = None):
+        """
+        Telethon orqali EXCEL_CHANNEL_ID (-1001795471853) ni real-vaqt rejimida tinglash:
+        Har qanday yangi post / fayl / xabar kelganda uni darhol EXCEL_FORWARD_CHANNEL_ID (-1004405333505) ga uzatish
+        va agar Excel fayl bo'lsa, bazani yangilash.
+        """
+        if not self.has_user_session():
+            logger.info("start_telethon_listener: User session mavjud emas, tinglovchi o'tkazib yuborildi.")
+            return
+
+        target_channel = int(os.getenv("EXCEL_CHANNEL_ID", "-1001795471853"))
+        forward_group = int(os.getenv("EXCEL_FORWARD_CHANNEL_ID", os.getenv("OYLIK_ABONIT_GROUP_ID", "-1004405333505")))
+
+        while True:
+            try:
+                client = await self.get_telethon_client()
+                if not client or not client.is_connected():
+                    await asyncio.sleep(10)
+                    continue
+
+                # 1. Start bo'lganda o'tkazib yuborilgan yangi xabarlarni sinxronlashtirish
+                await self.sync_excel_from_channel(channel_id=target_channel, forward_target=forward_group)
+
+                # 2. Yangi xabarlarni real-vaqt rejimida qabul qilish
+                from telethon import events
+
+                @client.on(events.NewMessage(chats=target_channel))
+                async def on_new_channel_message(event):
+                    try:
+                        from state_manager import (
+                            get_last_forwarded_excel_channel_msg_id,
+                            set_last_forwarded_excel_channel_msg_id,
+                            set_last_excel_channel_msg_id,
+                        )
+                        from excel_manager import excel_manager
+
+                        msg = event.message
+                        last_fwd = get_last_forwarded_excel_channel_msg_id() or 0
+                        if msg.id <= last_fwd:
+                            return
+
+                        logger.info(
+                            f"🔔 Real-vaqt: Excel kanalida ({target_channel}) yangi xabar (ID={msg.id}) paydo bo'ldi! "
+                            f"Oylik abanit ({forward_group}) ga uzatilmoqda..."
+                        )
+
+                        # Uzatish (forward)
+                        try:
+                            await client.forward_messages(forward_group, msg.id, from_peer=target_channel)
+                            logger.info(f"✅ Telethon: Xabar (ID={msg.id}) {forward_group} ga uzatildi.")
+                        except Exception as ef:
+                            logger.error(f"❌ Telethon forward xatoligi: {ef}")
+
+                        # Agar Excel fayl bo'lsa, bazani yangilash
+                        if msg.file and getattr(msg.file, "name", None):
+                            fn = msg.file.name.lower()
+                            if fn.endswith(".xlsx") or fn.endswith(".xls"):
+                                temp_path = os.path.join(DATA_DIR, f"auto_sync_{msg.file.name}")
+                                logger.info(f"📥 Yangi Excel fayl yuklab olinmoqda: {msg.file.name} (msg_id={msg.id})...")
+                                await client.download_media(msg, file=temp_path)
+                                if os.path.exists(temp_path):
+                                    success = await asyncio.to_thread(excel_manager.update_file, temp_path)
+                                    try:
+                                        os.remove(temp_path)
+                                    except Exception:
+                                        pass
+                                    if success:
+                                        set_last_excel_channel_msg_id(msg.id)
+                                        logger.info(f"✅ Excel baza yangilandi (ID={msg.id}, jami={excel_manager.records_count})")
+
+                        set_last_forwarded_excel_channel_msg_id(msg.id)
+                    except Exception as ex:
+                        logger.error(f"on_new_channel_message xatoligi: {ex}", exc_info=True)
+
+                logger.info(f"🎧 Telethon real-vaqt tinglovchisi ishga tushdi: {target_channel} -> {forward_group}")
+                await client.run_until_disconnected()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Telethon listener uzildi yoki xatolik: {e}. 10 soniyadan so'ng qayta ulanadi...")
+                await asyncio.sleep(10)
 
 
 ofd_bridge = OFDBridgeManager()

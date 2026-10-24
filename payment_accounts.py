@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 SOURCE_CHANNEL_ID = int(os.getenv("SOURCE_CHANNEL_ID", "-1001641871516"))  # @POS_Terminal_UzSmart_Bank
+EXCEL_CHANNEL_ID = int(os.getenv("EXCEL_CHANNEL_ID", "-1001795471853"))  # Абонент тулови🏦💸💰
+EXCEL_FORWARD_CHANNEL_ID = int(os.getenv("EXCEL_FORWARD_CHANNEL_ID", os.getenv("OYLIK_ABONIT_GROUP_ID", "-1004405333505")))  # Oylik abanit guruhi
 
 # 1.1 OYLIK ABONENT TO'LOVI (Har oyning 6-sanasigacha to'lanadi)
 # Xizmat turi: Smart POS kassa apparatiga dasturiy va servis xizmati ko'rsatish

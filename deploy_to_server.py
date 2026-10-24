@@ -57,7 +57,8 @@ def deploy():
         'modules/admin_module.py',
         'data/custom_patches.json',
         'data/regional_admins.json',
-        'data/admin_config.json'
+        'data/admin_config.json',
+        'data/bot_state.json'
     ]
 
     print("Building compressed tar archive in memory...")
