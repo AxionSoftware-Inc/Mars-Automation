@@ -40,16 +40,11 @@ async def main():
 
     # Scheduler rejalashtiruvchi
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
-    # Har kuni soat 9:00 va 15:00 da
+    # Har 6 soatda (00:00, 06:00, 12:00, 18:00) zaxira sifatida kanaldan tekshirish
+    # Asosiy real-vaqt sinxronizatsiyasi esa Telethon tinglovchisi orqali xabar kelganda avtomatik ishlaydi
     scheduler.add_job(
         daily_channel_file_maintenance,
-        CronTrigger(hour="9,15", minute=0, timezone="Asia/Tashkent"),
-        args=[bot]
-    )
-    # Zaxira sifatida har soatda tekshirish (real-vaqt tinglovchisiga xalaqit bermaslik uchun)
-    scheduler.add_job(
-        daily_channel_file_maintenance,
-        CronTrigger(minute=0, timezone="Asia/Tashkent"),
+        CronTrigger(hour="0,6,12,18", minute=0, timezone="Asia/Tashkent"),
         args=[bot]
     )
     scheduler.start()

@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("GEMINI_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash-lite")
+DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-3.5-flash-lite")
 
 class OpenRouterClient:
     """
-    OpenRouter orqali Gemini 2.5 Flash modeliga so'rov yuborish mijozi.
+    OpenRouter orqali Gemini 3.5 Flash Lite modeliga so'rov yuborish mijozi.
     Matn va rasm (multimodal) so'rovlarini to'liq qo'llab-quvvatlaydi.
     Ham asinxron (httpx.AsyncClient), ham sinxron (httpx.Client) usullarni taqdim etadi.
     """

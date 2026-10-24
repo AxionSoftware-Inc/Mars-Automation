@@ -58,7 +58,7 @@ def is_device_issue(text: str) -> bool:
     # Moslashuvchan o'zaklar (har xil xatoliklar, orfografik xatolar va shevalar uchun: "ishklamayapdi", "ishlamayabdi", "kurib beriyla")
     has_device = any(d in lower for d in ["aparat", "apparat", "kassa", "terminal", "pos", "smart one", "p3", "uskuna", "ekran"])
     has_issue_stem = any(s in lower for s in [
-        "ishlam", "ishklam", "ochil", "ochmay", "yonmay", "yoqil", "qotib", "buzil",
+        "ishlam", "ishklam", "islam", "ochil", "ochmay", "yonmay", "yoqil", "qotib", "buzil",
         "blok", "xato", "oshibka", "chek chiq", "chek berm", "chek ur"
     ])
     if has_device and has_issue_stem:
@@ -117,7 +117,7 @@ class HardwareIntentHandler:
                 return False
 
         is_in_issue = user_memory.is_issue_mode(chat_id, user_id)
-        has_issue_phrase = any(phrase in lower_text for phrase in DEVICE_ISSUE_PHRASES)
+        has_issue_phrase = is_device_issue(text)
 
         # Agar foydalanuvchi muammo rejimida bo'lmasa va xabarda nosozlik so'zi bo'lmasa -> bu hardware emas
         if not is_in_issue and not has_issue_phrase:

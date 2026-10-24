@@ -223,22 +223,27 @@ class GroupResponseOrchestrator:
         # =====================================================================
         # 2.5-QADAM: SALOMLASHISH / GREETINGS (Mutlaqo xavfsiz, adminga yo'naltirmaydi)
         # =====================================================================
-        PURE_GREETINGS = {
-            "salom", "assalomu alaykum", "assalomu aleykum", "assalom alaykum", "assalom aleykum",
-            "salom alaykum", "salomalaykum", "salom hammaga", "salomlar",
-            "privet", "привет", "салом", "ассалому алайкум", "ассалому алейкум",
-            "здравствуйте", "добрый день", "доброе утро", "добрый вечер",
-            "hayrli kun", "xayrli kun", "hayrli tong", "xayrli tong", "hayrli kech", "xayrli kech"
-        }
-        words = lower_text.split()
-        is_pure_greeting = (
-            lower_text in PURE_GREETINGS
-            or (len(words) <= 4 and any(lower_text.startswith(w) for w in ["salom", "assalomu alaykum", "assalomu aleykum", "салом", "ассалому алайкум", "привет", "здравствуйте"])
-                and not any(action_kw in lower_text for action_kw in [
-                    "ishlamay", "ishlamayapti", "qarz", "shot", "hisob", "chek", "kvitansiya", "video", "admin", "usta",
-                    "inn", "fm", "fiskal", "yillik", "oylik", "operat", "tuzat", "blok", "och", "yoq", "tolash", "to'lash"
-                ]))
+        # Barcha salomlashish variantlari: "salom", "assalom*", "asalom*", "privet", "/salom", "/salombot", "salom bot" va h.k.
+        raw_norm = lower_text.lstrip("/!").strip()
+        if "@" in raw_norm:
+            raw_norm = raw_norm.split("@")[0].strip()
+
+        words = raw_norm.split()
+        first_word = words[0] if words else ""
+        greeting_roots = (
+            "salom", "assalom", "asalom", "privet", "привет", "салом",
+            "ассалом", "асалом", "здравствуй", "хей", "hey", "hello", "hi", "qalesiz", "qalaysiz"
         )
+        has_greeting_root = any(first_word.startswith(root) for root in greeting_roots)
+        has_time_greeting = any(raw_norm.startswith(tg) for tg in [
+            "hayrli kun", "xayrli kun", "hayrli tong", "xayrli tong", "hayrli kech", "xayrli kech",
+            "добрый день", "доброе утро", "добрый вечер"
+        ])
+        has_no_action = not any(action_kw in lower_text for action_kw in [
+            "ishlamay", "ishlamayapti", "qarz", "shot", "hisob", "chek", "kvitansiya", "video", "admin", "usta",
+            "inn", "fm", "fiskal", "yillik", "oylik", "operat", "tuzat", "blok", "och", "yoq", "tolash", "to'lash"
+        ])
+        is_pure_greeting = (has_greeting_root or has_time_greeting) and has_no_action
         if is_pure_greeting:
             user_memory.clear_issue_mode(chat_id, user_id)
             user_memory.clear_escalation(chat_id, user_id)
@@ -311,6 +316,7 @@ class GroupResponseOrchestrator:
             or is_device_issue(clean_text)
             or is_debt_inquiry(message)
             or is_payment_claim(clean_text)
+            or is_pure_greeting
         )
         if is_new_meaningful_intent and user_memory.is_escalated_to_admin(chat_id, user_id):
             user_memory.clear_escalation(chat_id, user_id)
