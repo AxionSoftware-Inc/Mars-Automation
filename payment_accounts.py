@@ -842,6 +842,144 @@ def is_general_debt_check_intent(text: str) -> bool:
     return False
 
 
+def is_payment_claim(text: str) -> bool:
+    """
+    Foydalanuvchi to'lov qilinganini bildiruvchi xabar yozganmi?
+    (Masalan: 'to'ladim', 'tuladim', 'toladim', 'to'lov qildim', 'pul o'tkazdim', 'to'lab bo'ldik', 'to'lab qo'ydim' va h.k.)
+
+    Qaytaradi: True agar to'lov qilingani da'vo qilinayotgan bo'lsa.
+    Bunday holatda agar kvitansiya biriktirilmagan bo'lsa, bot albatta to'lov kvitansiyasini so'rashi shart!
+    """
+    if not text:
+        return False
+    t = _normalize_payment_text(text)
+
+    # 1. Kelgusi zamon yoki to'lash istagi / savol bo'lsa -> bu to'lov da'vosi emas!
+    future_or_inquiry = [
+        "to'lamoqchi", "tolamoqchi", "tulamoqchi", "to'lamoqchiman", "tolamoqchiman", "tulamoqchiman",
+        "to'lamoqchi edim", "tolamoqchi edim", "tulamoqchi edim", "to'lamoqchiydim", "tolamoqchiydim",
+        "to'layman", "tolayman", "tulayman", "to'lay", "tolay", "tulay",
+        "to'lash kerak", "tolash kerak", "to'lasam", "tolasam", "tulasam", "to'lasak", "tolasak",
+        "qanday to'la", "qanday tola", "qayerga to'la", "qayerga tola", "qachongacha to'la", "qachongacha tola",
+        "to'lash tartibi", "tolash tartibi", "to'lash videosi", "tolash videosi",
+        "тўламоқчи", "толамокчи", "туламокчи", "тўламоқчиман", "толамокчиман", "туламокчиман",
+        "тўлайман", "толайман", "тўлай", "толай", "тўлаш керак", "толаш керак",
+        "тўласам", "толасам", "туласам", "қаерга тўла", "каерга тола", "қандай тўла", "кандай тола"
+    ]
+    if any(fi in t for fi in future_or_inquiry):
+        return False
+
+    # 2. To'lov qilinganini bildiruvchi aniq iboralar
+    exact_phrases = [
+        # Lotin
+        "to'ladim", "toladim", "tuladim", "tòladim", "töladim",
+        "to'ladik", "toladik", "tuladik",
+        "to'ladimku", "toladimku", "tuladimku",
+        "to'lab bo'ldim", "tolab boldim", "tulab buldim",
+        "to'lab bo'ldik", "tolab boldik", "tulab buldik",
+        "to'lab qo'ydim", "tolab qoydim", "tulab quydim",
+        "to'lab qo'ydik", "tolab qoydik", "tulab quydik",
+        "to'lab qo'yganman", "tolab qoyganman", "to'lab qo'yganmiz", "tolab qoyganmiz",
+        "to'lab tashladim", "tolab tashladim", "tulab tashladim",
+        "to'lab tashladik", "tolab tashladik", "tulab tashladik",
+        "to'lab tashadim", "tolab tashadim", "tulab tashadim",
+        "to'lab berdim", "tolab berdim", "tulab berdim",
+        "to'lab berdik", "tolab berdik", "tulab berdik",
+        "to'lab bo'lganman", "tolab bolganman", "to'lab bo'lganmiz", "tolab bolganmiz",
+        "to'lov qildim", "tolov qildim", "tulov qildim",
+        "to'lov qildik", "tolov qildik", "tulov qildik",
+        "to'lov qilindi", "tolov qilindi", "tulov qilindi",
+        "to'lov qilganman", "tolov qilganman", "tulov qilganman",
+        "to'lov qilganmiz", "tolov qilganmiz", "tulov qilganmiz",
+        "to'lov qilgandim", "tolov qilgandim", "tulov qilgandim",
+        "to'lov qilgandik", "tolov qilgandik", "tulov qilgandik",
+        "to'lov qilib bo'ldim", "tolov qilib boldim", "tulov qilib buldim",
+        "to'lov qilib bo'ldik", "tolov qilib boldik", "tulov qilib buldik",
+        "to'lov qilib qo'ydim", "tolov qilib qoydim", "tulov qilib quydim",
+        "to'lov o'tkazdim", "tolov otkazdim", "tulov otkazdim",
+        "pul o'tkazdim", "pul otkazdim", "pul o'tkazdik", "pul otkazdik",
+        "pul o'tkazildi", "pul otkazildi", "pul tashladim", "pul tashladik", "pul tashadim", "pul tashadik",
+        "pul tashlab qo'ydim", "pul tashlab qoydim", "pul tashavorganman", "pul tashavorganmiz",
+        "pul to'ladim", "pul toladim", "pul tuladim",
+        "to'laganman", "tolaganman", "tulaganman", "to'laganmanku", "tolaganmanku",
+        "to'lagandim", "tolagandim", "tulagandim", "to'lagandik", "tolagandik",
+        "to'langan", "tolangan", "tulangan", "to'langan edi", "tolangan edi",
+        "to'landi", "tolandi", "tulandi",
+        "shotga tashladim", "shotga tashadik", "shotga pul tashladim",
+        "kartaga tashladim", "kartaga pul tashladim",
+        "clickdan to'ladim", "clickdan toladim", "clickdan tuladim",
+        "paymedan to'ladim", "paymedan toladim", "paymedan tuladim",
+        "click qildim", "payme qildim",
+        "ertalab to'laganman", "ertalab to'ladim", "kecha to'laganman", "kecha to'ladim",
+        "kecha to'lagandim", "kecha tolagandim", "ertalab to'lagandim", "ertalab tolagandim",
+        "hozir to'ladim", "hozir toladim", "hozir tuladim",
+        "to'lab qo'ygan edim", "tolab qoygan edim", "to'lagan edim", "tolagan edim",
+        "to'lov qilib qo'yganman", "tolov qilib qoyganman", "to'lov qiluvdim", "tolov qiluvdim",
+        "pul to'lab qo'ydim", "pul tolab qoydim", "pul o'tkazib qo'ydim", "pul otkazib qoydim",
+        "mana to'ladim", "mana toladim", "mana tuladim",
+        "mana to'ladik", "mana toladik", "mana tuladik",
+        "mana to'lov", "mana tolov", "mana tulov",
+
+        # Kirill
+        "тўладим", "туладим", "толадим",
+        "тўладик", "туладик", "толадик",
+        "тўладимку", "туладимку", "толадимку",
+        "тўлаб бўлдим", "тулаб булдим", "толаб болдим",
+        "тўлаб бўлдик", "тулаб булдик", "толаб болдик",
+        "тўлаб қўйдим", "тулаб куйдим", "толаб койдим",
+        "тўлаб қўйдик", "тулаб куйдик", "толаб койдик",
+        "тўлаб қўйганман", "тулаб куйганман", "тўлаб қўйганмиз", "тулаб куйганмиз",
+        "тўлаб ташладим", "тулаб ташладим", "тўлаб ташладик", "тулаб ташладик",
+        "тўлаб бердим", "тулаб бердим", "тўлаб бердик", "тулаб бердик",
+        "тўлаб бўлганман", "тулаб булганман", "тўлаб бўлганмиз", "тулаб булганмиз",
+        "тўлов қилдим", "тулов килдим", "толов килдим", "тулов кылдым",
+        "тўлов қилдик", "тулов килдик", "толов килдик",
+        "тўлов қилинди", "тулов килинди", "толов килинди",
+        "тўлов бўлди", "тулов булди", "толов болди",
+        "тўлов қилганман", "тулов килганман", "толов килганман",
+        "тўлов қилганмиз", "тулов килганмиз", "толов килганмиз",
+        "тўлов қилгандим", "тулов килгандим", "толов килгандим",
+        "тўлов қилиб бўлдим", "тулов килиб булдим",
+        "тўлов қилиб бўлдик", "тулов килиб булдик",
+        "тўлов қилиб қўйдим", "тулов килиб куйдим",
+        "пул ўтказдим", "пул откасдим", "пул отказиб куйдим", "пул ўтказдик", "пул откасдик",
+        "пул ташладим", "пул ташладик", "пул тўладим", "пул толадим", "пул туладим",
+        "тўлаганман", "тулаганман", "толаганман", "тўлаганманку", "тулаганманку",
+        "тўлагандим", "тулагандим", "толагандим", "тўлагандик", "тулагандик",
+        "тўланган", "туланган", "тўланди", "туланди",
+        "кликдан тўладим", "кликдан туладим", "клик килдим",
+        "паймедан тўладим", "паймедан туладим", "пайме килдим",
+        "эрталаб тўладим", "кеча тўладим", "кеча тўлагандим", "ҳозир тўладим", "хозир туладим",
+        "мана туладим", "мана тўладим", "мана толадим", "тўладим мана",
+
+        # Ruscha
+        "оплатил", "оплатила", "оплатили", "я оплатил", "чек оплатил",
+        "деньги перевел", "деньги перевели", "перевел деньги", "перевела деньги",
+        "оплачено", "перевел"
+    ]
+
+    for phrase in exact_phrases:
+        if phrase in t:
+            return True
+
+    words = t.split()
+    single_claim_words = {
+        "to'ladim", "toladim", "tuladim", "to'ladik", "toladik", "tuladik",
+        "to'ladimku", "toladimku", "tuladimku",
+        "to'laganman", "tolaganman", "tulaganman", "to'lagandim", "tolagandim", "tulagandim",
+        "to'langan", "tolangan", "tulangan", "to'landi", "tolandi", "tulandi",
+        "тўладим", "туладим", "толадим", "тўладик", "туладик", "толадик",
+        "тўладимку", "туладимку", "толадимку",
+        "тўлаганман", "тулаганман", "толаганман", "тўлагандим", "тулагандим",
+        "тўланган", "туланган", "тўланди", "туланди",
+        "оплатил", "оплатила", "оплатили"
+    }
+    if any(w in single_claim_words for w in words):
+        return True
+
+    return False
+
+
 def is_how_to_pay_video_intent(text: str) -> bool:
     """
     Foydalanuvchi qanday to'lashni yoki to'lash videosi/yo'riqnomasini so'rayaptimi?

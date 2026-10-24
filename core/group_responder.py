@@ -32,7 +32,7 @@ from core.models import (
     is_incomplete_inn_text
 )
 from admin_manager import admin_manager, get_admin_contact_keyboard
-from payment_accounts import PAYMENT_METHODS_KEYWORDS, send_channel_message
+from payment_accounts import PAYMENT_METHODS_KEYWORDS, send_channel_message, is_payment_claim
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +310,7 @@ class GroupResponseOrchestrator:
             or is_command
             or is_device_issue(clean_text)
             or is_debt_inquiry(message)
+            or is_payment_claim(clean_text)
         )
         if is_new_meaningful_intent and user_memory.is_escalated_to_admin(chat_id, user_id):
             user_memory.clear_escalation(chat_id, user_id)
@@ -336,6 +337,7 @@ class GroupResponseOrchestrator:
                     or is_general_debt_check_intent(clean_text)
                     or is_mxik_intent(clean_text)
                     or is_how_to_pay_video_intent(clean_text)
+                    or is_payment_claim(clean_text)
                     or any(kw in lower_text for kw in PAYMENT_METHODS_KEYWORDS)
                     or bool(catalog_manager.find_post_by_keywords(clean_text))
                 )
@@ -393,6 +395,7 @@ class GroupResponseOrchestrator:
                 or is_both_check_intent(clean_text)
                 or is_general_debt_check_intent(clean_text)
                 or is_mxik_intent(clean_text)
+                or is_payment_claim(clean_text)
                 or any(kw in lower_text for kw in CONVERSATIONAL_FOLLOWUPS)
                 or bool(catalog_manager.find_matching_post(clean_text))
             )
@@ -469,6 +472,7 @@ class GroupResponseOrchestrator:
             or is_monthly_check_intent(clean_text)
             or is_both_check_intent(clean_text)
             or bool(classify_payment_intent(clean_text))
+            or is_payment_claim(clean_text)
             or is_asking_fm_location
             or is_incomplete_inn_text(clean_text)
             or is_paid_not_active

@@ -127,15 +127,49 @@ class UserMemoryManager:
         """Foydalanuvchi qidirgan oxirgi INN/JSHSHIR va korxona ma'lumotlarini eslab qolish"""
         session = self._get_or_create_session(chat_id, user_id)
         new_id = str(identifier).strip()
-        is_new_identifier = (session.get("last_id") != new_id)
+        old_id = session.get("last_id")
+        is_new_identifier = (old_id is not None and old_id != "" and old_id != new_id)
 
         session["last_id"] = new_id
 
         if is_new_identifier:
-            # Yangi INN kiritilganda eski korxona va eski qarz ma'lumotlarini tozalash!
+            logger.info(
+                f"UserMemory [chat={chat_id}, user={user_id}]: Yangi INN ({new_id}) kiritildi. "
+                f"Eski INN ({old_id}) ma'lumotlari, fotosuratlari va suhbat konteksti to'liq tozalanmoqda."
+            )
+            # 1. Korxona va apparat ma'lumotlarini tozalash
             session["org_name"] = None
             session["device_models"] = None
             session["debt_info"] = None
+
+            # 2. Eskisi bo'yicha tashlangan rasm va ekranlarni tozalash (chalkashmaslik uchun)
+            session["last_photo"] = None
+            session["photos"] = []
+            session["pending_device_screen"] = None
+
+            # 3. Eskisi bo'yicha to'lov kvitansiyalarini tozalash
+            session["last_receipt"] = None
+            session["receipt_history"] = []
+            session["pending_receipt"] = None
+
+            # 4. Eskisi bo'yicha fiskal modul va litsenziya holatini tozalash
+            session["last_fm"] = None
+            session["annual_status"] = None
+
+            # 5. Eskisi bo'yicha muammo rejimi va eskalatsiya holatini tozalash
+            session["issue_mode"] = False
+            session["issue_initial_query"] = None
+            session["is_escalated_to_admin"] = False
+            session["escalated_time"] = 0
+            session["escalation_reason"] = None
+            session["escalation_repeat_count"] = 0
+            session["last_topic"] = None
+
+            # 6. Eskisi bo'yicha so'rovlar, suhbat faktlari va LLM tarixini tozalash
+            session["conversation_facts"] = {}
+            session["identified_info"] = []
+            session["missing_info"] = []
+            session["history"] = []
 
         if org_name:
             session["org_name"] = str(org_name).strip()
@@ -258,6 +292,8 @@ class UserMemoryManager:
     def set_last_receipt(self, chat_id: int, user_id: int, receipt_info: Dict[str, Any]):
         """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash (kunlik Excel qarzini o'zgartirmasdan!)"""
         session = self._get_or_create_session(chat_id, user_id)
+        if "timestamp" not in receipt_info:
+            receipt_info["timestamp"] = time.time()
         session["last_receipt"] = receipt_info
         if "receipt_history" not in session or not isinstance(session["receipt_history"], list):
             session["receipt_history"] = []
@@ -305,7 +341,13 @@ class UserMemoryManager:
 
     def get_last_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt", user_id)
+        res = session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt", user_id)
+        if res and isinstance(res, dict):
+            # 2 soatdan (7200 sekund) ortiq o'tgan bo'lsa, eskirgan deb hisoblanadi
+            ts = res.get("timestamp", 0)
+            if ts and (time.time() - ts > 7200):
+                return None
+        return res
 
     def get_debt_info(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """Oxirgi tekshirilgan qarz ma'lumotlarini olish"""
@@ -484,8 +526,9 @@ class UserMemoryManager:
                 det = ann_st.get("details", "")
                 parts.append(f"• Davlat Soliq (OFD) yillik to'lovi: QARZDORLIK YO'Q (Litsenziya faol{', ' + det if det else ''}).")
 
-        if last_receipt:
-            amt = last_receipt.get("amount", 0.0)
+        active_receipt = self.get_last_receipt(chat_id, user_id)
+        if active_receipt:
+            amt = active_receipt.get("amount", 0.0)
             parts.append("=== YAQINDAGI TO'LOV KVITANSIYASI HOLATI ===")
             parts.append(f"• Mijoz yaqinda to'lov kvitansiyasini yubordi (Summa: {amt:,.0f} so'm).")
             parts.append("• Kvitansiya tekshirish uchun mas'ul adminga yetkazilgan. Qarzdorlik holati faqat kunlik Excel bazasi bo'yicha hisoblanadi.")

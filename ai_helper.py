@@ -77,13 +77,19 @@ SUHBAT KONTEKSTI VA KETMA-KET SAVOLLAR TALABLARI:
    - QAYTADAN INN SO'RASH QAT'IYAN TAQIQLANADI!
    - Siz allaqachon mijoz kimligini va uning holatini bilasiz. U bilan samimiy, davomiy va uzluksiz suhbat quring.
 
-   A) AGAR MIJOZ YAQINDA TO'LOV KVITANSIYASINI YUBORGAN BO'LSA:
-      - "qachon qo'shiladi?", "qachon yoqiladi?", "qachon ochiladi?", "qachon ishlaydi?", "kvitansiya yetib bordimi?", "to'lov tushdimi?", "endi nima qilaman?", "nima bo'ladi endi?":
-        -> "To'lov kvitansiyangiz tekshirish uchun mas'ul adminga yuborilgan. Adminlarimiz tekshirib chiqib javob berishadi."
-      - "keyingi to'lovni qachon qilaman?", "keyingi to'lov qachon?", "keyin qachon to'layman?":
-        -> "Oylik abonent to'lovi har oyning 6-sanasigacha amalga oshiriladi."
-      - "qancha to'lashim kerak?", "mening qarzim qancha?", "yana pul to'laymanmi?":
-        -> Kontekstdagi kunlik Excel bazasidagi qarz summasini ayting! Kvitansiya yuborilgani uchungina ASLO "qarzdorligingiz 0 so'm" yoki "bartaraf etilgan" deb aytmang!
+   A) AGAR MIJOZ TO'LOV QILGANINI AYTSA YOKI TO'LOV KVITANSIYASI SAVOLI BO'LSA:
+      - QAT'IY VA ENG ASOSIY QOIDA — CHEK YUBORMAGAN ODAMGA ASLO "KVITANSIYANGIZ QABUL QILINDI" DEMANG:
+        Agar mijoz "to'ladim", "tuladim", "toladim", "to'lov qildim", "pul o'tkazdim", "to'lab qo'ydim", "to'ladimku" desa, lekin kontekstda "YAQINDAGI TO'LOV KVITANSIYASI HOLATI" bo'limi bo'lmasa (ya'ni mijoz ayni shu suhbatda kvitansiya rasmi/PDF faylini yuklamagan bo'lsa):
+        -> QAT'IYAN "To'lov kvitansiyangiz qabul qilindi", "kvitansiyangiz adminga yuborildi" yoki "adminga yetkazildi" DEMANG! Bu eng qo'pol xato!
+        -> Mijozdan kvitansiya (skrinshot yoki bank cheki) tashlashni so'rang:
+           "To'lov qilganingiz uchun tashakkur! To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF) shu yerga yuboring."
+      - FAQAT VA FAQAT kontekstda "YAQINDAGI TO'LOV KVITANSIYASI HOLATI" mavjud bo'lsa (ya'ni mijoz haqiqatan fotosurat yoki PDF kvitansiya yuborgan bo'lsa):
+        * "qachon qo'shiladi?", "qachon yoqiladi?", "qachon ochiladi?", "qachon ishlaydi?", "kvitansiya yetib bordimi?", "to'lov tushdimi?", "endi nima qilaman?", "nima bo'ladi endi?":
+          -> "To'lov kvitansiyangiz tekshirish uchun mas'ul adminga yuborilgan. Adminlarimiz tekshirib chiqib javob berishadi."
+        * "keyingi to'lovni qachon qilaman?", "keyingi to'lov qachon?", "keyin qachon to'layman?":
+          -> "Oylik abonent to'lovi har oyning 6-sanasigacha amalga oshiriladi."
+        * "qancha to'lashim kerak?", "mening qarzim qancha?", "yana pul to'laymanmi?":
+          -> Kontekstdagi kunlik Excel bazasidagi qarz summasini ayting! Kvitansiya yuborilgani uchungina ASLO "qarzdorligingiz 0 so'm" yoki "bartaraf etilgan" deb aytmang!
 
    B) AGAR MIJOZDA QARZ BO'LSA (kvitansiya yubormagan bo'lsa):
       - "nega ishlamayapti?", "nima qilishim kerak?", "qachongacha to'lashim kerak?":
@@ -225,6 +231,27 @@ def generate_ai_reply_ex(
                 "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
             )
 
+        # GUARDRAIL: Agar mijoz to'lov kvitansiyasini yubormagan bo'lsa (kontekstda kvitansiya yo'q bo'lsa)
+        # lekin AI "kvitansiyangiz qabul qilindi / yetkazildi / yuborilgan" deb yolg'on javob chiqarsa yoki mijoz to'lov da'vo qilsa:
+        has_receipt_in_context = "YAQINDAGI TO'LOV KVITANSIYASI HOLATI" in (context_history or "")
+        from payment_accounts import is_payment_claim
+        if not has_receipt_in_context:
+            ft_lower = full_text.lower()
+            unverified_receipt_signals = [
+                "kvitansiyangiz qabul qilindi", "kvitansiyangiz tekshirish uchun",
+                "kvitansiyangiz mas'ul adminga", "kvitansiyangiz masul adminga",
+                "kvitansiyangiz adminga", "kvitansiyangiz yetib", "to'lov kvitansiyangiz tekshirish",
+                "to'lov kvitansiyangiz qabul", "tolov kvitansiyangiz qabul"
+            ]
+            if is_payment_claim(user_message) or any(sig in ft_lower for sig in unverified_receipt_signals):
+                logger.warning("Guardrail faollashdi: Kvitansiyasiz soxta tasdiqlash to'xtatildi -> kvitansiya so'raladi.")
+                full_text = (
+                    "✅ <b>To'lov qilganingiz uchun tashakkur!</b>\n\n"
+                    "To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun "
+                    "<b>to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF)</b> shu yerga yuboring.\n\n"
+                    "Operatorlarimiz chekni ko'rib, apparatingizni tezkorlik bilan ochib berishadi."
+                )
+
         # Alifboga moslashtirish kafolati
         full_text = adapt_to_user_script(full_text, target_script)
         return full_text, video_id, needs_admin
@@ -283,6 +310,27 @@ async def generate_ai_reply_ex_async(
                 "Savolingiz bo'yicha to'liq ma'lumot olish uchun korxonangiz INN raqamini yuboring "
                 "yoki apparat ekranidagi xatolikni rasmga olib yuboring."
             )
+
+        # GUARDRAIL: Agar mijoz to'lov kvitansiyasini yubormagan bo'lsa (kontekstda kvitansiya yo'q bo'lsa)
+        # lekin AI "kvitansiyangiz qabul qilindi / yetkazildi / yuborilgan" deb yolg'on javob chiqarsa yoki mijoz to'lov da'vo qilsa:
+        has_receipt_in_context = "YAQINDAGI TO'LOV KVITANSIYASI HOLATI" in (context_history or "")
+        from payment_accounts import is_payment_claim
+        if not has_receipt_in_context:
+            ft_lower = full_text.lower()
+            unverified_receipt_signals = [
+                "kvitansiyangiz qabul qilindi", "kvitansiyangiz tekshirish uchun",
+                "kvitansiyangiz mas'ul adminga", "kvitansiyangiz masul adminga",
+                "kvitansiyangiz adminga", "kvitansiyangiz yetib", "to'lov kvitansiyangiz tekshirish",
+                "to'lov kvitansiyangiz qabul", "tolov kvitansiyangiz qabul"
+            ]
+            if is_payment_claim(user_message) or any(sig in ft_lower for sig in unverified_receipt_signals):
+                logger.warning("Guardrail faollashdi: Kvitansiyasiz soxta tasdiqlash to'xtatildi -> kvitansiya so'raladi.")
+                full_text = (
+                    "✅ <b>To'lov qilganingiz uchun tashakkur!</b>\n\n"
+                    "To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun "
+                    "<b>to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF)</b> shu yerga yuboring.\n\n"
+                    "Operatorlarimiz chekni ko'rib, apparatingizni tezkorlik bilan ochib berishadi."
+                )
 
         full_text = adapt_to_user_script(full_text, target_script)
         return full_text, video_id, needs_admin

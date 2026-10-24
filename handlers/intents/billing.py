@@ -16,6 +16,7 @@ from core.models import (
 from ofd_bridge import ofd_bridge
 from payment_accounts import (
     classify_payment_intent,
+    is_payment_claim,
     is_both_check_intent,
     is_general_debt_check_intent,
     is_annual_check_intent,
@@ -197,23 +198,33 @@ class BillingIntentHandler:
             user_memory.add_assistant_message(chat_id, user_id, multi_dev_msg)
             return True
 
-        # 0.98 "To'laganman / Ertalab to'lagandim / To'lab bo'ldik"
-        payment_done_words = [
-            "to'laganman", "tolaganman", "to'lagandim", "tolagandim", "to'ladim", "toladim",
-            "to'lab bo'ldik", "tolab boldik", "to'lab qo'ydik", "tolab qoydik", "to'lab bo'lganmiz",
-            "ertalab to'lagan", "ertalab tolagan", "kecha to'lagan", "kecha tolagan",
-            "to'lov qilganman", "tolov qilganman", "to'lov qildik", "tolov qildik", "to'lov qilindi", "tolov qilindi",
-            "pul o'tkazdim", "pul otkazdim", "pul tashladim", "pul tashlaganmiz",
-            "тўлаганман", "тўладим", "тўлаб бўлдик", "тўлов қилинди", "тўлов қилдик"
-        ]
-        is_complaint = any(w in lower_text for w in ["yonmadi", "yoqmadi", "ishlamadi", "ochilmadi", "blok", "xatolik", "qachon"])
-        if any(w in lower_text for w in payment_done_words) and not is_complaint and not extract_clean_inn(text) and not extract_fiscal_module(text):
-            paid_prompt = (
-                "✅ <b>To'lov qilganingiz uchun tashakkur!</b>\n\n"
-                "To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun "
-                "<b>to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF)</b> shu yerga yuboring.\n\n"
-                "Operatorlarimiz chekni ko'rib, apparatingizni tezkorlik bilan ochib berishadi."
-            )
+        # 0.98 "To'ladim / Tuladim / To'lov qildim / Pul o'tkazdim / To'lab bo'ldik"
+        if is_payment_claim(text):
+            claim_inn = extract_clean_inn(text)
+            claim_fm = extract_fiscal_module(text)
+            if claim_inn and claim_fm and claim_inn in claim_fm:
+                claim_inn = None
+            if claim_inn and (excel_manager.search(claim_inn) or excel_manager.is_decommissioned(claim_inn)):
+                user_memory.set_last_id(chat_id, user_id, claim_inn)
+            elif claim_inn:
+                user_memory.set_last_id(chat_id, user_id, claim_inn)
+            if claim_fm:
+                user_memory.set_last_fiscal_module(chat_id, user_id, claim_fm)
+
+            last_rec = user_memory.get_last_receipt(chat_id, user_id)
+            if last_rec:
+                paid_prompt = (
+                    "ℹ️ <b>To'lov kvitansiyangiz qabul qilingan va tekshirish uchun mas'ul adminga yuborilgan.</b>\n\n"
+                    "Mutaxassislarimiz to'lovni tasdiqlab, apparatingizni tez orada ochib berishadi.\n"
+                    "📌 <i>Iltimos, apparatni o'chirib qayta yoqing (Перезагрузка) va kuting.</i>"
+                )
+            else:
+                paid_prompt = (
+                    "✅ <b>To'lov qilganingiz uchun tashakkur!</b>\n\n"
+                    "To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun "
+                    "<b>to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF)</b> shu yerga yuboring.\n\n"
+                    "Operatorlarimiz chekni ko'rib, apparatingizni tezkorlik bilan ochib berishadi."
+                )
             paid_prompt = adapt_to_user_script(paid_prompt, user_script)
             try:
                 await message.reply(paid_prompt, parse_mode="HTML")
@@ -221,7 +232,7 @@ class BillingIntentHandler:
                 await message.reply(paid_prompt)
             user_memory.add_user_message(chat_id, user_id, text)
             user_memory.add_assistant_message(chat_id, user_id, paid_prompt)
-            user_memory.set_last_topic(chat_id, user_id, "awaiting_receipt_after_payment_claim")
+            user_memory.set_last_topic(chat_id, user_id, "receipt_already_sent" if last_rec else "awaiting_receipt_after_payment_claim")
             return True
 
         # 1. Matnda INN va Fiskal modul (LG..., YG..., UZ...) borligini aniqlash

@@ -283,14 +283,15 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI
 DEBT_INQUIRY_KEYWORDS = [
     "nimaga qarz", "nega qarz", "qayerdan qarz", "qanaqa qarz", "qanaqasiga qarz",
-    "to'laganman", "tolaganman", "to'lagandim", "tolagandim", "to'laganmanku", "tolaganmanku",
-    "pul to'laganman", "oylik to'laganman", "to'lov qilganman", "tolov qilganman",
     "to'lov tarixi", "tolov tarixi", "qachon to'laganman", "qaysi oy", "qaysi oylar",
     "qayerdan kelib chiqdi", "summa noto'g'ri", "notogri qarz", "qarzim yo'q"
 ]
 
 def is_debt_inquiry(message: types.Message) -> bool:
     if not message.text:
+        return False
+    from payment_accounts import is_payment_claim
+    if is_payment_claim(message.text):
         return False
     t = message.text.lower()
     return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
@@ -315,7 +316,12 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
     # INNni eslab qolamiz va yagona 8-qadamli GroupResponseOrchestrator (chat_router) ga o'tkazamiz!
     lower = message.text.lower()
     from handlers.intents.hardware import is_device_issue
-    from payment_accounts import is_annual_check_intent, is_both_check_intent, classify_payment_intent
+    from payment_accounts import (
+        is_annual_check_intent,
+        is_both_check_intent,
+        classify_payment_intent,
+        is_payment_claim
+    )
 
     TECH_QUESTION_WORDS = [
         "qanday", "qanaqa", "qilish kerak", "qo'yish", "urish", "bekor qilish",
@@ -330,6 +336,7 @@ def is_inn_or_phone_query_message(message: types.Message) -> bool:
         or is_annual_check_intent(message.text)
         or is_both_check_intent(message.text)
         or bool(classify_payment_intent(message.text))
+        or is_payment_claim(message.text)
     ):
         user_id = message.from_user.id if message.from_user else 0
         if excel_manager.search(query_num) or excel_manager.is_decommissioned(query_num):

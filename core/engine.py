@@ -75,13 +75,10 @@ class CoreEngine:
         receipt_signals = [
             "to'lov amalga", "tolov amalga", "to'lov muvaffaqiyatli", "muvaffaqiyatli",
             "kvitansiya", "click", "payme", "oplata", "o'tkazildi", "otkazildi",
-            "pul o'tkazma", "munis", "uzum", "anorbank", "to'ladim", "toladim"
+            "pul o'tkazma", "munis", "uzum", "anorbank", "платежное поручение"
         ]
         is_pos_error_text = any(ind in summary_lower for ind in pos_error_indicators)
-        if not is_pos_error_text and (
-            any(sig in summary_lower for sig in receipt_signals) or
-            any(sig in caption_lower for sig in receipt_signals)
-        ):
+        if not is_pos_error_text and any(sig in summary_lower for sig in receipt_signals):
             logger.info("Ekrandagi yozuv to'lov kvitansiyasiga tegishli ekanligi aniqlandi -> Kvitansiya rejimiga yo'naltiriladi.")
             
             detected_amount = 0.0

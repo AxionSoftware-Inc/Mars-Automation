@@ -396,14 +396,6 @@ class RegionalAdminRouterService:
                     url=f"tg://user?id={user.id}"
                 )
             ])
-        if phone and phone != "-" and len(phone.replace("+", "").strip()) >= 7:
-            clean_p = phone.strip()
-            buttons.append([
-                InlineKeyboardButton(
-                    text=f"📞 Korxonaga qo'ng'iroq ({clean_p})",
-                    url=f"tel:{clean_p}"
-                )
-            ])
         return InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
 
 

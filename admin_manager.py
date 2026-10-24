@@ -447,6 +447,14 @@ class AdminManager:
         if photo_id and photo_id not in all_user_photos:
             all_user_photos.insert(0, photo_id)
 
+        target_check_inn = session_inn if (inn_mismatch and session_inn) else inn
+        comp_phone = ""
+        if target_check_inn and target_check_inn != "000":
+            from excel_manager import excel_manager
+            rec_matches = excel_manager.search(target_check_inn)
+            if rec_matches:
+                comp_phone = rec_matches[0].get("phone", "")
+
         admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user, phone=comp_phone)
 
         await self.notify_admins(

@@ -24,7 +24,7 @@ from payment_accounts import (
 
 RECEIPT_SIGNALS = [
     "kvitansiya", "click", "payme", "oplata", "to'lov amalga", "tolov amalga",
-    "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma", "to'ladim", "toladim",
+    "muvaffaqiyatli", "o'tkazildi", "otkazildi", "pul o'tkazma",
     "munis", "uzum bank", "anorbank", "milliy bank", "платежное поручение"
 ]
 
