@@ -449,6 +449,9 @@ async def _process_image_content(
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
 
+    if file_id and user_id:
+        user_memory.add_photo(chat_id, user_id, file_id)
+
     user_script = user_memory.get_preferred_script(chat_id, user_id)
     if caption:
         sc = detect_script(caption)

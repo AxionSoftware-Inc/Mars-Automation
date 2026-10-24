@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import logging
@@ -248,6 +249,11 @@ class UserMemoryManager:
     def get_org_name(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
         return session.get("org_name") or self._fallback_from_group(chat_id, "org_name", user_id)
+
+    def get_device_models(self, chat_id: int, user_id: int) -> Optional[str]:
+        """Foydalanuvchi korxonasining kassa apparati modelini olish"""
+        session = self._get_or_create_session(chat_id, user_id)
+        return session.get("device_models") or self._fallback_from_group(chat_id, "device_models", user_id)
 
     def set_last_receipt(self, chat_id: int, user_id: int, receipt_info: Dict[str, Any]):
         """Yuborilgan to'lov kvitansiyasi holatini xotiraga saqlash (kunlik Excel qarzini o'zgartirmasdan!)"""
@@ -572,14 +578,49 @@ class UserMemoryManager:
         return session.get("last_fm") or self._fallback_from_group(chat_id, "last_fm", user_id)
 
     def set_last_photo(self, chat_id: int, user_id: int, file_id: str):
-        """Oxirgi yuborilgan kassa rasmi file_id sini saqlash"""
+        """Oxirgi yuborilgan kassa rasmi file_id sini saqlash va fotosuratlar ro'yxatiga kiritish"""
         session = self._get_or_create_session(chat_id, user_id)
         session["last_photo"] = file_id
+        if "photos" not in session:
+            session["photos"] = []
+        if file_id and file_id not in session["photos"]:
+            session["photos"].append(file_id)
         self.save_sessions()
+
+    def add_photo(self, chat_id: int, user_id: int, file_id: str):
+        """Yangi fotosuratni sessiya ro'yxatiga qo'shish"""
+        self.set_last_photo(chat_id, user_id, file_id)
 
     def get_last_photo(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
         return session.get("last_photo") or self._fallback_from_group(chat_id, "last_photo", user_id)
+
+    def get_all_photos(self, chat_id: int, user_id: int) -> List[str]:
+        """Sessiya davomida mijoz yuborgan barcha fotosuratlar file_id ro'yxati"""
+        session = self._get_or_create_session(chat_id, user_id)
+        photos = list(session.get("photos", []))
+        last_p = session.get("last_photo")
+        if last_p and last_p not in photos:
+            photos.append(last_p)
+        return photos
+
+    def get_short_conversation_summary(self, chat_id: int, user_id: int, max_messages: int = 4) -> str:
+        """Adminga eskalatsiya uchun suhbatning qisqacha mazmuni (oxirgi 2-4 ta xabar)"""
+        session = self._get_or_create_session(chat_id, user_id)
+        history = session.get("history", [])
+        if not history:
+            return ""
+        recent = history[-max_messages:]
+        lines = []
+        for m in recent:
+            role = "Mijoz" if m.get("role") == "user" else "Bot"
+            txt = (m.get("text") or "").strip()
+            # HTML teglarni tozalash va ixchamlashtirish
+            txt = re.sub(r"<[^>]+>", "", txt)
+            if len(txt) > 90:
+                txt = txt[:87] + "..."
+            lines.append(f"▫️ <i>{role}:</i> {txt}")
+        return "\n".join(lines)
 
     def clear_context(self, chat_id: int, user_id: int):
         """Foydalanuvchi suhbat va qarz kontekstini tozalash"""

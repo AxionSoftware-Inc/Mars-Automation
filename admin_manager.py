@@ -1,7 +1,8 @@
 import os
 import json
+import html
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from dotenv import load_dotenv
 from aiogram import Bot, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -174,9 +175,10 @@ class AdminManager:
         short_caption: Optional[str] = None,
         inn: Optional[str] = None,
         tuman: Optional[str] = None,
-        reply_markup: Optional[InlineKeyboardMarkup] = None
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        photos: Optional[List[str]] = None
     ):
-        """Hududiy mas'ul adminga, bosh adminlarga va bildirishnoma kanaliga xabar (rasmi bilan) yuborish"""
+        """Hududiy mas'ul adminga, bosh adminlarga va bildirishnoma kanaliga xabar (barcha rasmlari bilan) yuborish"""
         from modules.admin_module import regional_admin_service
         raw_caption = short_caption or text
 
@@ -187,26 +189,48 @@ class AdminManager:
             notification_channel_id=self.notification_channel_id
         )
 
+        # Barcha noyob rasmlarni tartibli yig'ish
+        all_photos: List[str] = []
+        if photos:
+            for p in photos:
+                if p and p not in all_photos:
+                    all_photos.append(p)
+        if photo_file_id and photo_file_id not in all_photos:
+            all_photos.insert(0, photo_file_id)
+
         for target_id in targets:
             try:
-                if photo_file_id:
+                if all_photos:
+                    primary_photo = all_photos[0]
                     if len(raw_caption) <= 1000:
                         await bot.send_photo(
                             chat_id=target_id,
-                            photo=photo_file_id,
+                            photo=primary_photo,
                             caption=raw_caption,
                             parse_mode="HTML",
                             reply_markup=reply_markup
                         )
                     else:
                         # Rasm va uzun matnni ajratib yuborish (HTML buzilmasligi uchun)
-                        await bot.send_photo(chat_id=target_id, photo=photo_file_id)
+                        await bot.send_photo(chat_id=target_id, photo=primary_photo)
                         await bot.send_message(
                             chat_id=target_id,
                             text=text,
                             parse_mode="HTML",
                             reply_markup=reply_markup
                         )
+
+                    # Agar mijoz bir nechta rasm yuborgan bo'lsa, qolgan barcha rasmlarni ham uzatish
+                    for extra_p in all_photos[1:]:
+                        try:
+                            await bot.send_photo(
+                                chat_id=target_id,
+                                photo=extra_p,
+                                caption="📸 <i>Mijoz yuborgan qo'shimcha fotosurat</i>",
+                                parse_mode="HTML"
+                            )
+                        except Exception as ep_err:
+                            logger.warning(f"Qo'shimcha rasmni adminga ({target_id}) yuborishda xato: {ep_err}")
                 elif document_file_id:
                     if len(raw_caption) <= 1000:
                         await bot.send_document(
@@ -355,6 +379,9 @@ class AdminManager:
             inn_line = "❌ Topilmadi"
             bottom_inn_block = "⚠️ <i>INN topilmadi, mijozdan so'ralmoqda</i>"
 
+        from user_memory import user_memory
+        user_link = f'<a href="tg://user?id={user_id}">{user_name_esc}</a>' if user_id else user_name_esc
+
         if is_annual:
             status_text = f"ESKI ({warn})" if is_old else "YILLIK TO'LOV"
             title = "⚠️ <b>ESKI YILLIK TO'LOV!</b>" if is_old else "🏛 <b>YILLIK TO'LOV KVITANSIYASI!</b>"
@@ -362,7 +389,7 @@ class AdminManager:
             compact_msg = (
                 f"{title}\n"
                 f"{fraud_header}"
-                f"👤 {user_name_esc} ({user_username})\n"
+                f"👤 {user_link} ({user_username})\n"
                 f"💵 <b>{paid_amount:,.0f} so'm</b> | {date_line}"
                 f"🏢 <b>{org_name_esc}</b> (INN: {inn_line})\n"
                 f"{fm_admin_line}"
@@ -398,7 +425,7 @@ class AdminManager:
             compact_msg = (
                 f"{title}\n"
                 f"{fraud_header}"
-                f"👤 {user_name_esc} ({user_username})\n"
+                f"👤 {user_link} ({user_username})\n"
                 f"💵 <b>To'langan:</b> <b>{paid_amount:,.0f} so'm</b>\n"
                 f"{date_line}"
                 f"🏢 <b>{org_name_esc}</b> (INN: {inn_line})\n"
@@ -415,7 +442,12 @@ class AdminManager:
 
         photo_id = file_id if is_photo else None
         doc_id = file_id if not is_photo else None
-        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
+
+        all_user_photos = user_memory.get_all_photos(chat_id, user_id) if (chat_id and user_id) else []
+        if photo_id and photo_id not in all_user_photos:
+            all_user_photos.insert(0, photo_id)
+
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user, phone=comp_phone)
 
         await self.notify_admins(
             bot=bot,
@@ -425,8 +457,195 @@ class AdminManager:
             short_caption=short_caption,
             inn=session_inn if (inn_mismatch and session_inn) else inn,
             tuman=tuman,
-            reply_markup=admin_kb
+            reply_markup=admin_kb,
+            photos=all_user_photos if is_photo else None
         )
+
+    def _build_escalation_card(
+        self,
+        title: str,
+        reason: str,
+        user: Optional[types.User],
+        chat_id: int,
+        inn: Optional[str] = None,
+        org_name: Optional[str] = None,
+        fiscal_module: Optional[str] = None,
+        device_model: Optional[str] = None,
+        issue_summary: Optional[str] = None,
+        user_comment: Optional[str] = None,
+        query_text: Optional[str] = None,
+        photo_file_id: Optional[str] = None,
+        override_monthly_debt: Optional[float] = None,
+        override_annual_status: Optional[str] = None,
+        internet_status: Optional[str] = None
+    ) -> Tuple[str, str, str, str, List[str], Optional[InlineKeyboardMarkup]]:
+        """Adminga eskalatsiya uchun ixcham, to'liq va tushunarli kartochka yaratuvchi markaziy funksiya"""
+        from modules.admin_module import regional_admin_service
+        from user_memory import user_memory
+        from excel_manager import excel_manager
+
+        user_id = user.id if user else 0
+        user_name = user.full_name if user else "Mijoz"
+        user_name_esc = html.escape(user_name)
+        user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
+        user_link = f'<a href="tg://user?id={user_id}">{user_name_esc}</a>' if user_id else user_name_esc
+
+        # Sessiyadan yetishmayotgan ma'lumotlarni to'ldirish
+        session_inn = user_memory.get_last_id(chat_id, user_id) if (chat_id and user_id) else None
+        effective_inn = inn or session_inn or ""
+        session_fm = fiscal_module or (user_memory.get_last_fm(chat_id, user_id) if (chat_id and user_id) else None)
+
+        tuman = ""
+        comp_phone = ""
+        model_str = device_model or ""
+        monthly_debt = override_monthly_debt
+        records = []
+        if effective_inn:
+            records = excel_manager.search(effective_inn)
+            tuman = excel_manager.get_district_for_inn(effective_inn)
+            if records:
+                if not comp_phone:
+                    comp_phone = records[0].get("phone", "")
+                if not model_str:
+                    model_str = excel_manager.get_device_model_summary(records)
+                if monthly_debt is None:
+                    monthly_debt = sum(item.get("debt", 0.0) for item in records)
+                if not org_name:
+                    org_name = records[0].get("name", "")
+
+        if not org_name and chat_id and user_id:
+            org_name = user_memory.get_org_name(chat_id, user_id) or ""
+        if not model_str and chat_id and user_id:
+            model_str = user_memory.get_device_models(chat_id, user_id) or ""
+
+        # Hududiy mas'ul xodim
+        reg_admin = self.get_region_admin_info(inn=effective_inn, tuman=tuman)
+        reg_admin_line = ""
+        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
+        if reg_admin:
+            ra_user = (reg_admin.get("username") or "").replace("@", "")
+            reg_admin_line = f"▫️ Mas'ul mutaxassis: {reg_admin.get('admin_name')} (@{ra_user})"
+            target_mention = f"@{ra_user}"
+
+        # 1. Aniqlangan ma'lumotlar
+        id_lines = []
+        if org_name:
+            id_lines.append(f"▫️ Korxona: <b>{html.escape(org_name)}</b>")
+        if effective_inn:
+            id_lines.append(f"▫️ STIR (INN): <code>{effective_inn}</code>")
+        if session_fm:
+            id_lines.append(f"▫️ Fiskal modul: <code>{session_fm}</code>")
+        if tuman:
+            id_lines.append(f"▫️ Hudud / Tuman: {tuman}")
+        if model_str:
+            id_lines.append(f"▫️ Apparat modeli: {model_str}")
+        if comp_phone and comp_phone != "-":
+            id_lines.append(f"▫️ Korxona telefoni: <code>{comp_phone}</code>")
+        if internet_status:
+            id_lines.append(f"▫️ Internet aloqasi: {internet_status}")
+        if reg_admin_line:
+            id_lines.append(reg_admin_line)
+
+        id_block = "\n".join(id_lines) if id_lines else "▫️ Korxona ma'lumotlari kiritilmagan"
+
+        # 2. Qarzdorlik holati
+        debt_lines = []
+        if monthly_debt is not None:
+            if monthly_debt > 0:
+                debt_lines.append(f"▫️ «Mars» oylik to'lovi: 🔴 <b>{monthly_debt:,.0f} so'm QARZ MAVJUD</b>")
+            else:
+                debt_lines.append("▫️ «Mars» oylik to'lovi: ✅ <b>0 so'm (To'langan / Qarz yo'q)</b>")
+        else:
+            debt_lines.append("▫️ «Mars» oylik to'lovi: ❓ <i>Noma'lum (INN yo'q)</i>")
+
+        if override_annual_status:
+            debt_lines.append(f"▫️ Davlat Soliq (OFD) yillik: {override_annual_status}")
+        else:
+            ann_st = user_memory.get_annual_status(chat_id, user_id) if (chat_id and user_id) else None
+            if ann_st:
+                if ann_st.get("has_debt"):
+                    debt_lines.append("▫️ Davlat Soliq (OFD) yillik: 🔴 <b>440 000 so'm QARZ MAVJUD</b>")
+                elif not ann_st.get("unavailable"):
+                    debt_lines.append("▫️ Davlat Soliq (OFD) yillik: ✅ <b>Faol (Muddati joyida)</b>")
+                else:
+                    debt_lines.append("▫️ Davlat Soliq (OFD) yillik: ⚠️ <i>Tizim javob bermadi</i>")
+            else:
+                debt_lines.append("▫️ Davlat Soliq (OFD) yillik: ❓ <i>Tekshirilmagan</i>")
+
+        last_receipt = user_memory.get_last_receipt(chat_id, user_id) if (chat_id and user_id) else None
+        if last_receipt:
+            amt = last_receipt.get("amount", 0.0)
+            if amt > 0:
+                debt_lines.append(f"▫️ Yaqinda to'langan: 💵 <b>{amt:,.0f} so'm</b> (Kvitansiya tekshiruvda)")
+
+        debt_block = "\n".join(debt_lines)
+
+        # 3. Aniqlanmagan ma'lumotlar
+        all_photos = user_memory.get_all_photos(chat_id, user_id) if (chat_id and user_id) else []
+        if photo_file_id and photo_file_id not in all_photos:
+            all_photos.append(photo_file_id)
+
+        missing_lines = []
+        if not effective_inn:
+            missing_lines.append("▫️ Korxona STIR (INN) kiritilmagan")
+        if not session_fm:
+            missing_lines.append("▫️ Kassa Fiskal moduli (LG/YG) ma'lum emas")
+        if not all_photos:
+            missing_lines.append("▫️ Apparat ekrani / nosozlik fotosurati tashlanmagan")
+        if not missing_lines:
+            missing_lines.append("▫️ Barcha asosiy ma'lumotlar to'liq aniqlangan ✅")
+
+        missing_block = "\n".join(missing_lines)
+
+        # 4. Suhbat mazmuni
+        chat_summary = user_memory.get_short_conversation_summary(chat_id, user_id, max_messages=4) if (chat_id and user_id) else ""
+        msg_body = query_text or user_comment or issue_summary or ""
+        if not chat_summary and msg_body:
+            chat_summary = f"▫️ <i>Mijoz:</i> {html.escape(msg_body[:120])}"
+        elif msg_body and msg_body not in chat_summary:
+            clean_body = html.escape(msg_body[:90])
+            chat_summary += f"\n▫️ <i>Oxirgi xabar:</i> {clean_body}"
+
+        # Muammo / Nosozlik tafsiloti
+        issue_block = ""
+        if issue_summary:
+            issue_block = f"⚠️ <b>Muammo / Nosozlik:</b>\n<b>{html.escape(issue_summary)}</b>\n────────────────────\n"
+
+        full_text = (
+            f"{title}\n\n"
+            f"📌 <b>Holat:</b> {reason}\n"
+            f"👤 <b>Mijoz:</b> {user_link} ({user_username}) | ID: <code>{user_id}</code> | Chat: <code>{chat_id}</code>\n"
+            f"────────────────────\n"
+            f"🏢 <b>Aniqlangan ma'lumotlar:</b>\n"
+            f"{id_block}\n"
+            f"────────────────────\n"
+            f"📊 <b>Qarzdorlik holati:</b>\n"
+            f"{debt_block}\n"
+            f"────────────────────\n"
+            f"⚠️ <b>Aniqlanmagan ma'lumotlar:</b>\n"
+            f"{missing_block}\n"
+            f"────────────────────\n"
+            f"{issue_block}"
+            f"💬 <b>Suhbat mazmuni:</b>\n"
+            f"{chat_summary}\n\n"
+            f"⚡️ <i>Mas'ul mutaxassis ({target_mention}): Mijoz siz bilan bog'lanishni kutmoqda.</i>"
+        )
+
+        monthly_status_short = f"{monthly_debt:,.0f} so'm qarz" if (monthly_debt and monthly_debt > 0) else "0 so'm (qarz yo'q)"
+        missing_short = ", ".join(m.replace("▫️ ", "") for m in missing_lines[:2])
+        short_caption = (
+            f"{title}\n"
+            f"📌 {reason[:80]}\n"
+            f"👤 {user_link} ({user_username})\n"
+            f"🏢 <b>{html.escape(org_name or 'Aniqlanmagan')}</b> (INN: <code>{effective_inn or '-'}</code>)\n"
+            f"📊 Qarz: {monthly_status_short}\n"
+            f"⚠️ Yetishmaydi: {missing_short}\n"
+            f"💬 <i>{html.escape(msg_body[:80])}</i>\n"
+            f"⚡️ Mas'ul: {target_mention}"
+        )
+
+        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user, phone=comp_phone)
+        return full_text, short_caption, effective_inn, tuman, all_photos, admin_kb
 
     async def notify_technical_issue(
         self,
@@ -443,62 +662,29 @@ class AdminManager:
         Apparatda muammo bor, internet ishlab turibdi, lekin qarz yo'q bo'lgan holatlarda
         aynan o'sha hududdagi mas'ul adminga (va bosh adminlarga) rasmi bilan tezkor eskalatsiya yuborish.
         """
-        from modules.admin_module import regional_admin_service
-        user_name = user.full_name if user else "Mijoz"
-        user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
-        user_id = user.id if user else 0
-
-        from excel_manager import excel_manager
-        tuman = excel_manager.get_district_for_inn(inn) if inn else ""
-        records = excel_manager.search(inn) if inn else []
-        comp_phone = records[0].get("phone", "") if records else ""
-        model_str = excel_manager.get_device_model_summary(records) if records else ""
-
-        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
-        reg_admin_line = ""
-        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
-        if reg_admin:
-            ra_user = (reg_admin.get("username") or "").replace("@", "")
-            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
-            target_mention = f"@{ra_user}"
-
-        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
-        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
-        model_line = f"📟 <b>Apparat modeli:</b> {model_str}\n" if model_str else ""
-
-        text = (
-            f"🚨 <b>TEXNIK NOSOZLIK BO'YICHA HUDUDIY ESKALATSIYA!</b>\n\n"
-            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat:</b> <code>{chat_id}</code>\n"
-            f"{phone_line}"
-            f"────────────────────\n"
-            f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
-            f"🔢 <b>INN / JSHSHIR:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
-            f"{tuman_line}"
-            f"{reg_admin_line}"
-            f"{model_line}"
-            f"📶 <b>Internet aloqasi:</b> ✅ ISHLAYAPTI (Faol)\n"
-            f"💳 <b>Qarzdorlik holati:</b> ✅ QARZ YO'Q (To'langan / 0 so'm)\n"
-            f"────────────────────\n"
-            f"⚠️ <b>Ekrandagi nosozlik:</b>\n"
-            f"<b>{issue_summary}</b>\n"
-        )
-        if user_comment:
-            text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
-
-        text += (
-            f"\n⚡️ <i>Mas'ul mutaxassis ({target_mention}): Mijozga sizning kontaktingiz berildi, "
-            f"iltimos mijoz bilan bog'lanib amaliy yordam bering!</i>"
-        )
-
-        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
-        await self.notify_admins(
-            bot,
-            text=text,
-            photo_file_id=photo_file_id,
+        full_text, short_caption, eff_inn, tuman, all_photos, admin_kb = self._build_escalation_card(
+            title="🚨 <b>TEXNIK NOSOZLIK BO'YICHA HUDUDIY ESKALATSIYA!</b>",
+            reason=issue_summary,
+            user=user,
+            chat_id=chat_id,
             inn=inn,
+            org_name=org_name,
+            issue_summary=issue_summary,
+            user_comment=user_comment,
+            photo_file_id=photo_file_id,
+            override_monthly_debt=0.0,
+            internet_status="✅ ISHLAYAPTI (Faol)"
+        )
+
+        await self.notify_admins(
+            bot=bot,
+            text=full_text,
+            photo_file_id=photo_file_id,
+            short_caption=short_caption,
+            inn=eff_inn,
             tuman=tuman,
-            reply_markup=admin_kb
+            reply_markup=admin_kb,
+            photos=all_photos
         )
 
     async def notify_user_query_escalation(
@@ -514,65 +700,28 @@ class AdminManager:
     ):
         """
         Foydalanuvchi adminga murojaat qilganda yoki yordam talab qilganda
-        hududiy adminga (va bosh adminlarga) mijoz ma'lumotlari va rasmi bilan xabar yuborish.
+        hududiy adminga (va bosh adminlarga) mijoz ma'lumotlari, suhbat xulosasi va rasmlari bilan xabar yuborish.
         """
-        from modules.admin_module import regional_admin_service
-        user_name = user.full_name if user else "Mijoz"
-        user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
-        user_id = user.id if user else 0
-
-        tuman = ""
-        comp_phone = ""
-        model_str = ""
-        if inn:
-            from excel_manager import excel_manager
-            tuman = excel_manager.get_district_for_inn(inn)
-            records = excel_manager.search(inn)
-            if records:
-                comp_phone = records[0].get("phone", "")
-                model_str = excel_manager.get_device_model_summary(records)
-                if not org_name:
-                    org_name = records[0].get("name", "")
-
-        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
-        reg_admin_line = ""
-        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
-        if reg_admin:
-            ra_user = (reg_admin.get("username") or "").replace("@", "")
-            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
-            target_mention = f"@{ra_user}"
-
-        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
-        inn_line = f"🔢 <b>INN:</b> <code>{inn}</code>\n" if inn else ""
-        org_line = f"🏢 <b>Korxona:</b> <b>{org_name}</b>\n" if org_name else ""
-        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
-        model_line = f"📟 <b>Apparat modeli:</b> {model_str}\n" if model_str else ""
-
-        text = (
-            f"🔔 <b>YANGI HUDUDIY MUROJAAT / TEXNIK YORDAM SO'ROVI!</b>\n\n"
-            f"📌 <b>Holat:</b> {reason}\n"
-            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
-            f"{phone_line}"
-            f"{inn_line}"
-            f"{org_line}"
-            f"{tuman_line}"
-            f"{reg_admin_line}"
-            f"{model_line}"
-            f"────────────────────\n"
-            f"💬 <b>Mijoz xabari:</b>\n"
-            f"<i>{query_text}</i>\n\n"
-            f"⚡️ <i>Mas'ul mutaxassis ({target_mention}): "
-            f"Foydalanuvchi siz bilan bog'lanishni kutmoqda. Quyidagi tugma orqali mijozga yozishingiz mumkin.</i>"
-        )
-        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
-        await self.notify_admins(
-            bot,
-            text=text,
-            photo_file_id=photo_file_id,
+        full_text, short_caption, eff_inn, tuman, all_photos, admin_kb = self._build_escalation_card(
+            title="🔔 <b>YANGI HUDUDIY ESKALATSIYA!</b>",
+            reason=reason,
+            user=user,
+            chat_id=chat_id,
             inn=inn,
+            org_name=org_name,
+            query_text=query_text,
+            photo_file_id=photo_file_id
+        )
+
+        await self.notify_admins(
+            bot=bot,
+            text=full_text,
+            photo_file_id=photo_file_id,
+            short_caption=short_caption,
+            inn=eff_inn,
             tuman=tuman,
-            reply_markup=admin_kb
+            reply_markup=admin_kb,
+            photos=all_photos
         )
 
     async def notify_debt_free_device_issue(
@@ -590,88 +739,34 @@ class AdminManager:
     ):
         """
         To'lovlardan qarzdorlik bo'lmaganda (oylik 0 so'm, yillik 0 so'm/faol),
-        apparat nosozligi bo'yicha barcha to'plangan ma'lumotlar va rasmlarni
+        apparat nosozligi bo'yicha barcha to'plangan ma'lumotlar, suhbat mazmuni va rasmlarni
         zudlik bilan mijozning hududiy adminiga (@username) va bosh adminlarga uzatish.
         """
-        from modules.admin_module import regional_admin_service
-        user_name = user.full_name if user else "Mijoz"
-        user_username = f"@{user.username}" if (user and user.username) else "Yo'q"
-        user_id = user.id if user else 0
-
-        from excel_manager import excel_manager
-        tuman = excel_manager.get_district_for_inn(inn) if inn else ""
-        records = excel_manager.search(inn) if inn else []
-        comp_phone = records[0].get("phone", "") if records else ""
-        if not device_model and records:
-            device_model = excel_manager.get_device_model_summary(records)
-
-        reg_admin = self.get_region_admin_info(inn=inn, tuman=tuman)
-        reg_admin_line = ""
-        target_mention = "@quvonchbek_admin, @Yashnarbek_butaev"
-        if reg_admin:
-            ra_user = (reg_admin.get("username") or "").replace("@", "")
-            reg_admin_line = f"👨‍💻 <b>Hududiy mas'ul:</b> {reg_admin.get('admin_name')} (@{ra_user})\n"
-            target_mention = f"@{ra_user}"
-
-        tuman_line = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if tuman else ""
-        phone_line = f"📞 <b>Korxona telefoni:</b> <code>{comp_phone}</code>\n" if (comp_phone and comp_phone != "-") else ""
-        fm_line = f"🏛 <b>Fiskal modul:</b> <code>{fiscal_module}</code>\n" if fiscal_module else ""
-        model_line = f"📱 <b>Apparat modeli:</b> {device_model}\n" if device_model else ""
-
-        text = (
-            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI (HUDUDIY ESKALATSIYA)!</b>\n\n"
-            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code> | <b>Chat ID:</b> <code>{chat_id}</code>\n"
-            f"{phone_line}"
-            f"────────────────────\n"
-            f"🏢 <b>Korxona:</b> <b>{org_name or 'Aniqlanmadi'}</b>\n"
-            f"🔢 <b>INN / СТИР:</b> <code>{inn or 'Aniqlanmadi'}</code>\n"
-            f"{tuman_line}"
-            f"{reg_admin_line}"
-            f"{model_line}"
-            f"{fm_line}"
-            f"────────────────────\n"
-            f"📊 <b>To'lovlar tekshiruvi:</b>\n"
-            f"▫️ «Mars» oylik to'lovi: ✅ <b>0 so'm (To'langan / Qarz yo'q)</b>\n"
-            f"▫️ Davlat Soliq (OFD) yillik to'lovi: ✅ <b>Faol (To'langan / Qarz yo'q)</b>\n"
-            f"────────────────────\n"
-            f"⚠️ <b>Muammo / Xatolik:</b>\n"
-            f"<b>{issue_summary}</b>\n"
-        )
-        if user_comment:
-            text += f"\n💬 <b>Mijoz xabari:</b> <i>{user_comment}</i>\n"
-
-        if photo_file_id:
-            text += f"\n📸 <b>Apparat ekrani / xatolik fotosurati ilova qilindi.</b>\n"
-
-        text += (
-            f"\n⚡️ <i>Mas'ul mutaxassis ({target_mention}): "
-            f"Mijozda hech qanday qarzdorlik yo'q! Apparatida texnik muammo mavjud, "
-            f"mijoz siz bilan bog'lanishni kutmoqda. Zudlik bilan bog'laning!</i>"
+        full_text, short_caption, eff_inn, tuman, all_photos, admin_kb = self._build_escalation_card(
+            title="🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI (HUDUDIY ESKALATSIYA)!</b>",
+            reason="To'lovlar bo'yicha qarzdorlik yo'q (to'langan), apparatda nosozlik mavjud",
+            user=user,
+            chat_id=chat_id,
+            inn=inn,
+            org_name=org_name,
+            fiscal_module=fiscal_module,
+            device_model=device_model,
+            issue_summary=issue_summary,
+            user_comment=user_comment,
+            photo_file_id=photo_file_id,
+            override_monthly_debt=0.0,
+            override_annual_status="✅ <b>Faol (To'langan / Qarz yo'q)</b>"
         )
 
-        short_caption = (
-            f"🚨 <b>QARZDORLIKSIZ APPARAT NOSOZLIGI!</b>\n\n"
-            f"🏢 <b>{org_name or 'Korxona'}</b> (INN: <code>{inn or '-'}</code>)\n"
-            f"{tuman_line}"
-            f"{phone_line}"
-            f"{reg_admin_line}"
-            f"{fm_line}"
-            f"👤 <b>Mijoz:</b> {user_name} ({user_username})\n"
-            f"✅ To'lovlar: Qarz yo'q (0 so'm)\n"
-            f"⚠️ Muammo: {issue_summary[:140]}\n\n"
-            f"⚡️ Mas'ul: {target_mention}"
-        )
-
-        admin_kb = regional_admin_service.build_user_contact_keyboard_for_admin(user)
         await self.notify_admins(
             bot=bot,
-            text=text,
+            text=full_text,
             photo_file_id=photo_file_id,
             short_caption=short_caption,
-            inn=inn,
+            inn=eff_inn,
             tuman=tuman,
-            reply_markup=admin_kb
+            reply_markup=admin_kb,
+            photos=all_photos
         )
 
 
