@@ -7,8 +7,8 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Xotiraning amal qilish muddati: 1 soat (soniyalarda)
-TTL_SECONDS = 3600  # 3,600 soniya (1 soat)
+# Xotiraning amal qilish muddati: 5 daqiqa (soniyalarda)
+TTL_SECONDS = 300  # 300 soniya (5 daqiqa)
 MAX_HISTORY_TURNS = 10   # Har bir foydalanuvchi uchun oxirgi 10 ta xabar almashinuvi (20 ta xabar)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -34,7 +34,7 @@ class UserMemoryManager:
                 data = json.load(f)
                 if isinstance(data, dict):
                     now = time.time()
-                    # Faqat eskirib ketmagan (2 soat ichidagi) sessiyalarni yuklash
+                    # Faqat eskirib ketmagan (5 daqiqa ichidagi) sessiyalarni yuklash
                     self.sessions = {
                         k: v for k, v in data.items()
                         if now - v.get("last_active", 0) <= self.ttl_seconds
@@ -55,7 +55,7 @@ class UserMemoryManager:
             logger.warning(f"UserMemory: Sessiyalarni saqlashda xatolik: {e}")
 
     def _cleanup_expired(self):
-        """Eskirgan (2 soatdan oshgan) sessiyalarni tozalash"""
+        """Eskirgan (5 daqiqadan oshgan) sessiyalarni tozalash"""
         now = time.time()
         expired_keys = [
             k for k, v in self.sessions.items()
@@ -322,14 +322,14 @@ class UserMemoryManager:
         return total
 
     def is_recent_duplicate_receipt(self, chat_id: int, user_id: int, tx_id: Optional[str], amount: float, p_date: Optional[str] = None) -> bool:
-        """Oxirgi 1 soat ichida aynan shu tranzaksiya yoki bir xil summa/sana yuborilganmi?"""
+        """Oxirgi 5 daqiqa ichida aynan shu tranzaksiya yoki bir xil summa/sana yuborilganmi?"""
         if not tx_id and amount <= 0:
             return False
         session = self._get_or_create_session(chat_id, user_id)
         rec_hist = session.get("receipt_history") or []
         now = time.time()
         for item in rec_hist:
-            if now - item.get("time", 0) <= 3600:  # 1 soat ichida
+            if now - item.get("time", 0) <= self.ttl_seconds:  # 5 daqiqa ichida
                 inf = item.get("info") or {}
                 # 1) Tranzaksiya raqami mos kelsa
                 if tx_id and inf.get("transaction_id") and str(inf.get("transaction_id")) == str(tx_id):
@@ -343,9 +343,9 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         res = session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt", user_id)
         if res and isinstance(res, dict):
-            # 2 soatdan (7200 sekund) ortiq o'tgan bo'lsa, eskirgan deb hisoblanadi
+            # Sessiya muddati (5 daqiqa) dan ortiq o'tgan bo'lsa, eskirgan deb hisoblanadi
             ts = res.get("timestamp", 0)
-            if ts and (time.time() - ts > 7200):
+            if ts and (time.time() - ts > self.ttl_seconds):
                 return None
         return res
 

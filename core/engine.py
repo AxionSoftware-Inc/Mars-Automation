@@ -549,7 +549,7 @@ class CoreEngine:
                 payment_date=facts.payment_date
             )
 
-        # 3.4 Takroriy kvitansiya spamidan himoya (oxirgi 1 soat ichida yuborilgan bo'lsa)
+        # 3.4 Takroriy kvitansiya spamidan himoya (oxirgi 5 daqiqa ichida yuborilgan bo'lsa)
         is_recent_dup = user_memory.is_recent_duplicate_receipt(
             chat_id=chat_id,
             user_id=user_id,

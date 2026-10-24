@@ -34,10 +34,17 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
             "ai_helper.generate_ai_reply_ex",
             return_value=("Assalomu alaykum! Smart POS bo'yicha yordam beramiz.", None, False)
         )
+        self.ai_async_patcher = patch(
+            "ai_helper.generate_ai_reply_ex_async",
+            new_callable=AsyncMock,
+            return_value=("Assalomu alaykum! Smart POS bo'yicha yordam beramiz.", None, False)
+        )
         self.ai_patcher.start()
+        self.ai_async_patcher.start()
 
     def tearDown(self):
         self.ai_patcher.stop()
+        self.ai_async_patcher.stop()
 
     async def _send_msg(self, chat_id: int, user_id: int, text: str, bot_mock: AsyncMock) -> str:
         """Yordamchi funksiya: Foydalanuvchi xabarini router tartibida o'tkazish va javob matnini olish"""
@@ -252,9 +259,9 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
     # =========================================================================
     # FLOW 4: 1-HOUR MEMORY EXPIRATION MID-DIALOGUE (6 TURNS)
     # =========================================================================
-    async def test_flow_4_session_expiry_after_1_hour(self):
+    async def test_flow_4_session_expiry_after_5_minutes(self):
         """
-        1 soat (3600s) TTL tugashidan keyin botning xotirani toza unutishi,
+        5 daqiqa (300s) TTL tugashidan keyin botning xotirani toza unutishi,
         qulab tushmasdan muloyimlik bilan INNni qayta so'rashi.
         """
         chat_id = 70004
@@ -275,12 +282,12 @@ class Test10xUltraComplexAdversarialStress(unittest.IsolatedAsyncioTestCase):
             r2 = await self._send_msg(chat_id, user_id, "nega buncha qarzman to'lov tariximni ko'rsat", bot)
             self.assertIn("QASHQADARYO SHARQ GAVHARI", r2)
 
-            # Turn 3: 3605 soniya o'tdi (> 1 soat TTL)
-            current_fake_time += 3605.0
+            # Turn 3: 305 soniya o'tdi (> 5 daqiqa TTL)
+            current_fake_time += 305.0
 
             # Foydalanuvchi kelib qisqa savol beradi: "oylikdanchi?"
             r3 = await self._send_msg(chat_id, user_id, "oylikdanchi qarzim qancha", bot)
-            # Xotira 1 soatdan keyin tozalangan bo'lishi kerak, shuning uchun INN so'raydi
+            # Xotira 5 daqiqadan keyin tozalangan bo'lishi kerak, shuning uchun INN so'raydi
             self.assertIn("INN", r3)
             self.assertIsNone(user_memory.get_last_id(chat_id, user_id))
 

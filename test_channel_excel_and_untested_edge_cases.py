@@ -131,11 +131,11 @@ class TestChannelExcelAndUntestedEdgeCases(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Yozuvlar keskin kamaygan", call_text)
 
     # =========================================================================
-    # 3. TEST: 1 soatlik xotira (TTL) tugagandan keyin to'g'ri ishlash
+    # 3. TEST: 5 daqiqalik xotira (TTL) tugagandan keyin to'g'ri ishlash
     # =========================================================================
-    async def test_03_one_hour_memory_ttl_expiration_behavior(self):
-        """1 soat (3600s) o'tgandan so'ng xotira tozalanishi va botning xatosiz so'rashi"""
-        mem = UserMemoryManager(ttl_seconds=3600)
+    async def test_03_five_minutes_memory_ttl_expiration_behavior(self):
+        """5 daqiqa (300s) o'tgandan so'ng xotira tozalanishi va botning xatosiz so'rashi"""
+        mem = UserMemoryManager(ttl_seconds=300)
         chat_id = -100111222333
         user_id = 777
 
@@ -144,9 +144,9 @@ class TestChannelExcelAndUntestedEdgeCases(unittest.IsolatedAsyncioTestCase):
         mem.set_last_topic(chat_id, user_id, "debt_checked")
         self.assertEqual(mem.get_last_id(chat_id, user_id), "302568138")
 
-        # 2. Oradan 3605 soniya (1 soatdan ortiq) vaqt o'tdi
+        # 2. Oradan 305 soniya (5 daqiqadan ortiq) vaqt o'tdi
         key = f"{chat_id}:{user_id}"
-        mem.sessions[key]["last_active"] = time.time() - 3605
+        mem.sessions[key]["last_active"] = time.time() - 305
 
         # 3. Xotira tozalanganda INN yo'qolishi kerak
         mem._cleanup_expired()
