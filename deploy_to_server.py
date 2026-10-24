@@ -75,10 +75,10 @@ def deploy():
     print(f"Archive size: {len(tar_bytes)} bytes. Uploading via SFTP to server...")
 
     sftp = ssh.open_sftp()
-    remote_tar = '/tmp/deploy_mars.tar.gz'
+    remote_tar = f"{remote_dir}/deploy_mars.tar.gz"
     sftp.putfo(io.BytesIO(tar_bytes), remote_tar)
     sftp.close()
-    print("Archive uploaded to /tmp/deploy_mars.tar.gz")
+    print(f"Archive uploaded to {remote_tar}")
 
     # Remote papkalarni yaratish va tar ochish
     ssh.exec_command(f"mkdir -p {remote_dir}/handlers/intents {remote_dir}/core {remote_dir}/modules {remote_dir}/data")
