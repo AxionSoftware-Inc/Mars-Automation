@@ -33,6 +33,7 @@ def deploy():
         'state_manager.py',
         'translit_manager.py',
         'payment_accounts.py',
+        'templates.py',
         'ARCHITECTURE.md',
         'handlers/__init__.py',
         'handlers/chat.py',

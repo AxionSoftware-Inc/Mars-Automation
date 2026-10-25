@@ -13,118 +13,15 @@ logger = logging.getLogger(__name__)
 router = Router(name="debt_router")
 
 def format_debt_response(results: list, checked_fm: str = None, annual_status: dict = None, chat_id: int = 0, user_id: int = 0) -> str:
-    """Excel tekshiruvi natijasi: apparat soni va qarz summasi"""
-    if not results:
-        return (
-            "❌ <b>Bazada ushbu raqam bo'yicha ma'lumot topilmadi.</b>\n\n"
-            "Iltimos, korxonangiz СТИР (INN) yoki JSHSHIR raqami to'g'ri kiritilganini tekshirib qayta yuboring.\n"
-            "👨‍💻 <i>Yordam kerak bo'lsa, «Usta kerak» yoki «Admin» deb yozing.</i>"
-        )
-
-    first = results[0]
-    org_name = first.get("name", "-")
-    inn = first.get("stir", "-")
-    jshshir = first.get("jshshir", "-")
-    tuman = first.get("tuman", "-")
-    device_count = len(results)
-    
-    text = f"🏢 <b>Korxona:</b> {org_name}\n"
-    if inn != "-":
-        text += f"🆔 <b>СТИР (INN):</b> <code>{inn}</code>\n"
-    if jshshir != "-":
-        text += f"🆔 <b>ЖШSHIR:</b> <code>{jshshir}</code>\n"
-    if tuman != "-":
-        text += f"📍 <b>Hudud / Tuman:</b> {tuman}\n"
-    
-    p3_items = [item for item in results if item.get("is_p3", False)]
-    smart_items = [item for item in results if not item.get("is_p3", False)]
-
-    if device_count == 1:
-        single_model = "P3 Humo" if p3_items else "Smart One"
-        text += f"📟 <b>Apparat modeli:</b> {single_model}\n"
-        terminal_id = results[0].get("terminal", "-")
-        if terminal_id and terminal_id != "-":
-            text += f"🔢 <b>Terminal ID:</b> <code>{terminal_id}</code>\n"
-    else:
-        text += f"📟 <b>Biriktirilgan apparatlar soni:</b> {device_count} ta\n"
-        if p3_items and smart_items:
-            text += f"   • <b>P3 Humo:</b> {len(p3_items)} ta\n"
-            text += f"   • <b>Smart One:</b> {len(smart_items)} ta\n"
-        elif p3_items:
-            text += f"   • <b>Modeli:</b> P3 Humo ({len(p3_items)} ta)\n"
-        elif smart_items:
-            text += f"   • <b>Modeli:</b> Smart One ({len(smart_items)} ta)\n"
-
-    decom_items = excel_manager.get_decommissioned(inn) if inn != "-" else []
-    if decom_items:
-        text += f"ℹ️ <i>Eslatma: Korxonaning {len(decom_items)} ta apparati avval hisobdan chiqarilgan (o'chirilgan) va qarz hisoblanmaydi.</i>\n"
-
-    text += "────────────────────\n"
-
-    total_debt = sum(item.get("debt", 0.0) for item in results)
-
-    if total_debt > 0:
-        now_uzb = datetime.now(ZoneInfo("Asia/Tashkent"))
-        MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
-        current_month_idx = now_uzb.month
-        current_month_name = MONTHS[current_month_idx - 1]
-        remaining_months = max(0, 12 - current_month_idx)
-        monthly_rate = 100000.0 * device_count
-        pay_year_end = total_debt + (remaining_months * monthly_rate)
-
-        text += f"🔴 <b>JAMI QARZDORLIK: {total_debt:,.0f} so'm</b>\n\n"
-        if remaining_months > 0:
-            text += f"▫️ <b>Hozirgi qarz ({current_month_name}):</b> <code>{total_debt:,.0f}</code> so'm\n"
-            text += f"▫️ <b>Yil oxirigacha (Dekabr):</b> <code>{pay_year_end:,.0f}</code> so'm\n\n"
-        text += "💳 <i>To'lov uchun hisob raqam quyida keltirildi. To'lov qilgach kvitansiyani yuborishingiz mumkin.</i>"
-        
-        last_rec = user_memory.get_last_receipt(chat_id=chat_id, user_id=user_id) if (chat_id and user_id) else None
-        if last_rec and (not last_rec.get("inn") or last_rec.get("inn") == inn):
-            text += (
-                "\n\n💡 <b>Eslatma:</b> <i>Kvitansiyangiz adminga yetkazilgan. Baza har kuni yangilanishi sababli, "
-                "apparat admin tomonidan yoqiladi va to'lov keyingi hisobotda aks etadi.</i>"
-            )
-    elif total_debt < 0:
-        text += f"🟢 <b>Ortiqcha to'lov mavjud:</b> {abs(total_debt):,.0f} so'm\n"
-        text += "✅ <b>Abonent to'lovidan qarzdorlik yo'q.</b>"
-        if checked_fm and annual_status is not None:
-            if annual_status.get("unavailable"):
-                text += f"\n⏳ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Tizim vaqtincha javob bermadi (birozdan so'ng qayta tekshiring)."
-            elif annual_status.get("has_debt"):
-                text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
-            else:
-                text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
-        else:
-            is_issue = user_memory.is_issue_mode(chat_id, user_id) if (chat_id and user_id) else False
-            header = "2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish uchun:" if is_issue else "Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:"
-            text += (
-                f"\n\n🏛 <b>{header}</b>\n"
-                "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
-            )
-    else:
-        text += "✅ <b>«Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).</b>"
-        if checked_fm and annual_status is not None:
-            if annual_status.get("unavailable"):
-                text += f"\n⏳ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Tizim vaqtincha javob bermadi (birozdan so'ng qayta tekshiring)."
-            elif annual_status.get("has_debt"):
-                text += f"\n🔴 <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Qarzdorlik mavjud (440 000 so'm)."
-            else:
-                text += f"\n✅ <b>Yillik Soliq (OFD) litsenziyasi ({checked_fm}):</b> Faol (Qarzdorlik yo'q)."
-        else:
-            is_issue = user_memory.is_issue_mode(chat_id, user_id) if (chat_id and user_id) else False
-            header = "2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish uchun:" if is_issue else "Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun:"
-            text += (
-                f"\n\n🏛 <b>{header}</b>\n"
-                "Kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring yoki <b>«yillikni tekshir»</b> deb yozing."
-            )
-
-    if inn == "302568138":
-        text += (
-            "\n\n💡 <i>Eslatma: <code>302568138</code> — «Mars Elektron Texnika» MCHJ ning o'z STIR raqami hisoblanadi. "
-            "Agar o'z korxonangiz qarzini tekshirmoqchi bo'lsangiz, korxonangizning 9 xonali STIR raqamini yuboring.</i>"
-        )
-
-    return text
+    """Excel tekshiruvi natijasi: apparat soni va qarz summasi (markaziy shablondan)"""
+    from templates import format_debt_response_template
+    return format_debt_response_template(
+        results=results,
+        checked_fm=checked_fm,
+        annual_status=annual_status,
+        chat_id=chat_id,
+        user_id=user_id
+    )
 
 async def process_and_send_debt_result(message: types.Message, bot: Bot, query_num: str):
     """INN/JSHSHIR bo'yicha qidirib, javob berish va xotiraga saqlash"""
@@ -141,13 +38,8 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
     # 0.05 Agar mijoz «Yangi Texnologiyalar» DUK STIR raqamini (201589463) yuborgan bo'lsa
     from payment_accounts import YANGI_TEXNOLOGIYALAR_INN
     if query_num == YANGI_TEXNOLOGIYALAR_INN:
-        yt_inn_msg = (
-            f"⚠️ <b>Diqqat! Kiritilgan СТИР (<code>{YANGI_TEXNOLOGIYALAR_INN}</code>) — Davlat Soliq Qo'mitasi huzuridagi «Yangi Texnologiyalar» DUK ning STIR raqami hisoblanadi!</b>\n\n"
-            "Bu sizning korxonangiz STIR raqami emas (bu raqam to'lov rekvizitlarida qabul qiluvchi tashkilot STIRi sifatida yozilgan).\n\n"
-            "👉 <b>O'zingizning korxonangiz qarzini tekshirish uchun:</b> Korxonangiz guvohnomasidagi yoki kassa cheki yuqorisidagi <b>9 xonali STIR (INN)</b> raqamingizni yuboring.\n"
-            "👉 <b>Yillik Soliq (OFD) litsenziyasini tekshirish uchun:</b> Kassa chekining eng pastki qismidagi <b>Fiskal modul (LG..., YG...)</b> raqamini yuboring."
-        )
-        yt_inn_msg = adapt_to_user_script(yt_inn_msg, user_script)
+        from templates import get_yt_inn_warning
+        yt_inn_msg = get_yt_inn_warning(YANGI_TEXNOLOGIYALAR_INN, user_script)
         try:
             await message.reply(yt_inn_msg, parse_mode="HTML")
         except Exception:
@@ -187,17 +79,8 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
         decom_list = excel_manager.get_decommissioned(query_num)
         org_name = decom_list[0].get("name", "-") if decom_list else "-"
         tuman = decom_list[0].get("tuman", "-") if decom_list else "-"
-        tuman_str = f"📍 <b>Hudud / Tuman:</b> {tuman}\n" if (tuman and tuman != "-") else ""
-        decom_text = (
-            f"🏢 <b>Korxona:</b> {org_name}\n"
-            f"🆔 <b>Qidiruv raqami:</b> <code>{query_num}</code>\n"
-            f"{tuman_str}"
-            f"────────────────────\n"
-            f"ℹ️ <b>Holati:</b> Hisobdan chiqarilgan (o'chirilgan)\n"
-            f"✅ <b>Qarzdorlik:</b> 0 so'm\n\n"
-            f"⚠️ <i>Ushbu apparat / korxona xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan) bo'lib, unga abonent to'lovi yoki qarzdorlik hisoblanmaydi.</i>"
-        )
-        decom_text = adapt_to_user_script(decom_text, user_script)
+        from templates import get_decommissioned_template
+        decom_text = get_decommissioned_template(org_name, query_num, tuman, user_script)
         logger.info(f"📤 HISOBDAN CHIQARILGAN [chat_id={chat_id}, query={query_num}]: {org_name}")
         try:
             await message.reply(decom_text, parse_mode="HTML")
@@ -256,6 +139,10 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
             )
         elif not checked_fm:
             user_memory.set_last_topic(chat_id, user_id, "awaiting_fiscal_module")
+            resp = resp.replace(
+                "Yillik Soliq (OFD) litsenziyasini tekshirish uchun:",
+                "2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish:"
+            )
 
     resp = adapt_to_user_script(resp, user_script)
     logger.info(f"📤 QARZ JAVOBI [chat_id={chat_id}, query={query_num}]: {org_name} (qarz: {total_debt})")

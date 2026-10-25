@@ -24,6 +24,11 @@ from state_manager import (
 )
 from translit_manager import adapt_to_user_script, detect_script
 from ofd_bridge import ofd_bridge
+from templates import (
+    get_receipt_missing_inn_or_fm_template,
+    get_escalate_with_photo_template,
+    get_unrecognized_image_template,
+)
 from payment_accounts import (
     MARS_ACCOUNT,
     YANGI_TEXNOLOGIYALAR_ACCOUNT,
@@ -297,14 +302,7 @@ async def _process_fiscal_receipt_content(
 
     # Agar na INN, na FM topilmasa -> Foydalanuvchidan so'rash
     if not inn and not fm:
-        fail_msg = (
-            "🧾 <b>Kassa cheki tasviri qabul qilindi.</b>\n\n"
-            "⚠️ Afsuski, chekdan <b>СТИР (INN)</b> yoki <b>Fiskal modul (LG..., YG..., UZ...)</b> raqamini aniq o'qib bo'lmadi.\n\n"
-            "📌 <b>Iltimos:</b>\n"
-            "🔹 Chekning yuqori (INN) yoki pastki (Fiskal modul) qismini yaqinroqdan aniq rasmga olib yuboring;\n"
-            "🔹 Yoki korxonangiz <b>9 xonali СТИР (INN)</b> raqamini yozib yuboring."
-        )
-        fail_msg = adapt_to_user_script(fail_msg, user_script)
+        fail_msg = get_receipt_missing_inn_or_fm_template(user_script)
         try:
             await message.reply(fail_msg, parse_mode="HTML")
         except Exception:
@@ -585,17 +583,14 @@ async def _process_image_content(
                 photo_file_id=file_id,
                 fiscal_module=target_fm
             )
-            fm_text = f"\n🏛 <b>Fiskal modul:</b> <code>{target_fm}</code>" if target_fm else ""
-            esc_ack = (
-                "👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz hududiy mas'ul adminga yuborildi!</b>\n\n"
-                f"🏢 <b>Korxona:</b> {org_to_use}\n"
-                f"🆔 <b>INN:</b> <code>{inn_to_use}</code>"
-                f"{fm_text}\n\n"
-                f"{admin_manager.get_contacts_display(inn=inn_to_use)}\n\n"
-                "📸 Kassa apparati ekranidagi xatolik rasmi va korxona ma'lumotlari hududingiz bo'yicha mas'ul adminga yetkazildi. Tez orada admin o'zi siz bilan bog'lanadi!\n"
-                "Quyidagi tugmalar orqali ham to'g'ridan-to'g'ri aloqaga chiqishingiz mumkin:"
+            contacts_display = admin_manager.get_contacts_display(inn=inn_to_use)
+            esc_ack = get_escalate_with_photo_template(
+                org_name=org_to_use,
+                inn=inn_to_use,
+                fm=target_fm or "",
+                contacts_block=contacts_display,
+                script=user_script
             )
-            esc_ack = adapt_to_user_script(esc_ack, user_script)
             kb = get_admin_contact_keyboard(inn=inn_to_use)
             try:
                 await message.reply(esc_ack, parse_mode="HTML", reply_markup=kb)
@@ -695,13 +690,8 @@ async def _process_image_content(
         # Agar shaxsiy chat bo'lsa yoki rasm bilan izoh yozilgan bo'lsa -> jim turmaslik!
         if message.chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP] or caption:
             try:
-                unrec_msg = (
-                    "📸 <b>Kechirasiz, yuborilgan tasvirdan kassa apparati ekrani yoki to'lov kvitansiyasini aniqlab bo'lmadi.</b>\n\n"
-                    "📌 <b>Iltimos:</b>\n"
-                    "🔹 Agar bu <b>kassa apparati</b> bo'lsa, ekranidagi xatolikni (soat va tarmoq qatori bilan) yaqinroqdan rasmga olib yuboring.\n"
-                    "🔹 Agar bu <b>to'lov cheki</b> bo'lsa, to'lov kvitansiyasini aniq qilib yuboring yoki korxonangiz <b>INN (STIR)</b> raqamini yozing."
-                )
-                await message.reply(adapt_to_user_script(unrec_msg, user_script), parse_mode="HTML")
+                unrec_msg = get_unrecognized_image_template(user_script)
+                await message.reply(unrec_msg, parse_mode="HTML")
             except Exception:
                 pass
             return

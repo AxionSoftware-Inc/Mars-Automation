@@ -641,14 +641,16 @@ class AdminManager:
 
         monthly_status_short = f"{monthly_debt:,.0f} so'm qarz" if (monthly_debt and monthly_debt > 0) else "0 so'm (qarz yo'q)"
         missing_short = ", ".join(m.replace("▫️ ", "") for m in missing_lines[:2])
+        tuman_line_short = f"📍 {tuman}\n" if tuman else ""
         short_caption = (
             f"{title}\n"
             f"📌 {reason[:80]}\n"
             f"👤 {user_link} ({user_username})\n"
             f"🏢 <b>{html.escape(org_name or 'Aniqlanmagan')}</b> (INN: <code>{effective_inn or '-'}</code>)\n"
+            f"{tuman_line_short}"
             f"📊 Qarz: {monthly_status_short}\n"
             f"⚠️ Yetishmaydi: {missing_short}\n"
-            f"💬 <i>{html.escape(msg_body[:80])}</i>\n"
+            f"💬 <i>{html.escape(msg_body[:80], quote=False)}</i>\n"
             f"⚡️ Mas'ul: {target_mention}"
         )
 

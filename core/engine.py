@@ -7,6 +7,13 @@ from error_manager import error_manager
 from excel_manager import excel_manager
 from user_memory import user_memory
 from admin_manager import admin_manager
+from templates import (
+    get_receipt_ack_template,
+    get_hardware_step1_inn_template,
+    get_hardware_step2_fm_template,
+    get_hardware_step3_clear_template,
+    get_escalate_admin_template,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -144,14 +151,26 @@ class CoreEngine:
             if fm_in_text:
                 target_fm = fm_in_text
 
-        is_p3_device: bool = bool((facts.raw_facts or {}).get("is_p3_device", False))
+        match_payload = dict(facts.raw_facts or {})
+        if facts.screen_text_summary:
+            match_payload["screen_text_summary"] = facts.screen_text_summary
+        if facts.error_type:
+            match_payload["error_type"] = facts.error_type
+
+        raw_facts = facts.raw_facts or {}
+        is_p3_explicit = raw_facts.get("is_p3_device")
+        if is_p3_explicit is not None:
+            is_p3_device = bool(is_p3_explicit)
+        else:
+            is_p3_device = False
+            if target_inn:
+                res = excel_manager.search(target_inn)
+                if res and any(bool(item.get("is_p3", False)) for item in res):
+                    is_p3_device = True
 
         # A) P3 HUMO APPARATI (Sariq qator):
         # P3 apparat ekranida aniq gap chiqadi ("p3 bo'lsa mayli uni ekranida aniq yozuv chiqadi")
         if is_p3_device:
-            match_payload = dict(facts.raw_facts or {})
-            if facts.screen_text_summary:
-                match_payload["screen_text_summary"] = facts.screen_text_summary
             matched_rule = error_manager.match_error(match_payload)
             clean_summary = (facts.screen_text_summary or "").strip()
             is_meaningful_summary = clean_summary.lower() not in ["none", "normal", "", "asosiy oyna", "bosh oyna"]
@@ -165,6 +184,17 @@ class CoreEngine:
                 else:
                     p3_diag_text = rule_text
                 p3_video_id = matched_rule.get("video_id")
+                if matched_rule.get("escalate_to_admin"):
+                    return DecisionResult(
+                        action=ActionType.ESCALATE_TO_ADMIN,
+                        reply_text=p3_diag_text,
+                        video_id=p3_video_id,
+                        detected_inn=target_inn,
+                        should_notify_admin=True,
+                        admin_alert_type="tech_issue",
+                        admin_alert_text=f"Apparat xatosi: {clean_summary}",
+                        log_reason="P3 Humo screen error requires admin escalation"
+                    )
             elif is_meaningful_summary:
                 p3_diag_text = f"🖥 <b>P3 Humo apparat ekranidagi xabar:</b> {clean_summary}"
 
@@ -208,7 +238,7 @@ class CoreEngine:
         if not target_inn:
             return DecisionResult(
                 action=ActionType.ASK_FULL_SCREEN,
-                reply_text="🔍 <b>Kassa apparatingiz holatini tekshirishimiz uchun korxonangiz СТИР (INN) raqamini yuboring.</b>",
+                reply_text=get_hardware_step1_inn_template(),
                 detected_inn=None,
                 log_reason="Smart One Step 1: Asking for INN first"
             )
@@ -259,11 +289,7 @@ class CoreEngine:
 
         # 2-QADAM: MARS QARZI YO'Q (total_debt <= 0) -> FISKAL MODULNI TEKSHIRISH (YILLIK SOLIQ TO'LOVI)
         if not target_fm:
-            fm_ask_reply = (
-                f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-                f"✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
-                f"🏛 Yillik Soliq (OFD) litsenziya muddatini tekshirishimiz uchun kassa chekining pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
-            )
+            fm_ask_reply = get_hardware_step2_fm_template(org_name, target_inn)
             return DecisionResult(
                 action=ActionType.DEBT_INFO,
                 reply_text=fm_ask_reply,
@@ -274,14 +300,7 @@ class CoreEngine:
             )
 
         # 3-QADAM: OYLIK VA YILLIK QARZI BO'LMASA -> INTERNET, SOAT VA REBOOT
-        reboot_reply = (
-            f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{target_inn}</code>)\n"
-            f"✅ Oylik va yillik to'lovlardan qarzdorlik yo'q.\n\n"
-            f"📌 <b>Apparatni ishga tushirish uchun tekshiring:</b>\n"
-            f"1️⃣ Apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanligini tekshiring;\n"
-            f"2️⃣ Kassa dasturidan to'liq chiqib qayta kiring yoki apparatni o'chirib qayta yoqing (Перезагрузка / Reboot).\n\n"
-            f"🛠 <i>Agar shunda ham ishlamasa, «Usta kerak» deb yozing, hududingiz bo'yicha mutaxassisga bog'laymiz.</i>"
-        )
+        reboot_reply = get_hardware_step3_clear_template(org_name, target_inn, target_fm)
         return DecisionResult(
             action=ActionType.DIAGNOSE_AND_REPLY,
             reply_text=reboot_reply,
@@ -362,9 +381,7 @@ class CoreEngine:
             logger.info("Kvitansiya tahlili: Yillik fiskal modul to'lovi («Yangi Texnologiyalar» DUK) aniqlandi.")
             # Xotiradagi Fiskal modul (FM) ni tekshirish
             user_fm = user_memory.get_last_fm(chat_id, user_id)
-            annual_reply = (
-                "🧾 <b>Kvitansiyangiz qabul qilindi va tekshirish uchun mas'ul adminga yuborildi.</b>"
-            )
+            annual_reply = get_receipt_ack_template(is_recent_dup=False)
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
                 reply_text=annual_reply,
@@ -449,10 +466,7 @@ class CoreEngine:
             }
             user_memory.set_pending_receipt(chat_id, user_id, receipt_dict)
 
-            ask_inn_reply = (
-                "🧾 <b>Kvitansiyangiz qabul qilindi va mas'ul adminga yuborildi.</b>\n\n"
-                "❓ <i>Iltimos, ushbu to'lov qaysi korxona uchun ekanini bilishimiz uchun СТИР (INN) raqamingizni ham yozib yuboring.</i>"
-            )
+            ask_inn_reply = get_receipt_ack_template(missing_inn=True)
             return DecisionResult(
                 action=ActionType.RECEIPT_PROCESSED,
                 reply_text=ask_inn_reply,
@@ -584,15 +598,7 @@ class CoreEngine:
             remaining_debt = effective_prev_debt
 
         # Foydalanuvchiga oddiy, sodda va qisqa javob qaytarish:
-        if is_recent_dup:
-            user_reply = (
-                "ℹ️ <b>Ushbu to'lov kvitansiyangiz avval qabul qilingan va tekshirish uchun mas'ul adminga yuborilgan.</b>\n"
-                "<i>Iltimos kuting, admin tez orada apparatingiz holatini tekshirib aloqaga chiqadi.</i>"
-            )
-        else:
-            user_reply = (
-                "🧾 <b>Kvitansiyangiz qabul qilindi va tekshirish uchun mas'ul adminga yuborildi.</b>"
-            )
+        user_reply = get_receipt_ack_template(is_recent_dup=is_recent_dup)
 
         # Xotirada pending receiptni tozalash (MUHIM: mijozning kunlik Exceldagi qarzini va avvalgi INNsini buzmaslik!)
         user_memory.clear_pending_receipt(chat_id, user_id)
@@ -703,11 +709,7 @@ class CoreEngine:
 
         tuman = excel_manager.get_district_for_inn(inn) if (inn and inn != "-") else ""
         contacts_info = admin_manager.get_contacts_display(inn=inn if inn != "-" else None, tuman=tuman)
-        reply_text = (
-            f"👨‍💻 <b>Murojaatingiz qabul qilindi va operator / mas'ul mutaxassisga yetkazildi!</b>\n\n"
-            f"{contacts_info}\n\n"
-            f"Mas'ul ustamiz tez orada siz bilan bog'lanadi yoki quyidagi tugma orqali to'g'ridan-to'g'ri yozishingiz mumkin:"
-        )
+        reply_text = get_escalate_admin_template(contacts_info)
 
         return DecisionResult(
             action=ActionType.ESCALATE_TO_ADMIN,

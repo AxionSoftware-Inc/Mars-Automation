@@ -15,6 +15,7 @@ from admin_manager import AdminManager
 class TestAdvancedProductionScenarios(unittest.TestCase):
     def setUp(self):
         self.memory = UserMemoryManager()
+        user_memory.clear()
 
     # =========================================================================
     # 1. USER MEMORY ISOLATION & CONCURRENCY

@@ -129,7 +129,8 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     """Fiskal modul so'rash shabloni"""
     text = (
         "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun:</b>\n"
-        "Kassa chekining pastki qismidagi <b>Fiskal modul (LG... yoki YG...)</b> seriya raqamini yuboring."
+        "Kassa chekining pastki qismidagi <b>Fiskal modul seriya raqamini (LG... yoki YG...)</b> yuboring (masalan: <code>LG420210630789</code>).\n"
+        "Chek bo'lmasa, apparat orqasidagi nakleyka (yorliq) yoki ekranni <b>rasmga olib</b> tashlang."
     )
     return adapt_to_user_script(text, script)
 
@@ -137,7 +138,7 @@ def get_fiscal_module_request_prompt(script: str = "latin") -> str:
 def get_single_account_warning(script: str = "latin") -> str:
     """Bitta hisob raqamga to'lash mumkinmi deyilganda qat'iy va qisqa javob"""
     text = (
-        "❌ <b>Yo'q, to'lovlar 2 ta alohida tashkilotga to'lanadi:</b>\n\n"
+        "❌ <b>Yo'q, mutlaqo bo'lmaydi! To'lovlar 2 ta alohida tashkilotga to'lanadi:</b>\n\n"
         "1️⃣ <b>Oylik abonent (100 000 so'm)</b> — «Mars Elektron Texnika»ga\n"
         "2️⃣ <b>Yillik litsenziya (440 000 so'm)</b> — «Yangi Texnologiyalar» DUKga\n\n"
         "<i>Bitta hisobga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi.</i>"
@@ -332,7 +333,7 @@ def format_ofd_status_template(fm_code: str, ofd_text: Optional[str], script: st
             f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
             f"{code_label}\n"
             f"💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
-            f"💳 <i>To'lov rekvizitlari quyida uzatildi.</i>"
+            f"💳 <i>To'lov rekvizitlari quyida uzatildi (yoki «To'layman» deb yozing).</i>"
         )
     else:
         text = (
@@ -385,7 +386,7 @@ def get_hardware_step2_fm_template(org_name: str, inn: str, script: str = "latin
     text = (
         f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{inn}</code>)\n"
         f"✅ «Mars» oylik to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
-        f"🏛 Yillik Soliq litsenziyasini tekshirish uchun chekdagi <b>Fiskal modul (LG/YG)</b> raqamini yuboring."
+        f"🏛 Yillik Soliq litsenziyasini tekshirish uchun chekdagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
     )
     return adapt_to_user_script(text, script)
 
@@ -416,8 +417,8 @@ def get_hardware_step3_clear_template(
             "📌 <b>Tekshiring:</b>",
             "1. <b>Internet aloqasi:</b> Wi-Fi yoki SIM tarmog'i",
             "2. <b>Soat va sana:</b> Aniq vaqt to'g'riligi",
-            "3. <b>Qayta yoqish:</b> Apparatni o'chirib yoqing (Reboot)\n",
-            "📸 <i>Ishlamasa, ekrandagi xatolikni rasmga olib yuboring.</i>"
+            "3. <b>Qayta yoqish:</b> Apparatni o'chirib yoqing (Перезагрузка / Reboot)\n",
+            "📸 <i>Ishlamasa, ekrandagi xatolikni rasmga olib yuboring yoki «Usta kerak» deb yozing.</i>"
         ])
     text = "\n".join(lines)
     return adapt_to_user_script(text, script)
@@ -442,7 +443,7 @@ def get_hardware_no_receipt_template(org_name: str, inn: str, script: str = "lat
 
 def get_escalate_admin_template(contacts_block: str = "", script: str = "latin") -> str:
     """Operator yoki usta chaqirilganda qisqa xabar"""
-    text = "👨‍💻 <b>Murojaatingiz adminga yetkazildi:</b>"
+    text = "👨‍💻 <b>Murojaatingiz qabul qilindi va operator / adminga yetkazildi.</b> Tez orada siz bilan bog'lanishadi:"
     if contacts_block:
         text += f"\n\n{contacts_block}"
     return adapt_to_user_script(text, script)
@@ -481,8 +482,8 @@ def get_unrecognized_image_template(script: str = "latin") -> str:
 def get_receipt_missing_inn_or_fm_template(script: str = "latin") -> str:
     """Chek rasmida na INN, na FM o'qilganda qaytadigan xabar"""
     text = (
-        "🧾 <b>Chekdan INN yoki Fiskal modul raqami o'qilmadi.</b>\n"
-        "Chekni yaqinroqdan rasmga oling yoki <b>9 xonali INN</b> raqamingizni yozib yuboring."
+        "🧾 <b>Chekdan INN yoki Fiskal modul raqamini aniq o'qib bo'lmadi.</b>\n"
+        "Chekni yaqinroqdan aniq rasmga oling yoki <b>9 xonali INN</b> raqamingizni yozib yuboring."
     )
     return adapt_to_user_script(text, script)
 

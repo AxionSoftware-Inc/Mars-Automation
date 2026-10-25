@@ -3,6 +3,13 @@ from aiogram import types, Bot
 
 from user_memory import user_memory
 from translit_manager import adapt_to_user_script
+from templates import (
+    get_hardware_step1_inn_template,
+    get_hardware_step2_fm_template,
+    get_hardware_step3_clear_template,
+    get_hardware_no_receipt_template,
+    get_decommissioned_template,
+)
 from excel_manager import excel_manager
 from handlers.debt import format_debt_response
 from core.models import extract_clean_inn, extract_fiscal_module
@@ -108,7 +115,7 @@ class HardwareIntentHandler:
 
         # B) Agar foydalanuvchi video katalogdagi biror aniq qo'llanmani so'rayotgan bo'lsa -> apparat nosozligi sifatida bloklamaslik!
         matching_video_id = catalog_manager.find_post_by_keywords(text)
-        if matching_video_id:
+        if matching_video_id and not is_device_issue(text):
             return False
 
         # C) Agar mijoz "qanday qilinadi", "qanday tuzataman", "qanday olaman" kabi operatsion savol bersa va video katalogda mavjud bo'lsa:
@@ -223,12 +230,7 @@ class HardwareIntentHandler:
         # 1-BOSQICH: INN ANIQLANMAGAN BO'LSA -> INN NI SO'RASH
         # =====================================================================
         if not remembered_id:
-            guide_msg = (
-                "🔍 <b>Apparat holati va qarzdorlikni tekshirish:</b>\n\n"
-                "Kassa apparatlari to'xtab qolishining asosiy sababi abonent yoki soliq to'lovidagi qarzdorlik bo'ladi.\n\n"
-                "Iltimos, birinchi navbatda korxonangizning <b>СТИР (INN) raqamini yuboring</b>."
-            )
-            guide_msg = adapt_to_user_script(guide_msg, user_script)
+            guide_msg = get_hardware_step1_inn_template(user_script)
             try:
                 await message.reply(guide_msg, parse_mode="HTML")
             except Exception:
@@ -242,12 +244,7 @@ class HardwareIntentHandler:
         if not results and excel_manager.is_decommissioned(remembered_id):
             decom_list = excel_manager.get_decommissioned(remembered_id)
             decom_org = decom_list[0].get("name", "") if decom_list else ""
-            decom_msg = (
-                f"ℹ️ <b>{decom_org}</b> korxonasi xizmat ko'rsatish bazasidan hisobdan chiqarilgan (o'chirilgan).\n"
-                f"Qarzdorlik hisoblanmaydi (0 so'm).\n\n"
-                f"Agar apparatni qayta faollashtirish kerak bo'lsa, «Usta kerak» yoki «Admin» deb yozing."
-            )
-            decom_msg = adapt_to_user_script(decom_msg, user_script)
+            decom_msg = get_decommissioned_template(decom_org, remembered_id, script=user_script)
             try:
                 await message.reply(decom_msg, parse_mode="HTML")
             except Exception:
@@ -310,30 +307,17 @@ class HardwareIntentHandler:
             ])
 
             if is_no_receipt:
-                clear_msg = (
-                    f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
-                    f"✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
-                    f"⚠️ <b>Agar apparatdan yangi chek chiqmayotgan yoki eski chek bo'lmasa:</b>\n"
-                    f"1️⃣ Avvalroq chiqarilgan istalgan <b>eski kassa chekining eng pastki qismiga</b> qarang (Fiskal modul seriya raqami o'zgarmaydi);\n"
-                    f"2️⃣ Yoki apparatning <b>orqa qismidagi nakleyka (yorliq)</b> / batareya ostidagi seriya raqamini rasmga olib yuboring;\n"
-                    f"3️⃣ Yoki apparat <b>ekranidagi ko'rinish / xatolikni</b> rasmga olib tashlang.\n\n"
-                    f"👨‍💻 <i>Yordam kerak bo'lsa, mutaxassisga yo'naltirish uchun «Usta kerak» deb yozing.</i>"
-                )
+                clear_msg = get_hardware_no_receipt_template(org_name, remembered_id, script=user_script)
             elif is_fm_what:
                 clear_msg = (
                     f"ℹ️ <b>Fiskal modul</b> — bu kassa apparatingiz ichidagi Davlat Soliq xizmati bilan ishlovchi chip.\n\n"
                     f"Uning seriya raqami kassa chekining eng pastki qismida bo'ladi (masalan: <code>LG420210630789</code>).\n"
                     f"Chekdan topolmasangiz, chekning pastki qismini rasmga olib yuborsangiz botimiz o'zi aniqlab tekshiradi."
                 )
+                clear_msg = adapt_to_user_script(clear_msg, user_script)
             else:
-                clear_msg = (
-                    f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
-                    f"✅ «Mars» oylik abonent to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
-                    f"🔍 <b>2-bosqich: Davlat Soliq (OFD) yillik litsenziyasini tekshirish</b>\n"
-                    f"🏛 Litsenziya muddatini tekshirishimiz uchun kassa chekining eng pastki qismidagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
-                )
+                clear_msg = get_hardware_step2_fm_template(org_name, remembered_id, script=user_script)
 
-            clear_msg = adapt_to_user_script(clear_msg, user_script)
             try:
                 await message.reply(clear_msg, parse_mode="HTML")
             except Exception:
@@ -409,37 +393,14 @@ class HardwareIntentHandler:
         last_photo = user_memory.get_last_photo(chat_id, user_id)
         kb = get_admin_contact_keyboard(inn=remembered_id)
         contacts_block = admin_manager.get_contacts_display(inn=remembered_id)
-
-        if last_photo:
-            # Rasm allaqachon mavjud -> barcha ma'lumotlar bilan birga zudlik bilan adminga uzatish
-            step3_msg = (
-                f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
-                f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
-                f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n"
-                f"✅ <b>Oylik to'lov:</b> To'langan (0 so'm)\n"
-                f"✅ <b>Yillik litsenziya:</b> Faol (Muddati joyida)\n\n"
-                f"👨‍💻 <b>Iltimos kuting, barcha ma'lumotlaringiz (INN, Fiskal modul va apparat rasmi) hududingiz bo'yicha mas'ul adminga yuborildi!</b>\n\n"
-                f"{contacts_block}\n\n"
-                f"Mas'ul ustamiz tez orada siz bilan bog'lanadi yoki quyidagi tugma orqali to'g'ridan-to'g'ri yozishingiz mumkin:"
-            )
-        else:
-            # Rasm hali olinmagan -> Ekran rasmini so'rash va internet/soat/reboot bo'yicha ko'rsatma berish
-            step3_msg = (
-                f"🟢 <b>To'lovlar bo'yicha hech qanday qarzdorlik yo'q!</b>\n\n"
-                f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{remembered_id}</code>)\n"
-                f"🏛 <b>Fiskal modul:</b> <code>{remembered_fm}</code>\n"
-                f"✅ <b>Oylik abonent to'lovi:</b> To'langan (0 so'm)\n"
-                f"✅ <b>Yillik Soliq (OFD) litsenziyasi:</b> Faol (Litsenziya muddati joyida)\n\n"
-                f"{contacts_block}\n\n"
-                f"📸 <b>Iltimos, apparat ekranidagi xatolik yozuvini rasmga olib yuboring!</b>\n\n"
-                f"📌 <i>Shuningdek tekshirib ko'ring:</i>\n"
-                f"1️⃣ <b>Internet aloqasi:</b> Wi-Fi yoki SIM-karta tarmog'i borligini;\n"
-                f"2️⃣ <b>Soat va sana:</b> Hozirgi aniq vaqt to'g'riligini;\n"
-                f"3️⃣ <b>Qayta yoqish:</b> Kassa apparatini o'chirib qayta yoqishni (Reboot).\n\n"
-                f"👨‍💻 <b>Rasm tashlashingiz bilan barcha ma'lumotlar hududingiz bo'yicha mas'ul adminga to'liq yetkaziladi!</b>"
-            )
-
-        step3_msg = adapt_to_user_script(step3_msg, user_script)
+        step3_msg = get_hardware_step3_clear_template(
+            org_name=org_name,
+            inn=remembered_id,
+            fm=remembered_fm,
+            contacts_block=contacts_block,
+            has_photo=bool(last_photo),
+            script=user_script
+        )
         try:
             await message.reply(step3_msg, parse_mode="HTML", reply_markup=kb)
         except Exception:

@@ -5,6 +5,15 @@ from aiogram import types, Bot
 from user_memory import user_memory
 from excel_manager import excel_manager
 from translit_manager import adapt_to_user_script
+from templates import (
+    get_p2p_warning,
+    get_invalid_digits_template,
+    get_incomplete_inn_template,
+    get_payment_claim_template,
+    get_yt_inn_warning,
+    get_single_account_warning,
+    get_due_date_template,
+)
 from core.models import (
     extract_clean_inn,
     extract_fiscal_module,
@@ -67,15 +76,7 @@ class BillingIntentHandler:
         # 0.7 16 xonali bank plastik karta raqami (masalan: 8600..., 9860...)
         card_num = extract_bank_card_number(text)
         if card_num:
-            card_msg = (
-                f"💳 <b>Kiritilgan karta raqami:</b> <code>{card_num}</code>\n\n"
-                "⚠️ <b>DIQQAT: To'lovlar kartadan-kartaga (P2P) qabul qilinmaydi!</b>\n\n"
-                "Onlayn-NKM apparatlari uchun to'lovlar faqat rasmiy tashkilotlarning <b>20 xonali bank hisob raqamlariga (X/R)</b> amalga oshiriladi.\n\n"
-                "🔹 <b>«Mars» oylik to'lovi:</b> Click / Payme ilovalarida «To'lovlar» bo'limida <b>«Mars Elektron Texnika»</b> xizmatini tanlab, INN kiritib to'lanadi;\n"
-                "🔹 <b>Davlat Soliq (OFD) yillik to'lovi:</b> Click / Payme orqali Soliq to'lovlari («Yangi Texnologiyalar») bo'limidan 440 000 so'm to'lanadi.\n\n"
-                "<i>Rasmiy to'lov rekvizitlarini olish uchun «Oylik shot» yoki «Yillik shot» deb yozing.</i>"
-            )
-            card_msg = adapt_to_user_script(card_msg, user_script)
+            card_msg = get_p2p_warning(card_num, user_script)
             try:
                 await message.reply(card_msg, parse_mode="HTML")
             except Exception:
@@ -138,16 +139,7 @@ class BillingIntentHandler:
         # 0.85 10..13 xonali noto'g'ri uzunlikdagi son kiritilganda
         invalid_len = is_invalid_digit_length(text)
         if invalid_len:
-            inv_msg = (
-                f"⚠️ <b>Kiritilgan raqam {invalid_len} xonali bo'lib, standart formatlarga to'g'ri kelmaydi.</b>\n\n"
-                "Iltimos, tekshiring:\n"
-                "🔹 <b>СТИР (INN):</b> aniq <b>9 xonali</b> son (masalan: <code>302568138</code>);\n"
-                "🔹 <b>JSHSHIR:</b> aniq <b>14 xonali</b> son (jismoniy shaxs / YaTT uchun);\n"
-                "🔹 <b>Telefon raqam:</b> 9 xonali (masalan: <code>901234567</code>);\n"
-                "🔹 <b>Fiskal modul:</b> 2 ta harf va raqamlar (masalan: <code>LG420210630789</code>).\n\n"
-                "Iltimos, raqamni to'g'rilab qayta yuboring."
-            )
-            inv_msg = adapt_to_user_script(inv_msg, user_script)
+            inv_msg = get_invalid_digits_template(invalid_len, user_script)
             try:
                 await message.reply(inv_msg, parse_mode="HTML")
             except Exception:
@@ -159,12 +151,7 @@ class BillingIntentHandler:
         # 0.9 Chala yoki noto'g'ri kiritilgan INN (masalan: "INN 12345" yoki faqat 1..8 xonali raqam "123")
         is_short_digits = text.isdigit() and 1 <= len(text) <= 8 and not extract_fiscal_module(text)
         if is_incomplete_inn_text(text) or is_short_digits:
-            incomplete_msg = (
-                "⚠️ <b>Kiritilgan СТИР (INN) raqami to'liq emas.</b>\n\n"
-                "Korxona INN raqami <b>9 xonali</b> (yoki JSHSHIR 14 xonali) bo'lishi kerak.\n"
-                "Iltimos, korxona INN raqamingizni to'liq tekshirib qayta yuboring (masalan: <code>302568138</code>)."
-            )
-            incomplete_msg = adapt_to_user_script(incomplete_msg, user_script)
+            incomplete_msg = get_incomplete_inn_template(user_script)
             try:
                 await message.reply(incomplete_msg, parse_mode="HTML")
             except Exception:
@@ -212,20 +199,7 @@ class BillingIntentHandler:
                 user_memory.set_last_fiscal_module(chat_id, user_id, claim_fm)
 
             last_rec = user_memory.get_last_receipt(chat_id, user_id)
-            if last_rec:
-                paid_prompt = (
-                    "ℹ️ <b>To'lov kvitansiyangiz qabul qilingan va tekshirish uchun mas'ul adminga yuborilgan.</b>\n\n"
-                    "Mutaxassislarimiz to'lovni tasdiqlab, apparatingizni tez orada ochib berishadi.\n"
-                    "📌 <i>Iltimos, apparatni o'chirib qayta yoqing (Перезагрузка) va kuting.</i>"
-                )
-            else:
-                paid_prompt = (
-                    "✅ <b>To'lov qilganingiz uchun tashakkur!</b>\n\n"
-                    "To'lovingizni tizimda zudlik bilan tasdiqlashimiz va apparatingizni faollashtirishimiz uchun "
-                    "<b>to'lov kvitansiyasini (Click, Payme skrinshoti yoki bank chekining rasmi/PDF)</b> shu yerga yuboring.\n\n"
-                    "Operatorlarimiz chekni ko'rib, apparatingizni tezkorlik bilan ochib berishadi."
-                )
-            paid_prompt = adapt_to_user_script(paid_prompt, user_script)
+            paid_prompt = get_payment_claim_template(has_receipt=bool(last_rec), script=user_script)
             try:
                 await message.reply(paid_prompt, parse_mode="HTML")
             except Exception:
@@ -243,13 +217,7 @@ class BillingIntentHandler:
 
         # 1.05 Agar mijoz «Yangi Texnologiyalar» DUK STIR raqamini (201589463) o'zining STIR raqami sifatida yuborgan bo'lsa
         if found_inn == YANGI_TEXNOLOGIYALAR_INN:
-            yt_inn_msg = (
-                f"⚠️ <b>Diqqat! Kiritilgan СТИР (<code>{YANGI_TEXNOLOGIYALAR_INN}</code>) — Davlat Soliq Qo'mitasi huzuridagi «Yangi Texnologiyalar» DUK ning STIR raqami hisoblanadi!</b>\n\n"
-                "Bu sizning korxonangiz STIR raqami emas (bu raqam to'lov rekvizitlarida qabul qiluvchi tashkilot STIRi sifatida yozilgan).\n\n"
-                "👉 <b>O'zingizning korxonangiz qarzini tekshirish uchun:</b> Korxonangiz guvohnomasidagi yoki kassa cheki yuqorisidagi <b>9 xonali STIR (INN)</b> raqamingizni yuboring.\n"
-                "👉 <b>Yillik Soliq (OFD) litsenziyasini tekshirish uchun:</b> Kassa chekining eng pastki qismidagi <b>Fiskal modul (LG..., YG...)</b> raqamini yuboring."
-            )
-            yt_inn_msg = adapt_to_user_script(yt_inn_msg, user_script)
+            yt_inn_msg = get_yt_inn_warning(YANGI_TEXNOLOGIYALAR_INN, user_script)
             try:
                 await message.reply(yt_inn_msg, parse_mode="HTML")
             except Exception:
@@ -296,17 +264,7 @@ class BillingIntentHandler:
             "битта ҳисоб", "битта хисоб", "битта шот", "битта карта", "бирга тўла", "бирга тола", "битта счёт"
         ])
         if single_account_query and any(w in lower_text for w in ["oylik", "yillik", "fiskal", "soliq", "ikkala", "ikki", "ҳам", "ham", "иккала", "to'lasam", "tolasam", "o'tkazsam", "otkazsam", "tashlasam", "tashvorsam", "tashlasak", "yuborsam"]):
-            single_warn = (
-                "❌ <b>Yo'q, mutlaqo bo'lmaydi!</b>\n\n"
-                "Oylik va yillik to'lovlar <b>ikkita alohida, mustaqil tashkilotga</b> to'lanadi:\n\n"
-                "1️⃣ <b>«Mars» oylik abonent to'lovi (100 000 so'm/oy):</b>\n"
-                "Kassa apparatiga servis xizmati ko'rsatish uchun <b>«Mars Elektron Texnika» MChJ</b> hisob raqamiga to'lanadi.\n\n"
-                "2️⃣ <b>Davlat Soliq (OFD) yillik litsenziyasi (440 000 so'm/yil):</b>\n"
-                "Fiskal modulning 1 yillik ishlash muddatini uzaytirish uchun to'g'ridan-to'g'ri Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> hisob raqamiga to'lanadi.\n\n"
-                "⚠️ <b>Agar ikkalasini bitta hisob raqamga to'lasangiz, Soliq tizimi litsenziyangizni uzaytirmaydi!</b> Har birini o'zining hisob raqamiga alohida to'lashingiz shart.\n\n"
-                "👇 <i>Quyida har ikkala tashkilotning alohida to'lov rekvizitlari yuborildi:</i>"
-            )
-            single_warn = adapt_to_user_script(single_warn, user_script)
+            single_warn = get_single_account_warning(user_script)
             try:
                 await message.reply(single_warn, parse_mode="HTML")
             except Exception:
@@ -326,13 +284,7 @@ class BillingIntentHandler:
             "oylik to'lov qachongacha", "oylik tolov qachongacha", "oylik qachongacha"
         ]
         if any(q in lower_text for q in due_date_queries):
-            due_msg = (
-                "📅 <b>«Mars» oylik abonent to'lovi muddati:</b>\n\n"
-                "🔹 Har oyning <b>6-sanasigacha</b> to'lanishi shart (100 000 so'm/oy).\n"
-                "⚠️ Agar 6-sanasigacha to'lanmasa, apparat tizim tomonidan avtomatik ravishda to'xtatiladi (bloklanadi).\n\n"
-                "🏛 <i>Davlat Soliq (OFD) yillik to'lovi esa har yili 1 marta (440 000 so'm) to'lanadi.</i>"
-            )
-            due_msg = adapt_to_user_script(due_msg, user_script)
+            due_msg = get_due_date_template(user_script)
             try:
                 await message.reply(due_msg, parse_mode="HTML")
             except Exception:
