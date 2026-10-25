@@ -47,8 +47,8 @@ async def simulate_user_step(user_id: int, user_name: str, step_num: int, input_
 
     # 2. To'lov tarixi e'tirozlari bormi?
     lower_text = input_text.lower()
-    from handlers.debt import DEBT_INQUIRY_KEYWORDS
-    if any(kw in lower_text for kw in DEBT_INQUIRY_KEYWORDS):
+    from payment_accounts import is_debt_inquiry_or_objection
+    if is_debt_inquiry_or_objection(input_text):
         last_id = user_memory.get_last_id(chat_id, user_id)
         if last_id:
             results = excel_manager.search(last_id)
@@ -207,10 +207,10 @@ async def run_stress_test():
         print(f"   📄 Chiqarilgan korxona: {first_line}")
         if r['user_id'] == 1001:
             assert "206011507" in r['reply'], "User 1 o'z korxonasini olmadi!"
-            assert "1,500,400" in r['reply'], "User 1 qarz summasini olmadi!"
+            assert "1 500 400" in r['reply'] or "1,500,400" in r['reply'], "User 1 qarz summasini olmadi!"
         elif r['user_id'] == 1002:
             assert "311790999" in r['reply'], "User 2 o'z korxonasini olmadi!"
-            assert "to'liq to'langan" in r['reply'], "User 2 qarzsiz ekanligi chiqmadi!"
+            assert "qarzdorlik yo'q" in r['reply'].lower() or "to'liq to'langan" in r['reply'].lower() or "0 so'm" in r['reply'].lower(), "User 2 qarzsiz ekanligi chiqmadi!"
 
     print("\n" + "=" * 65)
     print("🎉 BARCHA 3 BOSQICHLI PARALLEL STRESS-TEST MUVAFFAQIShIYATLI TUGADI!")

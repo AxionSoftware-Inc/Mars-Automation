@@ -34,7 +34,7 @@ def test_device_facts_auto_redirect_receipt():
     assert decision.action != ActionType.ASK_FULL_SCREEN, "XATOLIK: Kvitansiyaga soat yo'q deb javob berildi!"
     assert decision.action == ActionType.RECEIPT_PROCESSED, f"Kvitansiya sifatida qabul qilinmadi: {decision.action}"
     assert "soat va internet belgisi" not in (decision.reply_text or "")
-    assert "To'lov qabul qilindi" in (decision.reply_text or "")
+    assert "qabul qilindi" in (decision.reply_text or "").lower()
     logger.info("✅ Kvitansiya avtomatik aniqlanib, qarz solishtirildi va soat so'ralmadi!")
 
 

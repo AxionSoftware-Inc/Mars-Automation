@@ -287,7 +287,7 @@ def get_yt_inn_warning(inn: str = "201589463", script: str = "latin") -> str:
 def get_incomplete_inn_template(script: str = "latin") -> str:
     """To'liq kiritilmagan INN uchun eslatma"""
     text = (
-        "⚠️ <b>Korxona INN raqami 9 xonali (JSHSHIR 14 xonali) bo'lishi kerak.</b>\n"
+        "⚠️ <b>Kiritilgan raqam to'liq emas. Korxona INN raqami 9 xonali (JSHSHIR 14 xonali) bo'lishi kerak.</b>\n"
         "Masalan: <code>302568138</code>"
     )
     return adapt_to_user_script(text, script)
@@ -360,7 +360,7 @@ def get_payment_claim_template(has_receipt: bool = False, script: str = "latin")
 def get_receipt_ack_template(is_recent_dup: bool = False, missing_inn: bool = False, script: str = "latin") -> str:
     """Kvitansiya qabul qilinganda foydalanuvchiga bildirishnoma"""
     if is_recent_dup:
-        text = "ℹ️ <b>Ushbu kvitansiya avval qabul qilingan va adminga yuborilgan.</b>"
+        text = "ℹ️ <b>Ushbu kvitansiya avval ham tizimga yuborilgan va adminga yetkazilgan.</b>"
     elif missing_inn:
         text = (
             "🧾 <b>Kvitansiyangiz qabul qilindi.</b>\n\n"
@@ -377,14 +377,21 @@ def get_receipt_ack_template(is_recent_dup: bool = False, missing_inn: bool = Fa
 
 def get_hardware_step1_inn_template(script: str = "latin") -> str:
     """1-bosqich: INN so'rash"""
-    text = "🔍 <b>Kassa apparati holatini tekshirish uchun korxonangiz СТИР (INN) raqamini yuboring.</b>"
+    text = "🔍 <b>Kassa apparati holatini tekshirish uchun korxonangiz СТИР (INN) raqamini (yoki chekdagi Fiskal modul LG/YG seriyasini) yuboring.</b>"
     return adapt_to_user_script(text, script)
 
 
-def get_hardware_step2_fm_template(org_name: str, inn: str, script: str = "latin") -> str:
+def get_hardware_step2_fm_template(org_name: str, inn: str, device_model: str = "", script: str = "latin") -> str:
     """2-bosqich: Oylik qarz yo'q bo'lsa, Fiskal modul so'rash"""
+    if not device_model and inn:
+        from excel_manager import excel_manager
+        recs = excel_manager.search(inn)
+        if recs:
+            device_model = excel_manager.get_device_model_summary(recs)
+    model_line = f"📟 <b>Apparat:</b> {device_model}\n" if device_model else ""
     text = (
         f"🏢 <b>Korxona:</b> {org_name} (INN: <code>{inn}</code>)\n"
+        f"{model_line}"
         f"✅ «Mars» oylik to'lovidan qarzdorlik yo'q (0 so'm).\n\n"
         f"🏛 Yillik Soliq litsenziyasini tekshirish uchun chekdagi <b>Fiskal modul raqamini (LG... yoki YG...)</b> yuboring."
     )

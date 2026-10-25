@@ -125,7 +125,8 @@ async def test_unknown_question_admin_escalation():
         logger.info(f"✅ generate_ai_reply_ex needs_admin=True qaytardi va tegni tozaladi: '{reply}'")
 
     # 2. handle_user_chat orqali real eskalatsiya chaqiruvini tekshiramiz
-    with patch("handlers.chat.generate_ai_reply_ex", return_value=("Kechirasiz, menda bu haqda aniq ma'lumot yo'q. Mutaxassisga yubordim.", None, True)), \
+    with patch("handlers.chat.generate_ai_reply_ex_async", new_callable=AsyncMock, return_value=("Kechirasiz, menda bu haqda aniq ma'lumot yo'q. Mutaxassisga yubordim.", None, True)), \
+         patch("handlers.chat.generate_ai_reply_ex", return_value=("Kechirasiz, menda bu haqda aniq ma'lumot yo'q. Mutaxassisga yubordim.", None, True)), \
          patch("admin_manager.admin_manager.notify_user_query_escalation", new_callable=AsyncMock) as mock_notify:
         
         msg = MockMessage(101, user, chat, "Menda umuman boshqa dastur bor, shuni ulab berasizlarmi?")

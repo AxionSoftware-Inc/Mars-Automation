@@ -147,6 +147,8 @@ class TransactionTracker:
         if parsed_date:
             days_ago = (now_uzb.date() - parsed_date.date()).days
             if days_ago >= 1:
+                if parsed_date.year < current_year:
+                    return True, f"Eski kvitansiya: o'tgan yilgi ({target_str}, {days_ago} kun oldingi)"
                 return True, f"Eski kvitansiya: sanasi {target_str} ({days_ago} kun oldingi)"
             return False, None
 

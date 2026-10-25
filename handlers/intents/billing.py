@@ -624,7 +624,7 @@ class BillingIntentHandler:
                     status_header = "\n\n".join(lines)
                     user_memory.set_last_topic(chat_id, user_id, "monthly_debt_exists" if has_any_debt else "monthly_debt_clear")
                 else:
-                    remembered_id = explicit_inn or user_memory.get_last_id(chat_id, user_id)
+                    remembered_id = explicit_inn or user_memory.get_last_id(chat_id, user_id, allow_fallback=True)
                     if remembered_id:
                         excel_res = excel_manager.search(remembered_id)
                         real_monthly_debt = sum(item.get("debt", 0.0) for item in excel_res) if excel_res else 0.0

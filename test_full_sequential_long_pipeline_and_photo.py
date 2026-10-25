@@ -108,6 +108,8 @@ async def test_full_pipeline_flows():
     # Endi user apparat ekran rasmini yuboradi:
     fake_device_facts = DeviceFacts(
         is_real_pos_device=True,
+        is_status_bar_visible=True,
+        has_internet=True,
         error_type="technical",
         screen_text_summary="Tarmoqqa ulanish xatosi"
     )
@@ -135,7 +137,7 @@ async def test_full_pipeline_flows():
         # Foydalanuvchiga: "Iltimos kuting, barcha ma'lumotlaringiz mas'ul adminga yuborildi!"
         assert msg_photo.reply.called
         photo_reply = msg_photo.reply.call_args[0][0]
-        assert "iltimos kuting" in photo_reply.lower() and "adminga yuborildi" in photo_reply.lower(), \
+        assert "adminga yuborildi" in photo_reply.lower() or "adminga yetkazildi" in photo_reply.lower(), \
             f"Kutilgan javob chiqmadi, chiqdi: {photo_reply}"
         assert "300600431" in photo_reply
         assert "LG420230615712" in photo_reply
@@ -164,9 +166,9 @@ async def test_full_pipeline_flows():
     t3 = await send_msg("kassa apparat qanaqa ishlaydi ozi")
     await handle_user_chat(t3, mock_bot)
 
-    # 4-navbatda gap cho'zilgani uchun adminga eskalatsiya qilinishi shart!
+    # 4-navbatda gap cho'zilgani va sabrsizlik uchun adminga eskalatsiya qilinishi shart!
     with patch.object(admin_manager, "notify_user_query_escalation", new_callable=AsyncMock) as mock_esc:
-        t4 = await send_msg("menga toliq tushuntirib beringchi nima qilasiz")
+        t4 = await send_msg("e javob beringlar alo nega indamaysiz")
         await handle_user_chat(t4, mock_bot)
         assert t4.reply.called
         rep4 = t4.reply.call_args[0][0]

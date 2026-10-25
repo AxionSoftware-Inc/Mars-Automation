@@ -34,7 +34,7 @@ async def run_tests():
         # 2. Admin inline tugmalari berilganini tekshirish
         assert "reply_markup" in reply_call[1]
         assert reply_call[1]["reply_markup"] is not None
-        assert "quvonchbek_admin" in reply_call[1]["reply_markup"].inline_keyboard[0][0].url
+        assert any(adm in btn[0].url for adm in ["quvonchbek_admin", "BIM_Project_Manager", "Yashnarbek_butaev"] for btn in reply_call[1]["reply_markup"].inline_keyboard)
 
         # 3. Adminga xabarnoma borganini tekshirish
         assert mock_admin_notify.called

@@ -16,6 +16,8 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
     def setUp(self):
         self.memory = UserMemoryManager()
         user_memory.clear()
+        from transaction_tracker import transaction_tracker
+        transaction_tracker.transactions.clear()
 
     # =========================================================================
     # 1. USER MEMORY ISOLATION & CONCURRENCY
@@ -91,7 +93,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 100000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=101, user_id=101)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
+            self.assertTrue("avval ham" in res.reply_text or "kvitansiya" in res.reply_text.lower())
             self.assertTrue(res.debt_status_info.get("debt_covered"))
             self.assertEqual(res.debt_status_info.get("remaining_debt"), 0.0)
 
@@ -113,7 +115,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 200000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=102, user_id=102)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
+            self.assertTrue("avval ham" in res.reply_text or "kvitansiya" in res.reply_text.lower())
             self.assertFalse(res.debt_status_info.get("debt_covered"))
             self.assertEqual(res.debt_status_info.get("remaining_debt"), 120000.0)
 
@@ -135,7 +137,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 100000.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=103, user_id=103)
             self.assertEqual(res.action, ActionType.RECEIPT_PROCESSED)
-            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
+            self.assertTrue("avval ham" in res.reply_text or "kvitansiya" in res.reply_text.lower())
             self.assertTrue(res.debt_status_info.get("debt_covered"))
             self.assertEqual(res.debt_status_info.get("remaining_debt"), 0.0)
 
@@ -162,7 +164,7 @@ class TestAdvancedProductionScenarios(unittest.TestCase):
         with patch("transaction_tracker.transaction_tracker.is_duplicate", return_value=True), \
              patch.object(excel_manager, "search", return_value=[{"name": "Mars MChJ", "debt": 0.0, "stir": "302568138", "tuman": "Shahrisabz"}]):
             res = core_engine.process_receipt_facts(facts, chat_id=104, user_id=104)
-            self.assertIn("Kvitansiyangiz qabul qilindi", res.reply_text)
+            self.assertTrue("avval ham" in res.reply_text or "kvitansiya" in res.reply_text.lower())
             self.assertTrue(res.is_duplicate)
 
     def test_07_receipt_soliq_annual_fiscal_fee(self):

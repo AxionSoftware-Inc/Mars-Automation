@@ -131,7 +131,6 @@ class CoreEngine:
 
         # Agar INN topilmagan bo'lsa, ekran yozuvidan (kassa/terminal raqami yoki INN) qidirish
         if not target_inn and facts.screen_text_summary:
-            import re
             inn_in_text = extract_clean_inn(facts.screen_text_summary)
             if inn_in_text:
                 target_inn = inn_in_text
@@ -167,6 +166,30 @@ class CoreEngine:
                 res = excel_manager.search(target_inn)
                 if res and any(bool(item.get("is_p3", False)) for item in res):
                     is_p3_device = True
+            elif not facts.is_status_bar_visible and error_manager.match_error(match_payload):
+                is_p3_device = True
+
+        # Maxsus holat: Jiddiy apparat nosozligi (Tamper detected / jismoniy buzilish)
+        # Bunday holatda apparat bloklanadi va faqat servis markazida usta tomonidan tuzatiladi
+        matched_fatal = error_manager.match_error(match_payload)
+        if facts.error_type == "hardware_tamper" or (matched_fatal and matched_fatal.get("id") == "fatal_hardware_damage"):
+            rule_text = (matched_fatal.get("response_text") if matched_fatal else "") or "🚨 <b>TAMPER DETECTED — Apparat xavfsizlik datchigi qulflangan!</b>"
+            escalation_reply = (
+                f"{rule_text}\n\n"
+                f"👨‍💻 <b>Ushbu masala bo'yicha ma'lumotlar bosh administratorimizga (@Yashnarbek_butaev) hamda ustalariga yetkazildi.</b> "
+                f"Mutaxassislarimiz tez orada siz bilan bog'lanishadi.\n\n"
+                f"{admin_manager.get_contacts_display()}"
+            )
+            return DecisionResult(
+                action=ActionType.ESCALATE_TO_ADMIN,
+                reply_text=escalation_reply,
+                video_id=None,
+                detected_inn=target_inn,
+                should_notify_admin=True,
+                admin_alert_type="tech_issue",
+                admin_alert_text=f"Apparat jiddiy xatosi (Tamper): {facts.screen_text_summary or 'hardware_tamper'}",
+                log_reason="Fatal hardware damage / Tamper detected requires direct admin escalation"
+            )
 
         # A) P3 HUMO APPARATI (Sariq qator):
         # P3 apparat ekranida aniq gap chiqadi ("p3 bo'lsa mayli uni ekranida aniq yozuv chiqadi")
@@ -223,6 +246,15 @@ class CoreEngine:
                 video_id=p3_video_id,
                 detected_inn=target_inn,
                 log_reason="P3 Humo screen handled"
+            )
+
+        # Smart One apparatida tanish xato kodi bo'lmasa, status bar ko'rinmasa va hali FM tekshirilmagan bo'lsa -> To'liq ekran so'rash
+        if not facts.is_status_bar_visible and not target_fm and not error_manager.match_error(match_payload):
+            return DecisionResult(
+                action=ActionType.ASK_FULL_SCREEN,
+                reply_text=INCOMPLETE_SCREEN_REPLY,
+                detected_inn=target_inn,
+                log_reason="Status bar invisible on Smart One"
             )
 
         # B) SMART ONE (VA BOSHQA BARCHA APPARATLAR):
@@ -598,7 +630,7 @@ class CoreEngine:
             remaining_debt = effective_prev_debt
 
         # Foydalanuvchiga oddiy, sodda va qisqa javob qaytarish:
-        user_reply = get_receipt_ack_template(is_recent_dup=is_recent_dup)
+        user_reply = get_receipt_ack_template(is_recent_dup=(is_recent_dup or facts.is_duplicate))
 
         # Xotirada pending receiptni tozalash (MUHIM: mijozning kunlik Exceldagi qarzini va avvalgi INNsini buzmaslik!)
         user_memory.clear_pending_receipt(chat_id, user_id)

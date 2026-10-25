@@ -172,7 +172,7 @@ class TestChatHandlerStrictFlow(unittest.IsolatedAsyncioTestCase):
 
         msg.reply.assert_called_once()
         sent_text = msg.reply.call_args[0][0]
-        self.assertIn("СТИР (INN) raqamini yuboring", sent_text)
+        self.assertTrue("СТИР (INN) raqamini" in sent_text and "yuboring" in sent_text)
 
     async def test_reboot_failed_escalates_to_master_with_saved_photo(self):
         """Rebootdan keyin 'ishlamadi baribir usta kerak' deyilsa, adminga avval saqlangan rasm bilan eskalatsiya qilinadi!"""

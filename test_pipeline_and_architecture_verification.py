@@ -97,23 +97,23 @@ async def run_pipeline_verification():
         assert "faol holatda" in fm_reply or "OFD" in fm_reply, f"OFD javobi chiqmadi: {fm_reply}"
         logger.info("✅ 2.D Fiskal modul orqali Yillik Soliq litsenziyasi tekshirildi!")
 
-    logger.info("\n=== 3. 2-BOSQICH: QARZDORLIK BO'LMAGANDA TEXNIK DIAGNOSTIKA & REBOOT ===")
-    # Qarzdorliklar to'liq tekshirilgan va yo'q:
-    msg_hardware = create_fake_message("apparat ishlamayapti", chat_id, user_id)
-    await handle_user_chat(msg_hardware, bot)
-    hw_reply = msg_hardware.reply.call_args[0][0]
-    assert ("internet" in hw_reply.lower() or "reboot" in hw_reply.lower() or "перезагрузка" in hw_reply.lower()), f"Reboot/Internet ko'rsatmasi berilmadi: {hw_reply}"
-    logger.info("✅ 3. Qarzdorlik yo'q bo'lganda 1-urinishda Internet/Soat va Reboot tavsiya qilindi!")
+        logger.info("\n=== 3. 2-BOSQICH: QARZDORLIK BO'LMAGANDA TEXNIK DIAGNOSTIKA & REBOOT ===")
+        # Qarzdorliklar to'liq tekshirilgan va yo'q:
+        msg_hardware = create_fake_message("apparat ishlamayapti", chat_id, user_id)
+        await handle_user_chat(msg_hardware, bot)
+        hw_reply = msg_hardware.reply.call_args[0][0]
+        assert ("internet" in hw_reply.lower() or "reboot" in hw_reply.lower() or "перезагрузка" in hw_reply.lower()), f"Reboot/Internet ko'rsatmasi berilmadi: {hw_reply}"
+        logger.info("✅ 3. Qarzdorlik yo'q bo'lganda 1-urinishda Internet/Soat va Reboot tavsiya qilindi!")
 
-    logger.info("\n=== 4. 2-BOSQICH (TEZKOR ESKALATSIYA): 1 URINISHDAN SO'NG TEZDA ADMINGA YO'NALTIRISH ===")
-    # Foydalanuvchi: "ishlamadi" deb yozdi. Bot takrorlamasligi va darhol eskalatsiya qilishi shart!
-    with patch("admin_manager.admin_manager.notify_user_query_escalation", new=AsyncMock()) as mock_admin_notify:
-        msg_unresolved = create_fake_message("ishlamadi baribir", chat_id, user_id)
-        await handle_user_chat(msg_unresolved, bot)
-        unresolved_reply = msg_unresolved.reply.call_args[0][0]
-        assert ("administrator" in unresolved_reply.lower() or "usta" in unresolved_reply.lower() or "bog'laymiz" in unresolved_reply.lower() or "yetkazildi" in unresolved_reply.lower()), f"Adminga eskalatsiya qilinmadi: {unresolved_reply}"
-        assert mock_admin_notify.called, "Admin managerga xabarnoma yuborilmadi!"
-        logger.info("✅ 4. 'Ishlamadi' deyilganda ko'p cho'zmasdan TEZDA adminga va ustaga eskalatsiya qilindi!")
+        logger.info("\n=== 4. 2-BOSQICH (TEZKOR ESKALATSIYA): 1 URINISHDAN SO'NG TEZDA ADMINGA YO'NALTIRISH ===")
+        # Foydalanuvchi: "ishlamadi" deb yozdi. Bot takrorlamasligi va darhol eskalatsiya qilishi shart!
+        with patch("admin_manager.admin_manager.notify_user_query_escalation", new=AsyncMock()) as mock_admin_notify:
+            msg_unresolved = create_fake_message("ishlamadi baribir", chat_id, user_id)
+            await handle_user_chat(msg_unresolved, bot)
+            unresolved_reply = msg_unresolved.reply.call_args[0][0]
+            assert ("administrator" in unresolved_reply.lower() or "usta" in unresolved_reply.lower() or "bog'laymiz" in unresolved_reply.lower() or "yetkazildi" in unresolved_reply.lower()), f"Adminga eskalatsiya qilinmadi: {unresolved_reply}"
+            assert mock_admin_notify.called, "Admin managerga xabarnoma yuborilmadi!"
+            logger.info("✅ 4. 'Ishlamadi' deyilganda ko'p cho'zmasdan TEZDA adminga va ustaga eskalatsiya qilindi!")
 
     logger.info("\n=== 5. DISK PERSISTENCE: PENDING RECEIPT TESTI ===")
     fake_receipt = {

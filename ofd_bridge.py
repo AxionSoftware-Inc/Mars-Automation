@@ -37,6 +37,7 @@ class OFDBridgeManager:
         self.ofd_username: str = DEFAULT_OFD_USERNAME
         self.ofd_group_id: Optional[int] = None
         self._query_lock = asyncio.Lock()
+        self._client_lock = asyncio.Lock()
         self._active_collector: Optional[Dict[str, Any]] = None
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._telethon_client = None
@@ -274,7 +275,7 @@ class OFDBridgeManager:
         """Telethon mijozini olish yoki ulash (lock bilan xavfsiz singleton)"""
         if not self.has_user_session():
             return None
-        async with self._query_lock:
+        async with self._client_lock:
             if self._telethon_client is not None:
                 try:
                     if self._telethon_client.is_connected():

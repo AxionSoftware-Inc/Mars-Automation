@@ -102,14 +102,14 @@ class AdminManager:
     def is_admin(self, user_id: int, username: Optional[str] = None) -> bool:
         """Foydalanuvchi admin yoki hududiy texnik ekanligini tekshirish"""
         from modules.admin_module import regional_admin_service
-        if user_id in self.admin_ids or user_id in regional_admin_service.get_all_admin_telegram_ids():
-            return True
         if username:
             clean_u = username.lower().replace("@", "")
             if clean_u in self.admin_usernames or clean_u in regional_admin_service.get_all_admin_usernames():
                 self.check_and_register_username(user_id, username)
                 regional_admin_service.register_user_id_by_username(user_id, username)
                 return True
+        if user_id in self.admin_ids or user_id in regional_admin_service.get_all_admin_telegram_ids():
+            return True
         return False
 
     def check_and_register_username(self, user_id: int, username: str):
@@ -153,7 +153,11 @@ class AdminManager:
     def get_contacts_display(self, inn: Optional[str] = None, tuman: Optional[str] = None) -> str:
         """Foydalanuvchilarga ko'rsatish uchun hududiy mas'ul xodim va kontaktlar matni"""
         from modules.admin_module import regional_admin_service
-        return regional_admin_service.format_user_facing_admin_info(inn=inn, tuman=tuman)
+        base_info = regional_admin_service.format_user_facing_admin_info(inn=inn, tuman=tuman)
+        if self.contacts:
+            extra = "\n".join(f"👨‍💻 {c['name']} ({c.get('role', 'Mutaxassis')}): {c['phone']}" for c in self.contacts)
+            return f"{base_info}\n\n{extra}"
+        return base_info
 
     def get_region_admin_info(self, inn: Optional[str] = None, tuman: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Berilgan INN yoki tuman bo'yicha hududiy admin ma'lumotlarini olish"""
@@ -320,7 +324,7 @@ class AdminManager:
         fraud_header = ""
         if is_dup:
             tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
-            fraud_header += f"🚨 <b>OGOHLANTIRISH: DUBLIKAT TRANZAKSIYA!</b>\nUshbu chek (ID: <code>{tx_id}</code>) avval ham tizimga yuborilgan!\n\n"
+            fraud_header += f"🚨 <b>DUBLIKAT TRANZAKSIYA (ID: <code>{tx_id}</code>)</b>\nUshbu chek avval ham tizimga yuborilgan!\n\n"
         if is_old:
             fraud_header += f"⚠️ <b>DIQQAT: ESKI KVITANSIYA! ({warn})</b>\n\n"
         if inn_mismatch:
@@ -362,7 +366,7 @@ class AdminManager:
         fraud_header = ""
         if is_dup:
             tx_id = getattr(receipt_facts, "transaction_id", "") or "-"
-            fraud_header += f"🚨 <b>DUBLIKAT CHEK (ID: <code>{tx_id}</code>)</b>\n"
+            fraud_header += f"🚨 <b>DUBLIKAT TRANZAKSIYA (ID: <code>{tx_id}</code>)</b>\n"
         if is_old:
             fraud_header += f"⚠️ <b>ESKI KVITANSIYA ({warn})</b>\n"
         if inn_mismatch:
@@ -427,6 +431,7 @@ class AdminManager:
                 f"{fraud_header}"
                 f"👤 {user_link} ({user_username})\n"
                 f"💵 <b>To'langan:</b> <b>{paid_amount:,.0f} so'm</b>\n"
+                f"{purpose_line}"
                 f"{date_line}"
                 f"🏢 <b>{org_name_esc}</b> (INN: {inn_line})\n"
                 f"{tuman_line}"
@@ -492,10 +497,10 @@ class AdminManager:
         from user_memory import user_memory
         from excel_manager import excel_manager
 
-        user_id = user.id if user else 0
-        user_name = user.full_name if user else "Mijoz"
+        user_id = getattr(user, "id", 0) if user else 0
+        user_name = getattr(user, "full_name", None) or getattr(user, "first_name", "Mijoz")
         user_name_esc = html.escape(user_name)
-        user_username = f"@{user.username}" if (user and user.username) else "Mavjud emas"
+        user_username = f"@{user.username}" if (user and getattr(user, "username", None)) else "Mavjud emas"
         user_link = f'<a href="tg://user?id={user_id}">{user_name_esc}</a>' if user_id else user_name_esc
 
         # Sessiyadan yetishmayotgan ma'lumotlarni to'ldirish

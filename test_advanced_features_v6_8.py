@@ -1,6 +1,8 @@
 import os
 import asyncio
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from unittest.mock import AsyncMock, MagicMock
 from aiogram.enums import ChatType
 
@@ -64,7 +66,8 @@ def test_transaction_tracker_duplicate_and_old_date():
     assert is_old_60 is True
 
     # Bugungi chek
-    is_fresh, warn_fresh = tracker.check_old_receipt("2026-10-10 12:00")
+    today_str = datetime.now(ZoneInfo("Asia/Tashkent")).strftime("%Y-%m-%d %H:%M")
+    is_fresh, warn_fresh = tracker.check_old_receipt(today_str)
     assert is_fresh is False
     assert warn_fresh is None
     logger.info("✅ Dublikat va eski kvitansiya tekshiruvi to'liq to'g'ri ishlamoqda!")
@@ -141,7 +144,7 @@ def test_core_engine_repair_purpose_and_duplicate():
 
     assert decision.action == ActionType.RECEIPT_PROCESSED
     assert decision.payment_purpose == "repair"
-    assert "ta'miri" in decision.reply_text
+    assert "ta'miri" in (decision.purpose_label or decision.reply_text).lower()
     assert decision.tuman is not None
 
     # Qayta yuborilganda dublikat aniqlanishi kerak

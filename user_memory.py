@@ -275,10 +275,13 @@ class UserMemoryManager:
         session = self._get_or_create_session(chat_id, user_id)
         return session.get("annual_status") or self._fallback_from_group(chat_id, "annual_status", user_id)
 
-    def get_last_id(self, chat_id: int, user_id: int) -> Optional[str]:
+    def get_last_id(self, chat_id: int, user_id: int, allow_fallback: bool = False) -> Optional[str]:
         """Foydalanuvchining oxirgi INN/JSHSHIR raqamini olish"""
         session = self._get_or_create_session(chat_id, user_id)
-        return session.get("last_id") or self._fallback_from_group(chat_id, "last_id", user_id)
+        val = session.get("last_id")
+        if not val and allow_fallback:
+            return self._fallback_from_group(chat_id, "last_id", user_id)
+        return val
 
     def get_org_name(self, chat_id: int, user_id: int) -> Optional[str]:
         session = self._get_or_create_session(chat_id, user_id)
@@ -339,9 +342,11 @@ class UserMemoryManager:
                     return True
         return False
 
-    def get_last_receipt(self, chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_last_receipt(self, chat_id: int, user_id: int, allow_fallback: bool = False) -> Optional[Dict[str, Any]]:
         session = self._get_or_create_session(chat_id, user_id)
-        res = session.get("last_receipt") or self._fallback_from_group(chat_id, "last_receipt", user_id)
+        res = session.get("last_receipt")
+        if not res and allow_fallback:
+            res = self._fallback_from_group(chat_id, "last_receipt", user_id)
         if res and isinstance(res, dict):
             # Sessiya muddati (30 daqiqa) dan ortiq o'tgan bo'lsa, eskirgan deb hisoblanadi
             ts = res.get("timestamp", 0)

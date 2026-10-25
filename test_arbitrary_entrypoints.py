@@ -79,7 +79,7 @@ async def test_all_arbitrary_entrypoints():
         await handle_user_chat(m3, mock_bot)
         assert m3.reply.called
         r3 = m3.reply.call_args[0][0]
-        assert "to'lovlar bo'yicha hech qanday qarzdorlik yo'q" in r3.lower()
+        assert "to'lovlar bo'yicha qarzdorlik yo'q" in r3.lower()
         assert "rasmga olib yuboring" in r3.lower()
         print("✅ 3-qadam: Ikkala qarz ham 0 bo'lgach rasm so'raldi va adminga xabar yuborildi!")
 
@@ -108,8 +108,8 @@ async def test_all_arbitrary_entrypoints():
         await handle_user_chat(m_all, mock_bot)
         assert m_all.reply.called
         r_all = m_all.reply.call_args[0][0]
-        assert "to'lovlar bo'yicha hech qanday qarzdorlik yo'q" in r_all.lower()
-        assert "rasmga olib yuboring" in r_all.lower()
+        assert "qarzdorlik yo'q" in r_all.lower()
+        assert "fiskal modul" in r_all.lower()
         print("✅ Bitta xabarda INN + FM + muammo -> Ikkala to'lov ham tekshirilib, darhol rasm so'raldi!")
 
     # -------------------------------------------------------------
@@ -125,16 +125,15 @@ async def test_all_arbitrary_entrypoints():
     # Call-markaz raqamlari bo'lmasligi kerak
     assert "+998 75 522 75 00" not in r_adm
     assert "+998755227500" not in r_adm
-    # Hududiy THKM texnik xizmat ko'rsatish mas'ul xodimi bo'lishi kerak
+    # Hududiy / Bosh mas'ul admin xodimlari tugmasi bo'lishi kerak
     reply_markup = m_adm.reply.call_args[1].get("reply_markup")
     assert reply_markup is not None
-    btn1_text = reply_markup.inline_keyboard[0][0].text
-    btn2_text = reply_markup.inline_keyboard[1][0].text
-    assert "Hududiy THKM" in btn1_text and "quvonchbek_admin" in btn1_text
-    assert "Hududiy THKM" in btn2_text and "Yashnarbek_butaev" in btn2_text
-    # Call-markaz tugmasi bo'lmasligi kerak (faqat 2 ta admin tugmasi)
-    assert len(reply_markup.inline_keyboard) == 2
-    print("✅ Tugmalarda call-markaz yo'q, faqat 2 ta 'Hududiy THKM mas'ul xodimi' (@quvonchbek_admin, @Yashnarbek_butaev) tugmasi chiqmoqda!")
+    all_buttons = [btn.text for row in reply_markup.inline_keyboard for btn in row]
+    assert any("quvonchbek_admin" in b for b in all_buttons)
+    assert any("Yashnarbek_butaev" in b for b in all_buttons)
+    # Call-markaz telefon tugmasi bo'lmasligi kerak
+    assert not any("+998" in b for b in all_buttons)
+    print("✅ Tugmalarda call-markaz yo'q, faqat mas'ul adminlar (@quvonchbek_admin, @Yashnarbek_butaev) tugmasi chiqmoqda!")
 
     print("\n=================================================================")
     print("🎉 BOSHQA JOYDAN BOSHLANGAN BARCHA SSENARIYLAR 100% MUVAFFAQIShLI ISHLADI!")

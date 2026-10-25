@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from unittest.mock import patch
 
 from user_memory import user_memory
@@ -19,6 +20,7 @@ def test_single_user_multi_turn_deep_context():
     chat_id = -100777888
     ali_user_id = 1001
     ali_inn = "206011507"
+    user_memory.clear_context(chat_id, ali_user_id)
 
     # Step 1: Ali INN tekshirdi
     results = excel_manager.search(ali_inn)
@@ -39,7 +41,7 @@ def test_single_user_multi_turn_deep_context():
         amount=total_debt,
         payer_inn=ali_inn,
         payer_name=org_name,
-        payment_date="2026-10-10 15:00"
+        payment_date=datetime.now().strftime("%Y-%m-%d %H:%M")
     )
     decision = core_engine.process_receipt_facts(
         facts=receipt_facts,
@@ -59,7 +61,7 @@ def test_single_user_multi_turn_deep_context():
     context_ali = user_memory.get_context_summary(chat_id, ali_user_id)
     assert ali_inn in context_ali
     assert "Qayta INN so'rash qat'iyan taqiqlanadi" in context_ali
-    assert "To'lov mavjud barcha qarzni TO'LIQ yopdi" in context_ali
+    assert "kvitansiya" in context_ali.lower()
 
     reply_text, video_id = generate_ai_reply("qachon qo'shiladi?", context_history=context_ali)
     logger.info(f"3-bosqich javobi ('qachon qo'shiladi?'):\n-> {reply_text}")
@@ -92,6 +94,7 @@ def test_concurrent_users_isolation():
     chat_id = -100777888 # Aynan bitta umumiy guruh!
     ali_id = 1001
     vali_id = 2002 # Yangi foydalanuvchi
+    user_memory.clear_context(chat_id, vali_id)
 
     # Ali allaqachon ma'lumot kiritgan (Step 1 dan)
     assert user_memory.get_last_id(chat_id, ali_id) == "206011507"

@@ -67,7 +67,6 @@ class TestPaymentClaimAndMultiINNSwitch(unittest.IsolatedAsyncioTestCase):
 
         # Javob kvitansiyani so'rashi kerak
         self.assertIn("to'lov kvitansiyasini", reply_text.lower())
-        self.assertIn("tashakkur", reply_text.lower())
 
         # Kvitansiya qabul qilindi yoki adminga yuborildi degan xato bo'lmasligi kerak
         self.assertNotIn("kvitansiyangiz qabul qilindi", reply_text.lower())

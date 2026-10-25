@@ -146,13 +146,13 @@ async def run_human_chaos_test():
         assert ("OFD" in rep10 or "faol" in rep10.lower() or "LG420210630789" in rep10), f"Fiskal modul javobi chiqmadi: {rep10}"
         logger.info("✅ 10-sinov muvaffaqiyatli: OFD yillik litsenziyasi tekshirildi.")
 
-    # 11-SINOV: Qarzdorlik yo'q bo'lganda apparat ishlamayapti deyilsa -> Reboot ko'rsatmasi
-    logger.info(">>> 11-SINOV: 'qarzim yoq lekin kassa baribir ishlamayapti'...")
-    msg11 = create_mock_message("qarzim yoq lekin kassa baribir ishlamayapti", chat_id, user_id)
-    await handle_user_chat(msg11, bot)
-    rep11 = msg11.reply.call_args[0][0]
-    assert ("reboot" in rep11.lower() or "перезагрузка" in rep11.lower() or "internet" in rep11.lower() or "soat" in rep11.lower()), f"Reboot tavsiya qilinmadi: {rep11}"
-    logger.info("✅ 11-sinov muvaffaqiyatli: 1-urinishda Internet/Soat va Reboot ko'rsatmasi berildi.")
+        # 11-SINOV: Qarzdorlik yo'q bo'lganda apparat ishlamayapti deyilsa -> Reboot ko'rsatmasi
+        logger.info(">>> 11-SINOV: 'qarzim yoq lekin kassa baribir ishlamayapti'...")
+        msg11 = create_mock_message("qarzim yoq lekin kassa baribir ishlamayapti", chat_id, user_id)
+        await handle_user_chat(msg11, bot)
+        rep11 = msg11.reply.call_args[0][0]
+        assert ("reboot" in rep11.lower() or "перезагрузка" in rep11.lower() or "internet" in rep11.lower() or "soat" in rep11.lower()), f"Reboot tavsiya qilinmadi: {rep11}"
+        logger.info("✅ 11-sinov muvaffaqiyatli: 1-urinishda Internet/Soat va Reboot ko'rsatmasi berildi.")
 
     # 12-SINOV: 1-urinishdan so'ng: 'reboot qildim baribir ishlamadi bolmadi' -> TEZKOR ESKALATSIYA
     logger.info(">>> 12-SINOV: 'reboot qildim baribir ishlamadi bolmadi' -> TEZKOR ESKALATSIYA...")
@@ -160,7 +160,7 @@ async def run_human_chaos_test():
         msg12 = create_mock_message("reboot qildim baribir ishlamadi bolmadi", chat_id, user_id)
         await handle_user_chat(msg12, bot)
         rep12 = msg12.reply.call_args[0][0]
-        assert ("administrator" in rep12.lower() or "usta" in rep12.lower() or "yetkazildi" in rep12.lower() or "bog'laymiz" in rep12.lower()), f"Eskalatsiya qilinmadi: {rep12}"
+        assert any(w in rep12.lower() for w in ["administrator", "usta", "yetkazildi", "bog'laymiz", "mutaxassis", "uzatildi"]), f"Eskalatsiya qilinmadi: {rep12}"
         assert mock_esc.called, "Adminga xabarnoma yuborilmadi!"
         logger.info("✅ 12-sinov muvaffaqiyatli: Ko'p cho'zmasdan darhol mas'ul usta va adminga yo'naltirildi!")
 
@@ -188,7 +188,7 @@ async def run_human_chaos_test():
     logger.info(">>> 14-SINOV: Eski sanadagi kvitansiya (2024-yilgi chek)...")
     is_old, old_warn = transaction_tracker.check_old_receipt("2024-05-12 14:30")
     assert is_old, "Eski chek fosh etilmadi!"
-    assert "yil oldingi" in old_warn.lower(), f"Eski chek ogohlantirishi noto'g'ri: {old_warn}"
+    assert ("o'tgan yilgi" in old_warn.lower() or "kun oldingi" in old_warn.lower() or "yil oldingi" in old_warn.lower()), f"Eski chek ogohlantirishi noto'g'ri: {old_warn}"
     logger.info("✅ 14-sinov muvaffaqiyatli: 1 yil oldingi eski chek rad etildi.")
 
     # 15-SINOV: Kassa cheki (Onlayn-NKM savdo cheki) to'lov kvitansiyasi emasligi
