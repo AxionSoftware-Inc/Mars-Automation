@@ -472,6 +472,13 @@ class GroupResponseOrchestrator:
             "to'langan lekin", "pul o'tdi", "ечилди", "тўладим лекин"
         ]) and any(w in lower_text for w in ["yonmadi", "yoqmadi", "ishlamadi", "ochilmadi", "hali", "xali", "blok"])
 
+        # =====================================================================
+        # 4.4 QARZ E'TIROZI VA TO'LOV TARIXI ("to'laganmanku", "nimaga qarzga chiqdi", "to'lov tarixi")
+        # =====================================================================
+        if is_debt_inquiry(message):
+            await handle_debt_inquiry(message)
+            return True
+
         is_billing_or_payment_intent = (
             bool(found_fm)
             or is_annual_check_intent(clean_text)

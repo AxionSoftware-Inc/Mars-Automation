@@ -178,111 +178,46 @@ async def send_how_to_pay_video(
 # 2. FORMATLANGAN REKVIZIT KARTALARI
 # =============================================================================
 
-def get_monthly_payment_card() -> str:
+def get_monthly_payment_card(script: str = "latin") -> str:
     """Oylik abonent to'lovi (Mars Elektron Texnika) uchun aniq rekvizitlar kartasi"""
-    return (
-        "💳 <b>OYLIK ABONENT TO'LOVI REKVIZITLARI</b>\n\n"
-        "🏢 <b>Tashkilot:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
-        "🏦 <b>Hisob raqam (X/R):</b> <code>20208000800208044003</code>\n"
-        "🏛 <b>Bank:</b> «Ipak Yo'li» AITB Shahrisabz filiali\n"
-        "🔢 <b>MFO:</b> <code>01048</code> | <b>INN (STIR):</b> <code>302568138</code>\n"
-        "💰 <b>Summa:</b> <b>100 000 so'm</b> (har oy uchun)\n"
-        "⏰ <b>To'lov muddati:</b> Har oyning <b>6-sanasigacha</b>\n"
-        "📝 <b>To'lov maqsadi:</b> <code>INN [korxona INN] Abonent to'lovi 100 000 so'm</code>\n"
-        "👨‍💻 <b>Hududiy THKM mas'ul xodimi:</b> @quvonchbek_admin, @Yashnarbek_butaev\n\n"
-        "📲 <b>Click orqali to'lash:</b>\n"
-        "Click dasturi -> <i>To'lovlar</i> -> <i>Rekvizit bo'yicha to'lov</i> (yoki <i>Xizmatlar</i> -> <i>Mars Elektron Texnika</i>)"
-    )
+    from templates import get_monthly_payment_card as _tpl
+    return _tpl(script=script)
 
 
-def get_annual_payment_card() -> str:
+def get_annual_payment_card(script: str = "latin") -> str:
     """Yillik fiskal modul to'lovi (Yangi Texnologiyalar DUK) uchun aniq rekvizitlar kartasi"""
-    return (
-        "🏛 <b>YILLIK FISKAL MODUL TO'LOVI REKVIZITLARI</b>\n\n"
-        "🏢 <b>Tashkilot:</b> «Yangi Texnologiyalar» DUK (Davlat Soliq Qo'mitasi)\n"
-        "🏦 <b>Hisob raqam (X/R):</b> <code>20210000100431200010</code>\n"
-        "🏛 <b>Bank:</b> ATB «Kapitalbank» Toshkent\n"
-        "🔢 <b>MFO:</b> <code>01018</code> | <b>INN (STIR):</b> <code>201589463</code>\n"
-        "🔑 <b>To'lov kodi:</b> <code>00668</code>\n"
-        "💰 <b>Summa:</b> <b>440 000 so'm</b> (1 yilga)\n"
-        "📝 <b>To'lov maqsadi:</b> <code>INN [korxona INN] fiskal modulning yillik to'lovi</code>\n"
-        "👨‍💻 <b>Hududiy THKM mas'ul xodimi:</b> @quvonchbek_admin, @Yashnarbek_butaev\n\n"
-        "⏳ <b>Ishga tushish vaqti:</b> To'lov qilingandan so'ng <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda Soliq tizimi tomonidan avtomatik uzaytiriladi.\n\n"
-        "⚠️ <b>DIQQAT:</b> Ushbu to'lov Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) ga qaratilgan bo'lib, «Mars Elektron Texnika» oylik abonent to'lovidan mutlaqo alohidadir!"
-    )
+    from templates import get_annual_payment_card as _tpl
+    return _tpl(script=script)
 
 
-def get_all_payment_accounts_card() -> str:
+def get_all_payment_accounts_card(script: str = "latin") -> str:
     """Ikkala hisob raqamni aniq ajratib ko'rsatuvchi to'liq karta"""
-    return (
-        "💳 <b>SMART POS KASSA APPARATLARI UCHUN TO'LOV REKVIZITLARI</b>\n\n"
-        "⚠️ <b>QAT'IY QOIDA:</b> Oylik abonent to'lovi va Yillik fiskal modul to'lovi <b>2 xil alohida tashkilotga</b> to'lanadi. Ularni mutlaqo adashtirmaslik lozim!\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "1️⃣ <b>OYLIK ABONENT TO'LOVI (Har oyning 6-sanasigacha):</b>\n"
-        "🏢 <b>Kompaniya:</b> «MARS ELEKTRON TEXNIKA» MCHJ\n"
-        "🏦 <b>Hisob raqam (X/R):</b> <code>20208000800208044003</code>\n"
-        "🏛 <b>Bank:</b> «Ipak Yo'li» AITB Shahrisabz, MFO: <code>01048</code>\n"
-        "🔢 <b>INN:</b> <code>302568138</code> | 💰 <b>Summa:</b> 100 000 so'm\n"
-        "📝 <b>To'lov maqsadi:</b> <code>INN [korxonangiz INN] abonent to'lov</code>\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "2️⃣ <b>YILLIK FISKAL MODUL TO'LOVI (Yilda 1 marta):</b>\n"
-        "🏢 <b>Tashkilot:</b> «Yangi Texnologiyalar» DUK (Davlat Soliq Qo'mitasi)\n"
-        "🏦 <b>Hisob raqam (X/R):</b> <code>20210000100431200010</code>\n"
-        "🏛 <b>Bank:</b> ATB «Kapitalbank» Toshkent, MFO: <code>01018</code>\n"
-        "🔢 <b>INN:</b> <code>201589463</code> | 🔑 <b>To'lov kodi:</b> <code>00668</code>\n"
-        "💰 <b>Summa:</b> 440 000 so'm (1 yillik sertifikat)\n"
-        "📝 <b>To'lov maqsadi:</b> <code>INN [korxonangiz INN] fiskal modulning yillik to'lovi</code>\n"
-        "👨‍💻 <b>Hududiy THKM mas'ul xodimi:</b> @quvonchbek_admin, @Yashnarbek_butaev (2-24 soat ichida faollashadi)\n\n"
-        "📲 <i>Ikkala to'lovni ham Click orqali «Rekvizit bo'yicha to'lov» bo'limida amalga oshirish mumkin.</i>"
-    )
+    from templates import get_all_payment_accounts_card as _tpl
+    return _tpl(script=script)
 
 
 def get_monthly_post_note(script: str = "latin") -> str:
     """Kanaldan uzatilgan 85-post (Oylik abonent) tagidan yuboriladigan qo'shimcha eslatma"""
-    from translit_manager import adapt_to_user_script
-    text = (
-        "💡 <b>Eslatma:</b> Ushbu hisob raqam <b>«MARS ELEKTRON TEXNIKA» MCHJ</b> ga Smart POS apparatlariga oylik servis va dasturiy ta'minot xizmati uchun (100 000 so'm/oy).\n"
-        "⏰ <b>Muddat:</b> Har oyning <b>6-sanasigacha</b> to'lanishi shart.\n\n"
-        "💡 <i>To'lov qilish tartibini ko'rish uchun «Qanday to'lanadi» deb yozishingiz mumkin.</i>"
-    )
-    return adapt_to_user_script(text, script)
+    from templates import get_monthly_post_note as _tpl
+    return _tpl(script=script)
 
 
 def get_annual_post_note(script: str = "latin") -> str:
     """Kanaldan uzatilgan 34-post (Yillik fiskal modul) tagidan yuboriladigan qo'shimcha eslatma"""
-    from translit_manager import adapt_to_user_script
-    text = (
-        "💡 <b>Eslatma:</b> Ushbu hisob raqam Davlat Soliq Qo'mitasi huzuridagi <b>«Yangi Texnologiyalar» DUK</b> ga 1 yillik fiskal modul sertifikati uchun (440 000 so'm/yil).\n"
-        "⏳ <b>Faollashishi:</b> To'lov qilingach <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda Soliq tizimida avtomatik ishga tushadi.\n"
-        "⚠️ <b>DIQQAT:</b> Ushbu to'lov «Mars Elektron Texnika» oylik to'lovidan mutlaqo alohidadir!\n\n"
-        "💡 <i>To'lov qilish tartibini ko'rish uchun «Qanday to'lanadi» deb yozishingiz mumkin.</i>"
-    )
-    return adapt_to_user_script(text, script)
+    from templates import get_annual_post_note as _tpl
+    return _tpl(script=script)
 
 
 def get_both_posts_intro(script: str = "latin") -> str:
     """Ikkala post uzatilishidan oldin adashtirmaslik haqida qat'iy ogohlantirish"""
-    from translit_manager import adapt_to_user_script
-    text = (
-        "⚠️ <b>QAT'IY QOIDA:</b> Smart POS kassa apparatlarida <b>2 xil alohida to'lov</b> mavjud bo'lib, ular <b>2 xil alohida tashkilotga</b> to'lanadi. Ularni mutlaqo adashtirmaslik lozim!\n\n"
-        "1️⃣ <b>Oylik abonent to'lovi (100 000 so'm)</b> — «MARS ELEKTRON TEXNIKA» MCHJ ga\n"
-        "2️⃣ <b>Yillik fiskal modul to'lovi (440 000 so'm)</b> — «Yangi Texnologiyalar» DUK ga\n\n"
-        "👇 <i>Quyida rasmiy kanaldan ikkala hisob raqamning matnli postlari va video-qo'llanmalari uzatilmoqda:</i>"
-    )
-    return adapt_to_user_script(text, script)
+    from templates import get_both_posts_intro as _tpl
+    return _tpl(script=script)
 
 
 def get_fiscal_module_request_prompt(script: str = "latin") -> str:
     """Yillik to'lovni tekshirish uchun Fiskal modul so'rash va uning nimaligini tushuntirish"""
-    from translit_manager import adapt_to_user_script
-    text = (
-        "🏛 <b>Yillik Soliq (OFD) to'lovini tekshirish uchun Fiskal modul seriya raqamini (FM) yuboring:</b>\n\n"
-        "📌 <b>Seriya raqami:</b> <code>LG...</code> yoki <code>YG...</code> bilan boshlanadi.\n"
-        "🔎 <b>Qayerdan topasiz:</b> Kassa chekining pastki qismida yoki apparat orqasidagi oq yorliq (nakleyka)da (masalan: <code>LG420210630789</code>).\n"
-        "📸 Chekning pastki qismini rasmga olib yuborsangiz ham bo'ladi.\n\n"
-        "👇 <i>Quyida kassa chekidan Fiskal modulni topish namunasi uzatildi:</i>"
-    )
-    return adapt_to_user_script(text, script)
+    from templates import get_fiscal_module_request_prompt as _tpl
+    return _tpl(script=script)
 
 
 # =============================================================================
@@ -295,109 +230,8 @@ def get_mxik_guidance(query: str = "") -> Tuple[str, int]:
     Hech qachon o'zidan 17 xonali kod to'qimaydi, doim tasnif.soliq.uz ga yo'naltiradi.
     Qaytaradi: (tushuntirish_matni, video_post_id)
     """
-    q = query.lower()
-
-    # 1. Kassa apparatiga ma'lumotlar va tovarlar bazasini yuklash (Post 138)
-    if any(w in q for w in [
-        "baza yuklash", "baza yuklasa", "baza kiritish", "excel", "exceldan",
-        "tovarlar bazasi", "tovar bazasi", "baza", "база", "база юклаш", "эксель", "эксел"
-    ]):
-        text = (
-            "📥 <b>Kassa apparatiga tovarlar bazasini yuklash:</b>\n\n"
-            "Kassa apparatiga barcha tovar va xizmatlar ro'yxatini (nomi, narxi, MXIK kodi va shtrix-kodi bilan) "
-            "Excel fayli orqali bir vaqtning o'zida ommaviy yuklash mumkin.\n\n"
-            "📌 <b>Tartibi:</b>\n"
-            "1. Shaxsiy kabinet yoki kassa dasturidan namunaviy Excel faylni yuklab oling;\n"
-            "2. Tovarlaringiz nomi, narxi va rasmiy MXIK kodlarini jadvalga kiriting;\n"
-            "3. Tayyor faylni kassa apparatiga yuklang."
-        )
-        return text, 138
-
-    # 2. Tovarni otkaz (bekor) qilish va qaytadan to'g'rilab urish (Post 53)
-    if any(w in q for w in [
-        "otkaz", "bekor qilish", "bekor qilsa", "bekor", "qaytadan urish", "qaytadan to'g'rilab",
-        "chekni bekor", "tovarni bekor", "отказ", "бекор", "бекор қилиш", "қайтадан уриш"
-    ]):
-        text = (
-            "🔄 <b>Tovarni otkaz (bekor) qilish va qaytadan to'g'rilab urish:</b>\n\n"
-            "Chek urish jarayonida xato tovar yoki noto'g'ri narx tanlangan bo'lsa, uni chek yakunlanishidan oldin bekor qilish mumkin.\n\n"
-            "📌 <b>Tartibi:</b>\n"
-            "1. Savatchadagi xato tovar ustiga bosing va <b>«Otkaz» (Bekor qilish)</b> tugmasini tanlang;\n"
-            "2. Agar chek to'liq urib bo'lingan bo'lsa, qaytarish (vozvrat) chekini chiqaring;\n"
-            "3. To'g'ri tovar va narxni kiritib chekni qaytadan uring."
-        )
-        return text, 53
-
-    # 3. Fiskal chekda QQS stavkasi va MXIK talablari (Post 89)
-    if any(w in q for w in [
-        "qqs", "nds", "soliq stavka", "qqs stavka", "12%", "stavka", "ққс", "ндс", "ставка"
-    ]):
-        text = (
-            "📊 <b>Fiskal chekda QQS stavkasi va MXIK talablari:</b>\n\n"
-            "Vazirlar Mahkamasining 943-sonli qaroriga muvofiq, QQS to'lovchi tadbirkorlar chekda 12% QQS stavkasi va tovarning to'g'ri MXIK kodini ko'rsatishlari shart.\n\n"
-            "📌 <b>QQS sozlamasi:</b>\n"
-            "Kassa dasturida tovar qo'shish vaqtida soliq stavkasini korxonangiz soliq rejimiga qarab (12% yoki 0% QQSiz) to'g'ri belgilang."
-        )
-        return text, 89
-
-    # 4. Naqdga savdo qilib bo'lmaydigan tovarlar (Post 133)
-    if any(w in q for w in [
-        "zapravka", "alkogol", "tamaki", "naqd", "naqt", "bloklab urish",
-        "заправка", "алкогол", "тамаки", "нақд", "накт"
-    ]):
-        text = (
-            "🚫 <b>Naqd pulga savdo qilib bo'lmaydigan MXIK tovarlar:</b>\n\n"
-            "Soliq talabiga ko'ra, <b>Zapravkalar, Alkogol, Tamaki</b> va davlat tashkilotlari xizmatlari MXIK kodi kiritilganda naqd pulga chek urib bo'lmaydi.\n\n"
-            "📌 <b>Tavsiya:</b>\n"
-            "Bunday holatda to'lovni bank kartasi orqali amalga oshiring yoki apparat dasturini yangilang."
-        )
-        return text, 133
-
-    # 5. Tekshirish yoki soliq jarimasi (Post 17)
-    if any(w in q for w in [
-        "tekshirish", "jarima", "soliq jarima", "xato kod", "to'g'rilash", "togrilash",
-        "tekshir", "текшириш", "жарима", "солиқ жарима", "солик жарима", "хато код", "тўғрилаш", "тогрилаш"
-    ]):
-        text = (
-            "⚠️ <b>Tovarlardagi MXIK kodni tekshirish va soliq jarimalari:</b>\n\n"
-            "Soliq qonunchiligiga (VMQ-943) ko'ra, chekda noto'g'ri yoki faoliyatingizga mos kelmaydigan MXIK kodi ko'rsatilsa, soliq organlari tomonidan <b>jarima</b> qo'llaniladi.\n\n"
-            "📌 <b>Nimalarga e'tibor berish lozim:</b>\n"
-            "🔹 Tovarlaringiz MXIK kodi to'g'ri tanlanganini tekshiring;\n"
-            "🔹 O'lchov birligi (dona, kg, litr) mos kelishini nazorat qiling;\n"
-            "🔹 Xato kiritilgan tovarlarni kassa dasturidan to'g'irlab qo'ying."
-        )
-        return text, 17
-
-    # 6. Tasnif sayti, soliq saytidan kod qidirish, qayerdan olinadi yoki aniq tovar kodi so'ralsa (Post 28)
-    if any(w in q for w in [
-        "tasnif", "soliq sayt", "soliqdan", "sayt", "qidirish", "topish", "qayerdan", "qayerdan olaman",
-        "qanday olinadi", "soliq portali", "kodini", "kodi qanaqa", "kodi nima", "kod bering", "kod tashlang",
-        "тасниф", "солиқ сайт", "солик сайт", "сайт", "қидириш", "кидириш", "топиш", "қаердан", "каердан",
-        "қандай олинади", "коди қанақа", "коди нима"
-    ]):
-        text = (
-            "🔍 <b>MXIK kodlarni Tasnif.soliq.uz saytidan qidirish:</b>\n\n"
-            "Davlat Soliq Qo'mitasining rasmiy <b>tasnif.soliq.uz</b> portali orqali har qanday tovar yoki xizmatning 17 xonali MXIK (IKPU) kodini aniq topishingiz mumkin.\n\n"
-            "⚠️ <b>Muhim:</b> Soliq jarimalariga tushmaslik uchun mahsulot va xizmatlarning rasmiy kodlarini faqat Soliq qo'mitasining <b>tasnif.soliq.uz</b> portalidan oling.\n\n"
-            "📌 <b>Tartibi:</b>\n"
-            "1. <a href='https://tasnif.soliq.uz'>tasnif.soliq.uz</a> saytiga kiring;\n"
-            "2. Qidiruv qatoriga tovaringiz nomini yozing (masalan: <i>Non</i>, <i>Kiyim</i>, <i>Xizmat</i>);\n"
-            "3. Korxonangiz faoliyatiga mos 17 xonali MXIK kodni nusxalab oling;\n"
-            "4. Kassa apparatiga tovar qo'shishda ushbu kodni kiriting."
-        )
-        return text, 28
-
-    # 7. Asosiy: Tovar qo'shish va MXIK kod kiritish tartibi (Post 15)
-    text = (
-        "📦 <b>Tovarlarni qo'shish va MXIK kod kiritish tartibi:</b>\n\n"
-        "<b>MXIK (ИКПУ)</b> — bu Mahsulot va xizmatlarning yagona identifikatsiya kodi bo'lib, har bir fiskal chekda aks ettirilishi shart (Davlat Soliq Qo'mitasi talabi).\n\n"
-        "📌 <b>Kassa apparatiga tovar qo'shish bosqichlari:</b>\n"
-        "1. Kassa dasturida <b>«Tovar qo'shish»</b> bo'limiga kiring;\n"
-        "2. Tovar nomini va narxini yozing;\n"
-        "3. <b>tasnif.soliq.uz</b> saytidan olingan 17 xonali MXIK kodni kiriting;\n"
-        "4. O'lchov birligini tanlab saqlang."
-    )
-    return text, 15
+    from templates import get_mxik_guidance_template as _tpl
+    return _tpl(query=query)
 
 
 # =============================================================================
@@ -418,6 +252,9 @@ def classify_payment_intent(text: str) -> Optional[str]:
     - 'both': Umumiy to'lov / barcha rekvizitlar
     - None: To'lov rekviziti so'ralmagan
     """
+    if is_debt_inquiry_or_objection(text):
+        return None
+
     t = _normalize_payment_text(text)
 
     # Agar savol qarz/tekshirish/muddat/sana, kelgan-kelmaganlik yoki davomiy holat so'rovi ("-kachi", "-danchi", "yillikchi") bo'lsa va unda aniq hisob raqam/shot/rekvizit so'ralmagan bo'lsa -> rekvizit intenti emas!
@@ -657,7 +494,7 @@ def classify_receipt_target(recipient_account: str, amount: float, raw_text: str
 
 def is_annual_check_intent(text: str) -> bool:
     """Foydalanuvchi yillik to'lov yoki fiskal modul (OFD/Soliq) qarzdorligini tekshirishni so'rayaptimi?"""
-    if is_mxik_intent(text):
+    if is_mxik_intent(text) or is_debt_inquiry_or_objection(text):
         return False
 
     t = _normalize_payment_text(text)
@@ -732,7 +569,7 @@ def is_annual_check_intent(text: str) -> bool:
 
 def is_monthly_check_intent(text: str) -> bool:
     """Foydalanuvchi oylik abonent to'lovi (Mars) qarzdorligini tekshirishni so'rayaptimi?"""
-    if is_mxik_intent(text):
+    if is_mxik_intent(text) or is_debt_inquiry_or_objection(text):
         return False
 
     t = _normalize_payment_text(text)
@@ -790,6 +627,8 @@ def is_monthly_check_intent(text: str) -> bool:
 
 def is_both_check_intent(text: str) -> bool:
     """Foydalanuvchi ikkala to'lov (oylik va yillik) yoki umumiy qarzdorlikni so'rayaptimi?"""
+    if is_debt_inquiry_or_objection(text):
+        return False
     t = _normalize_payment_text(text)
     phrases = [
         "ikkalasidanchi", "ikkalasidan", "ikkala tolov", "ikkala to'lov", "ikkalasiyam",
@@ -844,6 +683,101 @@ def is_general_debt_check_intent(text: str) -> bool:
     return False
 
 
+def is_debt_inquiry_or_objection(text: str) -> bool:
+    """
+    Foydalanuvchi qarzdan e'tiroz/norozilik bildirayotganini yoki to'lov tarixini so'rayotganini aniqlash.
+    (Masalan: 'tulaganmanku', 'to'lagandimku', 'nimaga qarzga chiqdi', 'to'laganmizku', 'to'lov tarixi' va h.k.)
+    Bu holatda kvitansiya so'ramay, oylik to'lovlar tarixini lo'nda va aniq ro'yxat qilib chiqarish lozim!
+    """
+    if not text:
+        return False
+    t = _normalize_payment_text(text)
+
+    # 1. Aniq e'tiroz va norozilik iboralari (-ku bilan yoki to'langanligi e'tirozi)
+    objection_phrases = [
+        # Lotin
+        "to'laganmanku", "tolaganmanku", "tulaganmanku", "tölaganmanku", "tòlaganmanku",
+        "to'lagandimku", "tolagandimku", "tulagandimku", "to'lagandim-ku", "tolagandim-ku",
+        "to'ladimku", "toladimku", "tuladimku", "to'ladim-ku", "toladim-ku",
+        "to'ladikku", "toladikku", "tuladikku", "to'ladik-ku",
+        "to'laganmizku", "tolaganmizku", "tulaganmizku", "to'lagandikku", "tolagandikku",
+        "to'lagan edimku", "tolagan edimku", "tulagan edimku", "to'lagan edikku", "tolagan edikku",
+        "to'langan ediku", "tolangan ediku", "to'langaniku", "tolanganiku", "to'langanku", "tolanganku",
+        "to'langan edi", "tolangan edi", "to'lagan edim", "tolagan edim",
+        "to'lov qilganmanku", "tolov qilganmanku", "tulov qilganmanku",
+        "to'lov qilgandimku", "tolov qilgandimku", "tulov qilgandimku",
+        "to'lov qildimku", "tolov qildimku", "tulov qildimku",
+        "to'lab bo'lganmanku", "tolab bolganmanku", "to'lab qo'yganmanku", "tolab qoyganmanku",
+        "to'lab bo'lgandimku", "tolab bolgandimku", "to'lab qo'ygandimku", "tolab qoygandimku",
+        "pul o'tkazganmanku", "pul otkazganmanku", "pul to'laganmanku", "pul tolaganmanku",
+        "pul to'ladimku", "pul toladimku", "pul tuladimku", "pul o'tkazdimku", "pul otkazdimku",
+        "to'lagandima", "tolagandima", "tulagandima", "to'laganmanu", "tolaganmanu",
+        "to'laganman axir", "tolaganman axir", "to'lagandik axir",
+
+        # Nimaga / nega / qayerdan qarzga chiqdi
+        "nimaga qarzga chiqdi", "nega qarzga chiqdi", "qayerdan qarzga chiqdi", "qanaqasiga qarzga chiqdi",
+        "nimaga qarz chiqdi", "nega qarz chiqdi", "qayerdan qarz chiqdi",
+        "nimaga qarz bo'ldi", "nega qarz bo'ldi", "nimaga qarz boldi", "nega qarz boldi",
+        "nimaga qarz chiqyapti", "nega qarz chiqyapti", "nimaga qarz chiqvotti", "nega qarz chiqvotti",
+        "nimaga qarz ko'rsatyapti", "nega qarz korsatyapti", "nimaga qarz beryapti", "nega qarz beryapti",
+        "nimaga qarz", "nega qarz", "qayerdan qarz", "qanaqa qarz", "qanaqasiga qarz", "qanaqa qarz bu",
+        "qayerdan kelib chiqdi", "qayerdan chiqdi", "qayerdan bu qarz", "qayerdan keldi bu qarz",
+        "qarzim yo'qku", "qarzim yoqku", "qarzim yuqku", "qarz yo'qku", "qarz yoqku", "qarz yuqku",
+        "qarz emas ediku", "qarzmas ediku", "qarzmasku", "qarz emasku",
+        "qarzim yo'q edi", "qarzim yoq edi", "qarz yo'q edi",
+        "summa noto'g'ri", "summa notogri", "noto'g'ri qarz", "notogri qarz", "xato qarz",
+
+        # To'lov tarixi so'rovlari
+        "to'lov tarixi", "tolov tarixi", "tulov tarixi", "tarixni ko'rsat", "tarixni korsat", "to'lovlar tarixi",
+        "qachon to'laganman", "qachon tolaganman", "qachon to'lagandim", "qachon tolagandim",
+        "qachon to'langan", "qachon tolangan", "qachon to'lov qilganman", "qachon tolov qilganman",
+        "qaysi oy", "qaysi oylar", "qaysi oyga to'langan", "qaysi oyga tolangan",
+        "qaysi oylarga to'langan", "qaysi oylarga tolangan", "qaysi oy uchun qarz", "qaysi oylar uchun qarz",
+        "qaysi oylar to'lanmagan", "qaysi oylar tolanmagan", "qaysi oylardan qarz",
+
+        # Kirill
+        "тўлаганманку", "тулаганманку", "толаганманку",
+        "тўлагандимку", "тулагандимку", "толагандимку",
+        "тўладимку", "туладимку", "толадимку",
+        "тўладикку", "туладикку", "толадикку",
+        "тўлаганмизку", "тулаганмизку", "толаганмизку",
+        "тўланганку", "туланганку", "толанганку",
+        "тўланган эдику", "туланган эдику", "тўлаган эдикку",
+        "тўланган эди", "туланган эди", "тўлаган эдим",
+        "тўлов қилганманку", "тулов килганманку",
+        "тўлов қилдимку", "тулов килдимку",
+        "пул тўладимку", "пул тўлаганманку", "пул ўтказганманку", "пул утказганманку",
+        "нимага қарзга чиқди", "нега қарзга чиқди", "қаердан қарзга чиқди", "қанақасига қарзга чиқди",
+        "нимага қарз чиқди", "нега қарз чиқди", "қаердан қарз чиқди",
+        "нимага қарз бўлди", "нега қарз бўлди", "нимага қарз бўляпти", "нега қарз бўляпти",
+        "нимага қарз кўрсатяпти", "нега қарз кўрсатяпти",
+        "нимага қарз", "нега қарз", "қаердан қарз", "қанақа қарз", "қанақасига қарз",
+        "қаердан келиб чиқди", "қаердан чиқди", "қаердан бу қарз",
+        "қарзим йўқку", "қарзим йукку", "қарз йўқку", "қарз йукку",
+        "қарз эмас эдику", "қарзмаску", "сумма нотўғри", "нотўғри қарз",
+        "тўлов тарихи", "тулов тарихи", "тарихни кўрсат", "тарихни курсат",
+        "қачон тўлаганман", "қачон тулаганман", "қайси ойларга тўланган", "қайси ойлар учун қарз"
+    ]
+    if any(op in t for op in objection_phrases):
+        return True
+
+    # 2. To'lov so'zi va qarz/e'tiroz so'zlari birgalikda kelsa
+    # Masalan: "to'laganman qarz emas", "qarzim yo'q to'lagandim", "to'lagan edim lekin qarz chiqyapti"
+    has_paid_word = any(w in t for w in [
+        "to'lagan", "tolagan", "tulagan", "to'lagandim", "tolagandim", "tulagandim",
+        "to'lov qilgan", "tolov qilgan", "pul to'lagan", "pul o'tkazgan",
+        "тўлаган", "тулаган", "толаган", "тўлагандим", "тулагандим"
+    ])
+    has_objection_context = any(w in t for w in [
+        "qarz", "chiqdi", "chiqyapti", "chiqib", "emas", "yo'q", "yoq", "yuq", "lekin", "ammo", "noto'g'ri",
+        "қарз", "чиқди", "чиқяпти", "эмас", "йўқ", "йук", "лекин", "нотўғри"
+    ])
+    if has_paid_word and has_objection_context:
+        return True
+
+    return False
+
+
 def is_payment_claim(text: str) -> bool:
     """
     Foydalanuvchi to'lov qilinganini bildiruvchi xabar yozganmi?
@@ -854,6 +788,11 @@ def is_payment_claim(text: str) -> bool:
     """
     if not text:
         return False
+
+    # Agar bu qarz e'tirozi yoki to'lov tarixi so'rovi bo'lsa -> bu to'lov da'vosi emas!
+    if is_debt_inquiry_or_objection(text):
+        return False
+
     t = _normalize_payment_text(text)
 
     # 1. Kelgusi zamon yoki to'lash istagi / savol bo'lsa -> bu to'lov da'vosi emas!
@@ -876,7 +815,6 @@ def is_payment_claim(text: str) -> bool:
         # Lotin
         "to'ladim", "toladim", "tuladim", "tòladim", "töladim",
         "to'ladik", "toladik", "tuladik",
-        "to'ladimku", "toladimku", "tuladimku",
         "to'lab bo'ldim", "tolab boldim", "tulab buldim",
         "to'lab bo'ldik", "tolab boldik", "tulab buldik",
         "to'lab qo'ydim", "tolab qoydim", "tulab quydim",
@@ -903,7 +841,7 @@ def is_payment_claim(text: str) -> bool:
         "pul o'tkazildi", "pul otkazildi", "pul tashladim", "pul tashladik", "pul tashadim", "pul tashadik",
         "pul tashlab qo'ydim", "pul tashlab qoydim", "pul tashavorganman", "pul tashavorganmiz",
         "pul to'ladim", "pul toladim", "pul tuladim",
-        "to'laganman", "tolaganman", "tulaganman", "to'laganmanku", "tolaganmanku",
+        "to'laganman", "tolaganman", "tulaganman",
         "to'lagandim", "tolagandim", "tulagandim", "to'lagandik", "tolagandik",
         "to'langan", "tolangan", "tulangan", "to'langan edi", "tolangan edi",
         "to'landi", "tolandi", "tulandi",
@@ -925,7 +863,6 @@ def is_payment_claim(text: str) -> bool:
         # Kirill
         "тўладим", "туладим", "толадим",
         "тўладик", "туладик", "толадик",
-        "тўладимку", "туладимку", "толадимку",
         "тўлаб бўлдим", "тулаб булдим", "толаб болдим",
         "тўлаб бўлдик", "тулаб булдик", "толаб болдик",
         "тўлаб қўйдим", "тулаб куйдим", "толаб койдим",
@@ -946,7 +883,7 @@ def is_payment_claim(text: str) -> bool:
         "тўлов қилиб қўйдим", "тулов килиб куйдим",
         "пул ўтказдим", "пул откасдим", "пул отказиб куйдим", "пул ўтказдик", "пул откасдик",
         "пул ташладим", "пул ташладик", "пул тўладим", "пул толадим", "пул туладим",
-        "тўлаганман", "тулаганман", "толаганман", "тўлаганманку", "тулаганманку",
+        "тўлаганман", "тулаганман", "толаганман",
         "тўлагандим", "тулагандим", "толагандим", "тўлагандик", "тулагандик",
         "тўланган", "туланган", "тўланди", "туланди",
         "кликдан тўладим", "кликдан туладим", "клик килдим",
@@ -1235,50 +1172,6 @@ def parse_ofd_reply_status(ofd_text: Optional[str]) -> str:
 
 def format_ofd_annual_status(fm_code: str, ofd_text: Optional[str], script: str = "latin") -> str:
     """@ofd943_bot javobini tahlil qilib, qisqa va aniq qarz bor/yo'qligini xabar qilish"""
-    from translit_manager import adapt_to_user_script
-
-    clean_code = str(fm_code).strip()
-    is_inn = len(clean_code) in (9, 14) and clean_code.isdigit()
-    code_label = f"🔢 <b>СТИР (INN):</b> <code>{clean_code}</code> (Fiskal modul)" if is_inn else f"🏛 <b>Fiskal modul:</b> <code>{clean_code}</code>"
-
-    status = parse_ofd_reply_status(ofd_text)
-
-    if status == "unavailable":
-        res = (
-            f"{code_label}\n\n"
-            f"ℹ️ <b>Yillik Davlat Soliq (OFD) litsenziyasi bo'yicha ma'lumot:</b>\n\n"
-            f"Davlat Soliq Qo'mitasi («Yangi Texnologiyalar» DUK) talabiga binoan (VMQ-943) har bir onlayn-NKM kassa apparati va <b>Fiskal modul</b> uchun "
-            f"yilda 1 marta <b>440 000 so'm</b> miqdorida yillik litsenziya to'lovi to'lanadi.\n\n"
-            f"📌 <b>Holatni aniqlash va apparatni ishlatish uchun:</b>\n"
-            f"1️⃣ Agar to'lov yaqinda qilingan bo'lsa, soliq tizimida <b>2 soatdan 24 soatgacha</b> bo'lgan muddatda avtomatik uzaytiriladi;\n"
-            f"2️⃣ Apparatda internet (Wi-Fi yoki SIM) va soat/sana to'g'ri ekanini tekshirib, apparatni o'chirib yoqing (Перезагрузка / Reboot).\n\n"
-            f"💳 <i>Yillik to'lov rekvizitlari kerak bo'lsa, «Shot raqam» deb yozing.</i>\n"
-            f"🛠 <i>Usta kerak bo'lsa, «Usta kerak» deb yozing.</i>"
-        )
-        return adapt_to_user_script(res, script)
-
-    if status == "not_found":
-        res = (
-            f"❌ <b>Fiskal modul topilmadi:</b> <code>{fm_code}</code>\n\n"
-            f"Soliq (OFD) tizimida bunday fiskal modul raqami ro'yxatda yo'q. "
-            f"Iltimos, kassa chekining eng pastki qismidagi seriya raqamini to'g'ri kiritganingizni tekshirib qaytadan yuboring.\n"
-            f"Masalan: <code>LG420210630789</code> yoki <code>UZ200701040469</code>."
-        )
-        return adapt_to_user_script(res, script)
-
-    if status == "debt":
-        res = (
-            f"🔴 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK MAVJUD!</b>\n\n"
-            f"{code_label}\n"
-            f"💰 <b>To'lov summasi:</b> <b>440 000 so'm</b> (1 yilga)\n\n"
-            f"💳 <i>To'lov uchun rekvizitlar quyida kanaldan uzatildi (yoki «To'layman» deb yozing).</i>"
-        )
-    else:
-        res = (
-            f"🟢 <b>Yillik Soliq (OFD) to'lovidan QARZDORLIK YO'Q!</b>\n\n"
-            f"{code_label}\n"
-            f"✅ <b>Holati:</b> To'langan va faol (Litsenziya muddati joyida)."
-        )
-
-    return adapt_to_user_script(res, script)
+    from templates import format_ofd_status_template as _tpl
+    return _tpl(fm_code=fm_code, ofd_text=ofd_text, script=script)
 

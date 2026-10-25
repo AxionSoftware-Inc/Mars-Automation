@@ -3,6 +3,10 @@ from aiogram import Router, types, Bot
 from aiogram.filters import Command, CommandStart
 from excel_manager import excel_manager
 from user_memory import user_memory
+from templates import (
+    get_start_template,
+    get_help_template,
+)
 from payment_accounts import (
     get_all_payment_accounts_card,
     get_both_posts_intro,
@@ -20,18 +24,7 @@ async def cmd_start(message: types.Message):
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
     user_script = user_memory.get_preferred_script(chat_id, user_id)
-
-    text = (
-        "👋 <b>Assalomu alaykum!</b>\n\n"
-        "<b>«Mars Elektron Texnika»</b> Smart POS kassa apparatlari rasmiy yordamchi botiga xush kelibsiz!\n\n"
-        "📌 <b>Bot imkoniyatlari:</b>\n"
-        "🔹 <b>Qarzdorlikni tekshirish:</b> INN (9 xonali) yoki JSHSHIR (14 xonali) raqamingizni yuboring\n"
-        "🔹 <b>To'lov ma'lumotlari:</b> /tolov buyrug'ini bosing\n"
-        "🔹 <b>Nosozlik va xatoliklar:</b> Apparat ekranini rasmga olib yuborsangiz, AI xatolik sababini aniqlab beradi\n"
-        "🔹 <b>Sozlamalar va qo'llanmalar:</b> Savolingizni yozsangiz tegishli video-qo'llanma yuboriladi\n"
-        "🔹 <b>Barcha buyruqlar:</b> /help buyrug'i orqali ko'rishingiz mumkin"
-    )
-    text = adapt_to_user_script(text, user_script)
+    text = get_start_template(user_script)
     await message.answer(text, parse_mode="HTML")
 
 
@@ -41,17 +34,7 @@ async def cmd_help(message: types.Message):
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
     user_script = user_memory.get_preferred_script(chat_id, user_id)
-
-    text = (
-        "📖 <b>Mavjud buyruqlar ro'yxati:</b>\n\n"
-        "🔹 /start — Botni qayta ishga tushirish va bosh menyu\n"
-        "🔹 /help — Buyruqlar bo'yicha yordam va yo'riqnoma\n"
-        "🔹 /tekshir <code>[INN/JSHSHIR]</code> — Qarzdorlikni tekshirish (masalan: <code>/tekshir 302568138</code>)\n"
-        "🔹 /tolov — Oylik to'lov rekvizitlari va Click qo'llanmasi\n"
-        "🔹 /tarix — Oxirgi tekshirilgan korxonaning to'lov tarixi\n\n"
-        "💬 <i>Shuningdek, to'g'ridan-to'g'ri INN raqamingizni, apparat ekranidagi nosozlik rasmini yoki savolingizni yuborishingiz mumkin!</i>"
-    )
-    text = adapt_to_user_script(text, user_script)
+    text = get_help_template(user_script)
     await message.answer(text, parse_mode="HTML")
 
 

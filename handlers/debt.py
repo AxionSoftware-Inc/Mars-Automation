@@ -281,20 +281,12 @@ async def process_and_send_debt_result(message: types.Message, bot: Bot, query_n
 
 
 # 1. TO'LOV TARIXI VA QARZ E'TIROZLARI SO'ROVLARI
-DEBT_INQUIRY_KEYWORDS = [
-    "nimaga qarz", "nega qarz", "qayerdan qarz", "qanaqa qarz", "qanaqasiga qarz",
-    "to'lov tarixi", "tolov tarixi", "qachon to'laganman", "qaysi oy", "qaysi oylar",
-    "qayerdan kelib chiqdi", "summa noto'g'ri", "notogri qarz", "qarzim yo'q"
-]
-
 def is_debt_inquiry(message: types.Message) -> bool:
+    """Foydalanuvchi qarzdan norozilik bildirayotganini yoki to'lov tarixini so'rayotganini aniqlash"""
     if not message.text:
         return False
-    from payment_accounts import is_payment_claim
-    if is_payment_claim(message.text):
-        return False
-    t = message.text.lower()
-    return any(kw in t for kw in DEBT_INQUIRY_KEYWORDS)
+    from payment_accounts import is_debt_inquiry_or_objection
+    return is_debt_inquiry_or_objection(message.text)
 
 from core.models import extract_clean_inn, extract_clean_phone, is_incomplete_inn_text
 
@@ -369,13 +361,15 @@ async def handle_debt_inquiry(message: types.Message):
     user_id = message.from_user.id if message.from_user else 0
     chat_id = message.chat.id
     user_script = user_memory.detect_and_update_script(chat_id, user_id, message.text or "")
+    user_memory.clear_escalation(chat_id, user_id)
 
-    last_id = user_memory.get_last_id(chat_id, user_id)
+    found_num = extract_clean_inn(message.text) or extract_clean_phone(message.text)
+    if found_num:
+        last_id = found_num
+    else:
+        last_id = user_memory.get_last_id(chat_id, user_id)
+
     if not last_id:
-        found_num = extract_clean_inn(message.text) or extract_clean_phone(message.text)
-        if found_num:
-            last_id = found_num
-        else:
             w_msg = adapt_to_user_script(
                 "⚠️ <b>To'lov tarixini tekshirish uchun korxona INN (STIR) yoki ro'yxatdan o'tgan telefon raqamingizni yuboring.</b>\n"
                 "Masalan: <code>302568138</code> yoki <code>901234567</code>",
@@ -412,7 +406,7 @@ async def handle_debt_inquiry(message: types.Message):
     total_debt = sum(item.get("debt", 0.0) for item in results) if results else 0.0
     user_memory.set_last_id(chat_id, user_id, primary_id, org_name=org_name, debt=total_debt)
 
-    history_resp = excel_manager.format_payment_history(results)
+    history_resp = excel_manager.format_payment_history(results, chat_id=chat_id, user_id=user_id)
     history_resp = adapt_to_user_script(history_resp, user_script)
     await message.reply(history_resp, parse_mode="HTML")
 

@@ -43,7 +43,6 @@ class TestPaymentClaimStrictVerification(unittest.IsolatedAsyncioTestCase):
             "to'ladim",
             "tuladim",
             "toladim",
-            "to'ladimku",
             "to'lov qildim",
             "pul o'tkazdim",
             "to'lab bo'ldik",
