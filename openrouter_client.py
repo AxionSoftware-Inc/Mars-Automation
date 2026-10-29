@@ -28,7 +28,9 @@ class OpenRouterClient:
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.2,
-        response_format: Optional[Dict[str, str]] = None
+        response_format: Optional[Dict[str, str]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Any] = None
     ) -> Optional[tuple]:
         if not self.api_key:
             logger.error("OpenRouterClient: API kalit mavjud emas!")
@@ -49,8 +51,51 @@ class OpenRouterClient:
 
         if response_format:
             payload["response_format"] = response_format
+        if tools:
+            payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
 
         return headers, payload
+
+    async def chat_completion_with_tools_async(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Any] = None,
+        temperature: float = 0.2
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Asinxron Function/Tool Calling so'rovi.
+        Natija sifatida message obyektini {"content": ..., "tool_calls": [...]} qaytaradi.
+        """
+        built = self._build_payload_and_headers(
+            messages=messages,
+            temperature=temperature,
+            tools=tools,
+            tool_choice=tool_choice
+        )
+        if not built:
+            return None
+        headers, payload = built
+
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        msg = choices[0].get("message", {})
+                        return {
+                            "content": msg.get("content") or "",
+                            "tool_calls": msg.get("tool_calls") or []
+                        }
+                else:
+                    logger.error(f"OpenRouter Tools API xatoligi (status={resp.status_code}): {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"OpenRouter Tools API asinxron so'rovida xatolik: {e}")
+        return None
 
     async def chat_completion_async(
         self,

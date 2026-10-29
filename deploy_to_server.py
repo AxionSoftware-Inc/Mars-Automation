@@ -51,6 +51,8 @@ def deploy():
         'core/__init__.py',
         'core/models.py',
         'core/engine.py',
+        'core/tools.py',
+        'core/ai_agent.py',
         'core/rule_engine.py',
         'core/module_registry.py',
         'core/group_responder.py',
